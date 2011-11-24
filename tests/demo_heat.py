@@ -39,4 +39,4 @@ while( t <= T):
 adj_html("forward.html", "forward")
 adj_html("adjoint.html", "forward")
 
-adjointer.get_adjoint_equation(9, "Drag")
+adjointer.get_forward_equation(0)
