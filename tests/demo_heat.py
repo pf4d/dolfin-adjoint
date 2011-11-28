@@ -39,4 +39,9 @@ while( t <= T):
 adj_html("forward.html", "forward")
 adj_html("adjoint.html", "forward")
 
-adjointer.get_forward_equation(0)
+(lhs, rhs) = adjointer.get_forward_equation(0)
+print lhs
+print rhs
+tmp = Function(V)
+print lhs.__class__
+solve(lhs == rhs, tmp)

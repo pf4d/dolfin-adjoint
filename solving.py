@@ -44,6 +44,7 @@ def solve(*args, **kwargs):
         def identity_assembly_cb(variables, dependencies, hermitian, coefficient, context):
           print "Inside identity_assembly_cb"
           assert coefficient == 1
+          print ufl.Identity(fn_space.dim()).__class__
           return (ufl.Identity(fn_space.dim()), dolfin.Function(fn_space))
 
         adjointer.register_block_assembly_callback(block_name, identity_assembly_cb)
