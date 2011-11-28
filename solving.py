@@ -22,7 +22,13 @@ def solve(*args, **kwargs):
     var = adj_variable_from_coeff(u)
 
     rhs_deps = [adj_variable_from_coeff(coeff) for coeff in ufl.algorithms.extract_coefficients(eq.rhs) if hasattr(coeff, "adj_timestep")]
-    eq = libadjoint.Equation(var, blocks=[diag_block], targets=[var], rhs_deps=rhs_deps)
+
+    def rhs_cb(adjointer, variable, dependencies, values, context):
+      # Need to replace the arguments (implicitly stored in eq.rhs) with the values from the values array!
+      # Otherwise it will evaluate things wrongly, I think ...
+      return eq.rhs
+
+    eq = libadjoint.Equation(var, blocks=[diag_block], targets=[var], rhs_deps=rhs_deps, rhs_cb=rhs_cb)
 
     # we need to check if this is the first equation,
     # so that we can register the appropriate initial conditions
@@ -30,7 +36,11 @@ def solve(*args, **kwargs):
       for rhs_dep in rhs_deps:
         assert rhs_dep.timestep == 0
         identity_block = libadjoint.Block("Identity")
-        initial_eq = libadjoint.Equation(rhs_dep, blocks=[identity_block], targets=[rhs_dep])
+
+        def zero_rhs_cb(adjointer, variable, dependencies, values, context):
+          return None
+
+        initial_eq = libadjoint.Equation(rhs_dep, blocks=[identity_block], targets=[rhs_dep], rhs_cb=zero_rhs_cb)
         adjointer.register_equation(initial_eq)
 
     adjointer.register_equation(eq)
