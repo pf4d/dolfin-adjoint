@@ -14,7 +14,11 @@ adjointer = libadjoint.Adjointer()
 def solve(*args, **kwargs):
   if isinstance(args[0], ufl.classes.Equation):
     # annotate !
-    eq, u, bcs, J, tol, M = dolfin.fem.solving._extract_args(*args, **kwargs)
+    unpacked_args = dolfin.fem.solving._extract_args(*args, **kwargs)
+    eq = unpacked_args[0]
+    u  = unpacked_args[1]
+    bcs = unpacked_args[2]
+    J = unpacked_args[3]
 
     diag_name = hashlib.md5(str(eq.lhs)).hexdigest()
     diag_deps = [adj_variable_from_coeff(coeff) for coeff in ufl.algorithms.extract_coefficients(eq.lhs) if hasattr(coeff, "adj_timestep")]
