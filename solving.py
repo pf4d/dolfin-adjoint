@@ -23,26 +23,33 @@ def solve(*args, **kwargs):
 
     diag_name = hashlib.md5(str(eq.lhs)).hexdigest()
     diag_deps = [adj_variable_from_coeff(coeff) for coeff in ufl.algorithms.extract_coefficients(eq.lhs) if hasattr(coeff, "adj_timestep")]
+    diag_coeffs = [coeff for coeff in ufl.algorithms.extract_coefficients(eq.lhs) if hasattr(coeff, "adj_timestep")]
     diag_block = libadjoint.Block(diag_name, dependencies=diag_deps)
 
     var = adj_variable_from_coeff(u)
 
     rhs_deps = [adj_variable_from_coeff(coeff) for coeff in ufl.algorithms.extract_coefficients(eq.rhs) if hasattr(coeff, "adj_timestep")]
-    rhs_coeffs = ufl.algorithms.extract_coefficients(eq.rhs)
+    rhs_coeffs = [coeff for coeff in ufl.algorithms.extract_coefficients(eq.rhs) if hasattr(coeff, "adj_timestep")]
 
-    def diag_assembly_cb(variables, dependencies, hermitian, coefficient, context):
-      print "Inside assembly of diagonal block"
+    def diag_assembly_cb(dependencies, values, hermitian, coefficient, context):
+
       assert coefficient == 1
       fn_space = u.function_space()
+
+      value_coeffs=[v.data for v in values]
+
+      eq_l=dolfin.replace(eq.lhs, dict(zip(diag_coeffs, value_coeffs)))
+
       if hermitian:
-        return (ufl.operators.transpose(eq.lhs), dolfin.Function(fn_space))
+        return (Matrix(ufl.operators.transpose(eq_l)), Vector(dolfin.Function(fn_space)))
       else:
-        return (eq.lhs, dolfin.Function(fn_space))
+        return (Matrix(eq_l), Vector(dolfin.Function(fn_space)))
 
     def rhs_cb(adjointer, variable, dependencies, values, context):
-      # Need to replace the arguments (implicitly stored in eq.rhs) with the values from the values array!
-      # Otherwise it will evaluate things wrongly, I think ...
-      return eq.rhs
+      # 
+      value_coeffs=[v.data for v in values]
+
+      return Vector(dolfin.assemble(dolfin.replace(eq.rhs, dict(zip(rhs_coeffs, value_coeffs)))))
 
     eq = libadjoint.Equation(var, blocks=[diag_block], targets=[var], rhs_deps=rhs_deps, rhs_cb=rhs_cb)
 
@@ -56,9 +63,9 @@ def solve(*args, **kwargs):
         identity_block = libadjoint.Block(block_name)
 
         def identity_assembly_cb(variables, dependencies, hermitian, coefficient, context):
-          print "Inside identity_assembly_cb"
+
           assert coefficient == 1
-          return (ufl.Identity(fn_space.dim()), dolfin.Function(fn_space))
+          return (Matrix(ufl.Identity(fn_space.dim())), Vector(dolfin.Function(fn_space)))
 
         adjointer.register_block_assembly_callback(block_name, identity_assembly_cb)
 
@@ -82,3 +89,21 @@ def adj_variable_from_coeff(coeff):
 
 def adj_html(*args, **kwargs):
   return adjointer.to_html(*args, **kwargs)
+
+
+class Vector(libadjoint.Vector):
+  def __init__(self, data):
+
+    self.data=data
+
+  def duplicate(self):
+    
+    data=dolfin.Function(self.data.function_space())
+
+    return Vector(data)
+
+class Matrix(libadjoint.Matrix):
+  def __init__(self, data):
+
+    self.data=data
+

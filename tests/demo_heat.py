@@ -39,9 +39,8 @@ while( t <= T):
 adj_html("forward.html", "forward")
 adj_html("adjoint.html", "forward")
 
+print adjointer.equation_count
 (lhs, rhs) = adjointer.get_forward_equation(0)
+print adjointer.equation_count
 print lhs
 print rhs
-tmp = Function(V)
-print lhs.__class__
-solve(lhs == rhs, tmp)
