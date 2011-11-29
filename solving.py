@@ -1,6 +1,7 @@
 import ufl
 import ufl.classes
 import ufl.algorithms
+import ufl.operators
 
 import dolfin.fem.solving
 import dolfin
@@ -29,6 +30,15 @@ def solve(*args, **kwargs):
     rhs_deps = [adj_variable_from_coeff(coeff) for coeff in ufl.algorithms.extract_coefficients(eq.rhs) if hasattr(coeff, "adj_timestep")]
     rhs_coeffs = ufl.algorithms.extract_coefficients(eq.rhs)
 
+    def diag_assembly_cb(variables, dependencies, hermitian, coefficient, context):
+      print "Inside assembly of diagonal block"
+      assert coefficient == 1
+      fn_space = u.function_space()
+      if hermitian:
+        return (ufl.operators.transpose(eq.lhs), dolfin.Function(fn_space))
+      else:
+        return (eq.lhs, dolfin.Function(fn_space))
+
     def rhs_cb(adjointer, variable, dependencies, values, context):
       # Need to replace the arguments (implicitly stored in eq.rhs) with the values from the values array!
       # Otherwise it will evaluate things wrongly, I think ...
@@ -48,7 +58,6 @@ def solve(*args, **kwargs):
         def identity_assembly_cb(variables, dependencies, hermitian, coefficient, context):
           print "Inside identity_assembly_cb"
           assert coefficient == 1
-          print ufl.Identity(fn_space.dim()).__class__
           return (ufl.Identity(fn_space.dim()), dolfin.Function(fn_space))
 
         adjointer.register_block_assembly_callback(block_name, identity_assembly_cb)
