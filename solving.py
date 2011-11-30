@@ -66,8 +66,8 @@ def solve(*args, **kwargs):
 
           assert coefficient == 1
           return (Matrix(ufl.Identity(fn_space.dim())), Vector(dolfin.Function(fn_space)))
-
-        adjointer.register_block_assembly_callback(block_name, identity_assembly_cb)
+        
+        identity_block.assemble=identity_assembly_cb
 
         def zero_rhs_cb(adjointer, variable, dependencies, values, context):
           return None
