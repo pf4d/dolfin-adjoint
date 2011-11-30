@@ -43,13 +43,13 @@ def solve(*args, **kwargs):
       if hermitian:
         return (Matrix(ufl.operators.transpose(eq_l)), Vector(dolfin.Function(fn_space)))
       else:
-        return (Matrix(eq_l), Vector(dolfin.Function(fn_space)))
+        return (Matrix(eq_l, bcs=bcs), Vector(dolfin.Function(fn_space)))
 
     def rhs_cb(adjointer, variable, dependencies, values, context):
       # 
       value_coeffs=[v.data for v in values]
 
-      return Vector(dolfin.assemble(dolfin.replace(eq.rhs, dict(zip(rhs_coeffs, value_coeffs)))))
+      return Vector(dolfin.replace(eq.rhs, dict(zip(rhs_coeffs, value_coeffs))))
 
     eq = libadjoint.Equation(var, blocks=[diag_block], targets=[var], rhs_deps=rhs_deps, rhs_cb=rhs_cb)
 
@@ -103,7 +103,19 @@ class Vector(libadjoint.Vector):
     return Vector(data)
 
 class Matrix(libadjoint.Matrix):
-  def __init__(self, data):
+  def __init__(self, data, bcs=None):
+
+    self.bcs=bcs
 
     self.data=data
 
+  def solve(self, b):
+      
+    x=b.duplicate()
+
+    if isinstance(self.data, ufl.Identity):
+      x.data.assign(b.data)
+    else:
+      dolfin.fem.solving.solve(self.data==b.data, x.data, self.bcs)
+
+    return x

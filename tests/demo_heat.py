@@ -40,7 +40,8 @@ adj_html("forward.html", "forward")
 adj_html("adjoint.html", "forward")
 
 print adjointer.equation_count
-(lhs, rhs) = adjointer.get_forward_equation(0)
+(fwd_var, output) = adjointer.get_forward_solution(0)
+
+adjointer.record_variable(fwd_var, libadjoint.MemoryStorage(output))
+(fwd_var2, output2) = adjointer.get_forward_solution(1)
 print adjointer.equation_count
-print lhs
-print rhs
