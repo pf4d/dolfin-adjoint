@@ -51,6 +51,8 @@ def solve(*args, **kwargs):
 
       return Vector(dolfin.replace(eq.rhs, dict(zip(rhs_coeffs, value_coeffs))))
 
+    diag_block.assemble=diag_assembly_cb
+
     eq = libadjoint.Equation(var, blocks=[diag_block], targets=[var], rhs_deps=rhs_deps, rhs_cb=rhs_cb)
 
     # we need to check if this is the first equation,
@@ -101,6 +103,10 @@ class Vector(libadjoint.Vector):
     data=dolfin.Function(self.data.function_space())
 
     return Vector(data)
+
+  def axpy(self, alpha, x):
+  
+    self.data+=alpha*x.data
 
 class Matrix(libadjoint.Matrix):
   def __init__(self, data, bcs=None):
