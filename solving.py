@@ -53,7 +53,7 @@ def solve(*args, **kwargs):
 
     diag_block.assemble=diag_assembly_cb
 
-    eq = libadjoint.Equation(var, blocks=[diag_block], targets=[var], rhs_deps=rhs_deps, rhs_cb=rhs_cb)
+    eqn = libadjoint.Equation(var, blocks=[diag_block], targets=[var], rhs_deps=rhs_deps, rhs_cb=rhs_cb)
 
     # we need to check if this is the first equation,
     # so that we can register the appropriate initial conditions
@@ -77,7 +77,7 @@ def solve(*args, **kwargs):
         initial_eq = libadjoint.Equation(rhs_dep, blocks=[identity_block], targets=[rhs_dep], rhs_cb=zero_rhs_cb)
         adjointer.register_equation(initial_eq)
 
-    adjointer.register_equation(eq)
+    adjointer.register_equation(eqn)
 
   dolfin.fem.solving.solve(*args, **kwargs)
 
