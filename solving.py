@@ -41,9 +41,9 @@ def solve(*args, **kwargs):
       eq_l=dolfin.replace(eq.lhs, dict(zip(diag_coeffs, value_coeffs)))
 
       if hermitian:
-        return (Matrix(ufl.operators.transpose(eq_l)), Vector(dolfin.Function(fn_space)))
+        return (Matrix(ufl.operators.transpose(eq_l)), Vector(None))
       else:
-        return (Matrix(eq_l, bcs=bcs), Vector(dolfin.Function(fn_space)))
+        return (Matrix(eq_l, bcs=bcs), Vector(None))
 
     def rhs_cb(adjointer, variable, dependencies, values, context):
       # 
@@ -99,14 +99,21 @@ class Vector(libadjoint.Vector):
     self.data=data
 
   def duplicate(self):
-    
-    data=dolfin.Function(self.data.function_space())
+    '''The data type will be determined by the first addto.'''
+
+    if isinstance(self.data, ufl.form.Form):
+      data=None
+    else:
+      data=dolfin.Function(self.data.function_space())
 
     return Vector(data)
 
   def axpy(self, alpha, x):
   
-    self.data+=alpha*x.data
+    if self.data is None:
+      self.data=alpha*x.data
+    else:
+      self.data+=alpha*x.data
 
 class Matrix(libadjoint.Matrix):
   def __init__(self, data, bcs=None):
