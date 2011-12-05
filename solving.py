@@ -124,11 +124,18 @@ class Matrix(libadjoint.Matrix):
 
   def solve(self, b):
       
-    x=b.duplicate()
-
     if isinstance(self.data, ufl.Identity):
+      x=b.duplicate()
       x.data.assign(b.data)
     else:
+      x=Vector(dolfin.Function(self.test_function().function_space()))
       dolfin.fem.solving.solve(self.data==b.data, x.data, self.bcs)
 
     return x
+
+  def test_function(self):
+    '''test_function(self)
+
+    Return the ufl.Argument corresponding to the trial space for the form'''
+
+    return ufl.algorithms.extract_arguments(self.data)[-1]
