@@ -156,15 +156,16 @@ class Functional(libadjoint.Functional):
   def derivative(self, variable, dependencies, values):
 
     # Find the dolfin Function corresponding to variable.
-    dolfin_variable=values[dependencies.index(variable)].data
+    dolfin_variable = values[dependencies.index(variable)].data
 
-    dolfin_dependencies=[dep for dep in ufl.algorithms.extract_coefficients(self.form) if hasattr(dep, "adj_timestep")]
+    dolfin_dependencies = [dep for dep in ufl.algorithms.extract_coefficients(self.form) if hasattr(dep, "adj_timestep")]
 
-    dolfin_values=[val.data for val in values]
+    dolfin_values = [val.data for val in values]
 
-    current_form=dolfin.replace(self.form, dict(zip(dolfin_dependencies, dolfin_values)))
-    
-    return Vector(ufl.diff(current_form, variable))
+    current_form = dolfin.replace(self.form, dict(zip(dolfin_dependencies, dolfin_values)))
+    test = dolfin.TestFunction(dolfin_variable.function_space())
+
+    return Vector(ufl.derivative(current_form, dolfin_variable, test))
 
   def dependencies(self, adjointer, timestep):
 

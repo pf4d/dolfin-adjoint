@@ -49,7 +49,7 @@ adj_html("adjoint.html", "forward")
 
 print "Replay forward model"
 
-functional=Functional(u_0*u_0*dx)
+functional=Functional(u_1*u_1*dx)
 
 u_out = File("u_replay.pvd", "compressed")
 
