@@ -41,7 +41,7 @@ def solve(*args, **kwargs):
       eq_l=dolfin.replace(eq.lhs, dict(zip(diag_coeffs, value_coeffs)))
 
       if hermitian:
-        return (Matrix(ufl.operators.transpose(eq_l)), Vector(None))
+        return (Matrix(dolfin.fem.formmanipulations.adjoint(eq_l)), Vector(None))
       else:
         return (Matrix(eq_l, bcs=bcs), Vector(None))
 
@@ -139,3 +139,42 @@ class Matrix(libadjoint.Matrix):
     Return the ufl.Argument corresponding to the trial space for the form'''
 
     return ufl.algorithms.extract_arguments(self.data)[-1]
+
+class Functional(libadjoint.Functional):
+  def __init__(self, form):
+
+    self.form=form
+
+  def __call__(self, dependencies, values):
+
+    dolfin_dependencies=[dep for dep in ufl.algorithms.extract_coefficients(self.form) if hasattr(dep, "adj_timestep")]
+
+    dolfin_values=[val.data for val in values]
+
+    return dolfin.assemble(dolfin.replace(self.form, dict(zip(dolfin_dependencies, dolfin_values))))
+
+  def derivative(self, variable, dependencies, values):
+
+    # Find the dolfin Function corresponding to variable.
+    dolfin_variable=values[dependencies.index(variable)].data
+
+    dolfin_dependencies=[dep for dep in ufl.algorithms.extract_coefficients(self.form) if hasattr(dep, "adj_timestep")]
+
+    dolfin_values=[val.data for val in values]
+
+    current_form=dolfin.replace(self.form, dict(zip(dolfin_dependencies, dolfin_values)))
+    
+    return Vector(ufl.diff(current_form, variable))
+
+  def dependencies(self, adjointer, timestep):
+
+    if timestep == adjointer.timestep_count-1:
+      deps = [adj_variable_from_coeff(coeff) for coeff in ufl.algorithms.extract_coefficients(self.form) if hasattr(coeff, "adj_timestep")]      
+    else:
+      deps = []
+    
+    return deps
+
+  def __str__(self):
+    
+    return hashlib.md5(str(self.form)).hexdigest()
