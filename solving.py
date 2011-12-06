@@ -64,17 +64,21 @@ def solve(*args, **kwargs):
         block_name = "Identity: %s" % str(fn_space)
         identity_block = libadjoint.Block(block_name)
 
+        v=dolfin.TestFunction(fn_space)
+        u=dolfin.TrialFunction(fn_space)
+
         def identity_assembly_cb(variables, dependencies, hermitian, coefficient, context):
 
           assert coefficient == 1
-          return (Matrix(ufl.Identity(fn_space.dim())), Vector(dolfin.Function(fn_space)))
+          return (Matrix(dolfin.inner(v,u)*dolfin.dx), Vector(None))
+          #return (Matrix(ufl.Identity(fn_space.dim())), Vector(dolfin.Function(fn_space)))
         
         identity_block.assemble=identity_assembly_cb
 
         def init_rhs_cb(adjointer, variable, dependencies, values, context):
-          return Vector(rhs_coeffs[index])
+          return Vector(dolfin.inner(v,rhs_coeffs[index])*dolfin.dx)
 
-        initial_eq = libadjoint.Equation(rhs_dep, blocks=[identity_block], targets=[rhs_dep], rhs_cb=zero_rhs_cb)
+        initial_eq = libadjoint.Equation(rhs_dep, blocks=[identity_block], targets=[rhs_dep], rhs_cb=init_rhs_cb)
         adjointer.register_equation(initial_eq)
 
     adjointer.register_equation(eqn)
@@ -114,6 +118,12 @@ class Vector(libadjoint.Vector):
       self.data=alpha*x.data
     else:
       self.data+=alpha*x.data
+
+  def norm(self):
+
+    print "norm:", (dolfin.assemble(dolfin.inner(self.data, self.data)*dolfin.dx))**0.5
+
+    return (dolfin.assemble(dolfin.inner(self.data, self.data)*dolfin.dx))**0.5
 
 class Matrix(libadjoint.Matrix):
   def __init__(self, data, bcs=None):
