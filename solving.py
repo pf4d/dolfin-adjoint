@@ -71,8 +71,8 @@ def solve(*args, **kwargs):
         
         identity_block.assemble=identity_assembly_cb
 
-        def zero_rhs_cb(adjointer, variable, dependencies, values, context):
-          return None
+        def init_rhs_cb(adjointer, variable, dependencies, values, context):
+          return Vector(rhs_coeffs[index])
 
         initial_eq = libadjoint.Equation(rhs_dep, blocks=[identity_block], targets=[rhs_dep], rhs_cb=zero_rhs_cb)
         adjointer.register_equation(initial_eq)
