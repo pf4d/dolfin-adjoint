@@ -76,13 +76,13 @@ def solve(*args, **kwargs):
         def identity_assembly_cb(variables, dependencies, hermitian, coefficient, context):
 
           assert coefficient == 1
-          return (Matrix(dolfin.inner(phi,psi)*dolfin.dx), Vector(None))
-          #return (Matrix(ufl.Identity(fn_space.dim())), Vector(dolfin.Function(fn_space)))
+          #return (Matrix(dolfin.inner(phi,psi)*dolfin.dx), Vector(None))
+          return (Matrix(ufl.Identity(fn_space.dim())), Vector(None))
         
         identity_block.assemble=identity_assembly_cb
 
         def init_rhs_cb(adjointer, variable, dependencies, values, context):
-          return Vector(dolfin.inner(phi,rhs_coeffs[index])*dolfin.dx)
+          return Vector(rhs_coeffs[index])
 
         if debugging["record_all"]:
           adjointer.record_variable(libadjoint.Variable(rhs_coeffs[index].adj_name,rhs_coeffs[index].adj_timestep), 
@@ -145,8 +145,6 @@ class Vector(libadjoint.Vector):
 
   def norm(self):
 
-    print "norm:", (abs(dolfin.assemble(dolfin.inner(self.data, self.data)*dolfin.dx)))**0.5
-
     return (abs(dolfin.assemble(dolfin.inner(self.data, self.data)*dolfin.dx)))**0.5
 
 class Matrix(libadjoint.Matrix):
@@ -160,7 +158,7 @@ class Matrix(libadjoint.Matrix):
       
     if isinstance(self.data, ufl.Identity):
       x=b.duplicate()
-      x.data.assign(b.data)
+      x.axpy(1.0, b)
     else:
       x=Vector(dolfin.Function(self.test_function().function_space()))
       dolfin.fem.solving.solve(self.data==b.data, x.data, self.bcs)
