@@ -139,6 +139,7 @@ class Vector(libadjoint.Vector):
   
     if (self.data is None) or self.zero:
       self.data=alpha*x.data
+      self.zero = False
     else:
       self.data+=alpha*x.data
 

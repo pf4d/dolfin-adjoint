@@ -1,6 +1,8 @@
 from dolfin import *
 from dolfin_adjoint import *
 
+debugging["record_all"] = True
+
 mesh = UnitSquare(16, 16)
 V = FunctionSpace(mesh, "CG", 1)
 
