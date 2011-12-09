@@ -56,8 +56,13 @@ u_out = File("u_replay.pvd", "compressed")
 for i in range(adjointer.equation_count):
     (fwd_var, output) = adjointer.get_forward_solution(i)
 
-    adjointer.record_variable(fwd_var, libadjoint.MemoryStorage(output))
+    storage = libadjoint.MemoryStorage(output)
+    storage.set_compare(tol=0.0)
+    storage.set_overwrite(True)
+    adjointer.record_variable(fwd_var, storage)
 
     u_out << output.data
+
+print "Run adjoint model"
 
 (fwd_var, output) = adjointer.get_adjoint_solution(10, functional)
