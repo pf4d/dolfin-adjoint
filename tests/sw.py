@@ -164,8 +164,6 @@ def timeloop_theta(M,G,state,params):
 
         state.assign(tmpstate)
 
-        adjointer.record_variable(libadjoint.Variable("state",step), libadjoint.MemoryStorage(Vector(state)))
-
         if step%params["dump_period"] == 0:
         
             # Project the solution to P1 for visualisation.
@@ -180,19 +178,35 @@ def timeloop_theta(M,G,state,params):
             p_out << p_out_state
 
 
-def replay():
+def replay(state,params):
 
-    for i in range(adjointer.equation_count):
+    u_out,p_out=output_files(params["basename"]+"_replay")
+
+    #for i in range(adjointer.equation_count):
+    print adjointer.equation_count
+    for i in range(3):
         (fwd_var, output) = adjointer.get_forward_solution(i)
 
         s=libadjoint.MemoryStorage(output)
         s.set_compare(0.0)
         s.set_overwrite(True)
 
-        try:
-            adjointer.record_variable(fwd_var, s)
-        except libadjoint.exceptions.LibadjointWarnComparisonFailed as ex:
-            print ex
+        adjointer.record_variable(fwd_var, s)
+
+        M_u_out, v_out, u_out_state=u_output_projector(state.function_space())
+        
+        M_p_out, q_out, p_out_state=p_output_projector(state.function_space())
+        
+        # Project the solution to P1 for visualisation.
+        rhs=assemble(inner(v_out,state.split()[0])*dx)
+        solve(M_u_out, u_out_state.vector(),rhs,"cg","sor") 
+    
+        # Project the solution to P1 for visualisation.
+        rhs=assemble(inner(q_out,state.split()[1])*dx)
+        solve(M_p_out, p_out_state.vector(),rhs,"cg","sor") 
+
+        u_out << u_out_state
+        p_out << p_out_state
 
 
 def u_output_projector(W):

@@ -10,6 +10,12 @@ import libadjoint
 
 import hashlib
 
+debugging={}
+
+# Set record_all to true to enable recording all variables in the forward
+# run. This is primarily useful for debugging.
+debugging["record_all"] = False
+
 adjointer = libadjoint.Adjointer()
 
 def solve(*args, **kwargs):
@@ -64,19 +70,23 @@ def solve(*args, **kwargs):
         block_name = "Identity: %s" % str(fn_space)
         identity_block = libadjoint.Block(block_name)
 
-        v=dolfin.TestFunction(fn_space)
-        u=dolfin.TrialFunction(fn_space)
+        phi=dolfin.TestFunction(fn_space)
+        psi=dolfin.TrialFunction(fn_space)
 
         def identity_assembly_cb(variables, dependencies, hermitian, coefficient, context):
 
           assert coefficient == 1
-          return (Matrix(dolfin.inner(v,u)*dolfin.dx), Vector(None))
+          return (Matrix(dolfin.inner(phi,psi)*dolfin.dx), Vector(None))
           #return (Matrix(ufl.Identity(fn_space.dim())), Vector(dolfin.Function(fn_space)))
         
         identity_block.assemble=identity_assembly_cb
 
         def init_rhs_cb(adjointer, variable, dependencies, values, context):
-          return Vector(dolfin.inner(v,rhs_coeffs[index])*dolfin.dx)
+          return Vector(dolfin.inner(phi,rhs_coeffs[index])*dolfin.dx)
+
+        if debugging["record_all"]:
+          adjointer.record_variable(libadjoint.Variable(rhs_coeffs[index].adj_name,rhs_coeffs[index].adj_timestep), 
+                                    libadjoint.MemoryStorage(Vector(rhs_coeffs[index])))
 
         initial_eq = libadjoint.Equation(rhs_dep, blocks=[identity_block], targets=[rhs_dep], rhs_cb=init_rhs_cb)
         adjointer.register_equation(initial_eq)
@@ -84,6 +94,11 @@ def solve(*args, **kwargs):
     adjointer.register_equation(eqn)
 
   dolfin.fem.solving.solve(*args, **kwargs)
+
+  if isinstance(args[0], ufl.classes.Equation):
+    
+    if debugging["record_all"]:
+      adjointer.record_variable(libadjoint.Variable(u.adj_name,u.adj_timestep), libadjoint.MemoryStorage(Vector(u)))
 
 def adj_variable_from_coeff(coeff):
   try:
@@ -98,9 +113,14 @@ def adj_html(*args, **kwargs):
 
 
 class Vector(libadjoint.Vector):
-  def __init__(self, data):
+  def __init__(self, data, zero=False):
 
     self.data=data
+    # self.zero is true if we can prove that the vector is zero.
+    if data is None:
+      self.zero=True
+    else:
+      self.zero=zero
 
   def duplicate(self):
     '''The data type will be determined by the first addto.'''
@@ -110,20 +130,23 @@ class Vector(libadjoint.Vector):
     else:
       data=dolfin.Function(self.data.function_space())
 
-    return Vector(data)
+    return Vector(data, zero=True)
 
   def axpy(self, alpha, x):
+
+    if x.zero:
+      return
   
-    if self.data is None:
+    if (self.data is None) or self.zero:
       self.data=alpha*x.data
     else:
       self.data+=alpha*x.data
 
   def norm(self):
 
-    print "norm:", (dolfin.assemble(dolfin.inner(self.data, self.data)*dolfin.dx))**0.5
+    print "norm:", (abs(dolfin.assemble(dolfin.inner(self.data, self.data)*dolfin.dx)))**0.5
 
-    return (dolfin.assemble(dolfin.inner(self.data, self.data)*dolfin.dx))**0.5
+    return (abs(dolfin.assemble(dolfin.inner(self.data, self.data)*dolfin.dx)))**0.5
 
 class Matrix(libadjoint.Matrix):
   def __init__(self, data, bcs=None):
