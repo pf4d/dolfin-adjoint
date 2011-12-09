@@ -183,7 +183,6 @@ def replay(state,params):
     u_out,p_out=output_files(params["basename"]+"_replay")
 
     #for i in range(adjointer.equation_count):
-    print adjointer.equation_count
     for i in range(3):
         (fwd_var, output) = adjointer.get_forward_solution(i)
 

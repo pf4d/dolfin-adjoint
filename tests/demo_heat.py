@@ -3,7 +3,7 @@ from dolfin_adjoint import *
 
 debugging["record_all"] = True
 
-mesh = UnitSquare(16, 16)
+mesh = UnitSquare(4, 4)
 V = FunctionSpace(mesh, "CG", 1)
 
 u = TrialFunction(V)
@@ -39,6 +39,7 @@ while( t <= T):
     u_0.adj_timestep = n-1
     
     solve(a == L, u_1, bc)
+
     u_0.assign(u_1)
     t += float(dt)
     #plot(u_1, interactive=True)

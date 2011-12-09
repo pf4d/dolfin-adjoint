@@ -73,16 +73,19 @@ def solve(*args, **kwargs):
         phi=dolfin.TestFunction(fn_space)
         psi=dolfin.TrialFunction(fn_space)
 
+        rhs=Vector(rhs_coeffs[index]).duplicate()
+        rhs.axpy(1.0,Vector(rhs_coeffs[index]))
+
         def identity_assembly_cb(variables, dependencies, hermitian, coefficient, context):
 
           assert coefficient == 1
           #return (Matrix(dolfin.inner(phi,psi)*dolfin.dx), Vector(None))
-          return (Matrix(ufl.Identity(fn_space.dim())), Vector(None))
+          return (Matrix(ufl.Identity(fn_space.dim())), Vector(dolfin.Function(fn_space)))
         
         identity_block.assemble=identity_assembly_cb
 
         def init_rhs_cb(adjointer, variable, dependencies, values, context):
-          return Vector(rhs_coeffs[index])
+          return rhs
 
         if debugging["record_all"]:
           adjointer.record_variable(libadjoint.Variable(rhs_coeffs[index].adj_name,rhs_coeffs[index].adj_timestep), 
@@ -136,12 +139,20 @@ class Vector(libadjoint.Vector):
 
     if x.zero:
       return
-  
-    if (self.data is None) or self.zero:
+
+    if (self.data is None):
+      # self is an empty form.
+      assert(isinstance(x.data, ufl.form.Form))
       self.data=alpha*x.data
-      self.zero = False
+    elif isinstance(self.data, dolfin.Coefficient):
+      self.data.vector().axpy(alpha, x.data.vector())
     else:
+      # self is a non-empty form.
+      assert(isinstance(x.data, ufl.form.Form))
+      assert(isinstance(self.data, ufl.form.Form))
       self.data+=alpha*x.data
+
+    self.zero = False
 
   def norm(self):
 

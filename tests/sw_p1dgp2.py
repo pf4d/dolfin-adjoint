@@ -22,4 +22,3 @@ sw.timeloop_theta(M,G,state,kelvin.params)
 
 sw.replay(state,kelvin.params)
 
-print (abs(assemble(inner(state,state)*dx)))**0.5
