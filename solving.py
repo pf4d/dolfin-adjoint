@@ -34,9 +34,6 @@ def solve(*args, **kwargs):
 
     var = adj_variable_from_coeff(u)
 
-    rhs_deps = [adj_variable_from_coeff(coeff) for coeff in ufl.algorithms.extract_coefficients(eq.rhs) if hasattr(coeff, "adj_timestep")]
-    rhs_coeffs = [coeff for coeff in ufl.algorithms.extract_coefficients(eq.rhs) if hasattr(coeff, "adj_timestep")]
-
     def diag_assembly_cb(dependencies, values, hermitian, coefficient, context):
 
       assert coefficient == 1
@@ -51,30 +48,26 @@ def solve(*args, **kwargs):
       else:
         return (Matrix(eq_l, bcs=bcs), Vector(None))
 
-    def rhs_cb(variable, dependencies, values, context):
-      # 
-      value_coeffs=[v.data for v in values]
-
-      return Vector(dolfin.replace(eq.rhs, dict(zip(rhs_coeffs, value_coeffs))))
-
     diag_block.assemble=diag_assembly_cb
 
-    eqn = libadjoint.Equation(var, blocks=[diag_block], targets=[var], rhs_deps=rhs_deps, rhs_cb=rhs_cb)
+    rhs=RHS(eq.rhs)
+
+    eqn = libadjoint.Equation(var, blocks=[diag_block], targets=[var], rhs=rhs)
 
     # we need to check if this is the first equation,
     # so that we can register the appropriate initial conditions
     if adjointer.equation_count == 0:
-      for index, rhs_dep in enumerate(rhs_deps):
+      for rhs_coeff, rhs_dep in zip(rhs.coefficients(),rhs.dependencies()):
         assert rhs_dep.timestep == 0
-        fn_space = rhs_coeffs[index].function_space()
+        fn_space = rhs_coeff.function_space()
         block_name = "Identity: %s" % str(fn_space)
         identity_block = libadjoint.Block(block_name)
 
         phi=dolfin.TestFunction(fn_space)
         psi=dolfin.TrialFunction(fn_space)
 
-        rhs=Vector(rhs_coeffs[index]).duplicate()
-        rhs.axpy(1.0,Vector(rhs_coeffs[index]))
+        rhs=Vector(rhs_coeff).duplicate()
+        rhs.axpy(1.0,Vector(rhs_coeff))
 
         def identity_assembly_cb(variables, dependencies, hermitian, coefficient, context):
 
@@ -84,14 +77,11 @@ def solve(*args, **kwargs):
         
         identity_block.assemble=identity_assembly_cb
 
-        def init_rhs_cb(variable, dependencies, values, context):
-          return rhs
 
         if debugging["record_all"]:
-          adjointer.record_variable(libadjoint.Variable(rhs_coeffs[index].adj_name,rhs_coeffs[index].adj_timestep), 
-                                    libadjoint.MemoryStorage(Vector(rhs_coeffs[index])))
+          adjointer.record_variable(rhs_dep, libadjoint.MemoryStorage(Vector(rhs_coeff)))
 
-        initial_eq = libadjoint.Equation(rhs_dep, blocks=[identity_block], targets=[rhs_dep], rhs_cb=init_rhs_cb)
+        initial_eq = libadjoint.Equation(rhs_dep, blocks=[identity_block], targets=[rhs_dep], rhs=RHS(rhs))
         adjointer.register_equation(initial_eq)
 
     adjointer.register_equation(eqn)
@@ -230,31 +220,62 @@ class RHS(libadjoint.RHS):
 
   def __call__(self, dependencies, values):
 
-    dolfin_dependencies=[dep for dep in ufl.algorithms.extract_coefficients(self.form) if hasattr(dep, "adj_timestep")]
+    if isinstance(self.form, ufl.form.Form):
 
-    dolfin_values=[val.data for val in values]
+      dolfin_dependencies=[dep for dep in ufl.algorithms.extract_coefficients(self.form) if hasattr(dep, "adj_timestep")]
+      
+      dolfin_values=[val.data for val in values]
 
-    return dolfin.replace(self.form, dict(zip(dolfin_dependencies, dolfin_values)))
+      return Vector(dolfin.replace(self.form, dict(zip(dolfin_dependencies, dolfin_values))))
+
+    else:
+      # RHS is a Vector.
+      assert isinstance(self.form, Vector)
+      return self.form
+    
 
   def derivative_action(self, dependencies, values, variable, contraction_vector, hermitian):
 
-    # Find the dolfin Function corresponding to variable.
-    dolfin_variable = values[dependencies.index(variable)].data
+    if isinstance(self.form, ufl.form.Form):
+      # Find the dolfin Function corresponding to variable.
+      dolfin_variable = values[dependencies.index(variable)].data
 
-    dolfin_dependencies = [dep for dep in ufl.algorithms.extract_coefficients(self.form) if hasattr(dep, "adj_timestep")]
+      dolfin_dependencies = [dep for dep in ufl.algorithms.extract_coefficients(self.form) if hasattr(dep, "adj_timestep")]
 
-    dolfin_values = [val.data for val in values]
+      dolfin_values = [val.data for val in values]
 
-    current_form = dolfin.replace(self.form, dict(zip(dolfin_dependencies, dolfin_values)))
-    test = dolfin.TestFunction(dolfin_variable.function_space())
+      current_form = dolfin.replace(self.form, dict(zip(dolfin_dependencies, dolfin_values)))
+      trial = dolfin.TrialFunction(dolfin_variable.function_space())
 
-    return Vector(ufl.derivative(current_form, dolfin_variable, test))
+      d_rhs=ufl.derivative(current_form, dolfin_variable, trial)
+
+      if hermitian:
+        return Vector(dolfin.action(dolfin.adjoint(d_rhs),contraction_vector.data))
+      else:
+        return Vector(dolfin.action(d_rhs,contraction_vector.data))
+      
+    else:
+      # RHS is a Vector. Its derivative is therefore zero.
+      raise exceptions.LibadjointErrorNotImplemented("No derivative method for constant RHS.")
+      
 
   def dependencies(self):
 
-    deps = [adj_variable_from_coeff(coeff) for coeff in ufl.algorithms.extract_coefficients(self.form) if hasattr(coeff, "adj_timestep")]      
-    
+    if isinstance(self.form, ufl.form.Form):
+      deps = [adj_variable_from_coeff(coeff) for coeff in ufl.algorithms.extract_coefficients(self.form) if hasattr(coeff, "adj_timestep")]      
+    else:
+      deps = []
+
     return deps
+
+  def coefficients(self):
+
+    if isinstance(self.form, ufl.form.Form):
+      coeffs = [coeff for coeff in ufl.algorithms.extract_coefficients(self.form) if hasattr(coeff, "adj_timestep")]      
+    else:
+      coeffs = []
+
+    return coeffs
 
   def __str__(self):
     
