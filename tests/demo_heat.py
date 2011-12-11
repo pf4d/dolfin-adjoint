@@ -68,4 +68,11 @@ for i in range(adjointer.equation_count):
 
 print "Run adjoint model"
 
-(fwd_var, output) = adjointer.get_adjoint_solution(10, functional)
+for i in range(adjointer.equation_count)[::-1]:
+    print i
+
+    (adj_var, output) = adjointer.get_adjoint_solution(i, functional)
+    
+    storage = libadjoint.MemoryStorage(output)
+    adjointer.record_variable(adj_var, storage)
+    

@@ -51,7 +51,7 @@ def solve(*args, **kwargs):
       else:
         return (Matrix(eq_l, bcs=bcs), Vector(None))
 
-    def rhs_cb(adjointer, variable, dependencies, values, context):
+    def rhs_cb(variable, dependencies, values, context):
       # 
       value_coeffs=[v.data for v in values]
 
@@ -84,7 +84,7 @@ def solve(*args, **kwargs):
         
         identity_block.assemble=identity_assembly_cb
 
-        def init_rhs_cb(adjointer, variable, dependencies, values, context):
+        def init_rhs_cb(variable, dependencies, values, context):
           return rhs
 
         if debugging["record_all"]:
@@ -216,6 +216,43 @@ class Functional(libadjoint.Functional):
       deps = [adj_variable_from_coeff(coeff) for coeff in ufl.algorithms.extract_coefficients(self.form) if hasattr(coeff, "adj_timestep")]      
     else:
       deps = []
+    
+    return deps
+
+  def __str__(self):
+    
+    return hashlib.md5(str(self.form)).hexdigest()
+
+class RHS(libadjoint.RHS):
+  def __init__(self, form):
+
+    self.form=form
+
+  def __call__(self, dependencies, values):
+
+    dolfin_dependencies=[dep for dep in ufl.algorithms.extract_coefficients(self.form) if hasattr(dep, "adj_timestep")]
+
+    dolfin_values=[val.data for val in values]
+
+    return dolfin.replace(self.form, dict(zip(dolfin_dependencies, dolfin_values)))
+
+  def derivative_action(self, dependencies, values, variable, contraction_vector, hermitian):
+
+    # Find the dolfin Function corresponding to variable.
+    dolfin_variable = values[dependencies.index(variable)].data
+
+    dolfin_dependencies = [dep for dep in ufl.algorithms.extract_coefficients(self.form) if hasattr(dep, "adj_timestep")]
+
+    dolfin_values = [val.data for val in values]
+
+    current_form = dolfin.replace(self.form, dict(zip(dolfin_dependencies, dolfin_values)))
+    test = dolfin.TestFunction(dolfin_variable.function_space())
+
+    return Vector(ufl.derivative(current_form, dolfin_variable, test))
+
+  def dependencies(self):
+
+    deps = [adj_variable_from_coeff(coeff) for coeff in ufl.algorithms.extract_coefficients(self.form) if hasattr(coeff, "adj_timestep")]      
     
     return deps
 
