@@ -116,9 +116,9 @@ class Vector(libadjoint.Vector):
       self.zero=zero
 
   def duplicate(self):
-    '''The data type will be determined by the first addto.'''
 
     if isinstance(self.data, ufl.form.Form):
+      # The data type will be determined by the first addto.
       data=None
     else:
       data=dolfin.Function(self.data.function_space())
@@ -135,7 +135,12 @@ class Vector(libadjoint.Vector):
       assert(isinstance(x.data, ufl.form.Form))
       self.data=alpha*x.data
     elif isinstance(self.data, dolfin.Coefficient):
-      self.data.vector().axpy(alpha, x.data.vector())
+      if isinstance(x.data, dolfin.Coefficient):
+        self.data.vector().axpy(alpha, x.data.vector())
+      else:
+        # This occurs when adding a RHS derivative to an adjoint equation
+        # corresponding to the initial conditions.
+        self.data.vector().axpy(alpha, dolfin.assemble(x.data))
     else:
       # self is a non-empty form.
       assert(isinstance(x.data, ufl.form.Form))
@@ -264,6 +269,7 @@ class RHS(libadjoint.RHS):
     if isinstance(self.form, ufl.form.Form):
       deps = [adj_variable_from_coeff(coeff) for coeff in ufl.algorithms.extract_coefficients(self.form) if hasattr(coeff, "adj_timestep")]      
     else:
+
       deps = []
 
     return deps
