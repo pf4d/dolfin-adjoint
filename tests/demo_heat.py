@@ -21,9 +21,6 @@ bc = DirichletBC(V, 1.0, "on_boundary")
 
 a, L = lhs(F), rhs(F)
 
-u_0.adj_name = "Temperature"
-u_1.adj_name = "Temperature"
-
 t = float(dt)
 T = 1.0
 n = 1
@@ -35,16 +32,11 @@ u_out << u_0
 
 while( t <= T):
 
-    u_1.adj_timestep = n
-    u_0.adj_timestep = n-1
+    u_0
     
-    solve(a == L, u_1, bc)
+    solve(a == L, u_0, bc)
 
-    u_0.assign(u_1)
     t += float(dt)
-    #plot(u_1, interactive=True)
-    n = n + 1
-
     u_out << u_0
 
 adj_html("forward.html", "forward")
@@ -52,7 +44,7 @@ adj_html("adjoint.html", "forward")
 
 print "Replay forward model"
 
-functional=Functional(u_1*u_1*dx)
+functional=Functional(u_0*u_0*dx)
 
 u_out = File("u_replay.pvd", "compressed")
 
