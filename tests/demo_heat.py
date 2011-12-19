@@ -29,11 +29,8 @@ u_out = File("u.pvd", "compressed")
 
 u_out << u_0
 
-
 while( t <= T):
 
-    u_0
-    
     solve(a == L, u_0, bc)
 
     t += float(dt)

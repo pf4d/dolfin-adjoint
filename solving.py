@@ -12,7 +12,7 @@ import hashlib
 
 debugging={}
 
-class Coeff_store(object):
+class CoeffStore(object):
   def __init__(self):
     self.coeffs={}
 
@@ -35,7 +35,7 @@ class Coeff_store(object):
 
     return libadjoint.Variable(str(coeff), self.coeffs[str(coeff)], 0)
 
-adj_variables=Coeff_store()
+adj_variables=CoeffStore()
 
 # Set record_all to true to enable recording all variables in the forward
 # run. This is primarily useful for debugging.
