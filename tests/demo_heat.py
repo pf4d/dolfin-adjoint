@@ -45,6 +45,8 @@ functional=Functional(u_0*dx)
 
 u_out = File("u_replay.pvd", "compressed")
 
+f_direct=0.0
+
 for i in range(adjointer.equation_count):
     (fwd_var, output) = adjointer.get_forward_solution(i)
 
@@ -55,9 +57,13 @@ for i in range(adjointer.equation_count):
 
     u_out << output.data
 
+# The functional is only a function of final state.
+f_direct+=adjointer.evaluate_functional(functional, i)
+
 print "Run adjoint model"
 
 
+f_adj=0.0
 
 for i in range(adjointer.equation_count)[::-1]:
     print i
@@ -66,4 +72,9 @@ for i in range(adjointer.equation_count)[::-1]:
     
     storage = libadjoint.MemoryStorage(output)
     adjointer.record_variable(adj_var, storage)
-    
+
+    if i!=0:
+        print assemble(f*output.data*dx)
+        f_adj+=assemble(-f*output.data*dx)
+
+print f_adj-f_direct
