@@ -74,6 +74,8 @@ for i in range(adjointer.equation_count)[::-1]:
     adjointer.record_variable(adj_var, storage)
 
     if i!=0:
+        # f is only the RHS from equation 1 onwards. At equation 0, the
+        # RHS is the zero vector, so we don't bother. 
         f_adj+=assemble(-f*output.data*dx)
 
 print f_adj-f_direct
