@@ -74,7 +74,6 @@ for i in range(adjointer.equation_count)[::-1]:
     adjointer.record_variable(adj_var, storage)
 
     if i!=0:
-        print assemble(f*output.data*dx)
         f_adj+=assemble(-f*output.data*dx)
 
 print f_adj-f_direct
