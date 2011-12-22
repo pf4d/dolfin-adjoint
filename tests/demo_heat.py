@@ -17,7 +17,7 @@ dt = Constant(0.1)
 f = Expression("sin(pi*x[0])")
 F = ( (u - u_0)/dt*v + inner(grad(u), grad(v)) + f*v)*dx
 
-bc = DirichletBC(V, 1.0, "on_boundary")
+#bc = DirichletBC(V, 1.0, "on_boundary")
 
 a, L = lhs(F), rhs(F)
 
@@ -38,7 +38,7 @@ while( t <= T):
     u_1.adj_timestep = n
     u_0.adj_timestep = n-1
     
-    solve(a == L, u_1, bc)
+    solve(a == L, u_1)
 
     u_0.assign(u_1)
     t += float(dt)
@@ -48,11 +48,11 @@ while( t <= T):
     u_out << u_0
 
 adj_html("forward.html", "forward")
-adj_html("adjoint.html", "forward")
+adj_html("adjoint.html", "adjoint")
 
 print "Replay forward model"
 
-functional=Functional(u_1*u_1*dx)
+functional=Functional(u_1*dx)
 
 u_out = File("u_replay.pvd", "compressed")
 
@@ -67,6 +67,8 @@ for i in range(adjointer.equation_count):
     u_out << output.data
 
 print "Run adjoint model"
+
+
 
 for i in range(adjointer.equation_count)[::-1]:
     print i
