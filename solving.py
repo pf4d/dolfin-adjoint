@@ -153,6 +153,10 @@ class Vector(libadjoint.Vector):
 
     return (abs(dolfin.assemble(dolfin.inner(self.data, self.data)*dolfin.dx)))**0.5
 
+  def dot_product(self,y):
+
+    return dolfin.assemble(dolfin.inner(self.data, y.data)*dolfin.dx)
+
 class Matrix(libadjoint.Matrix):
   def __init__(self, data, bcs=None):
 
