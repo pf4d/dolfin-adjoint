@@ -13,6 +13,9 @@ import hashlib
 debugging={}
 
 class CoeffStore(object):
+  '''This object manages the mapping from Dolfin coefficients to libadjoint Variables.
+  In the process, it also manages the incrementing of the timestep associated with each
+  variable, so that the user does not have to manually manage the time information.'''
   def __init__(self):
     self.coeffs={}
 
@@ -41,92 +44,137 @@ adj_variables=CoeffStore()
 # run. This is primarily useful for debugging.
 debugging["record_all"] = False
 
+# Create the adjointer, the central object that records the forward solve
+# as it happens.
 adjointer = libadjoint.Adjointer()
 
 def solve(*args, **kwargs):
-  if isinstance(args[0], ufl.classes.Equation):
-    # annotate !
-    unpacked_args = dolfin.fem.solving._extract_args(*args, **kwargs)
-    eq = unpacked_args[0]
-    u  = unpacked_args[1]
-    bcs = unpacked_args[2]
-    J = unpacked_args[3]
+  '''This solve routine comes from the dolfin_adjoint package, and wraps the real Dolfin
+  solve call. Its purpose is to annotate the model, recording what solves occur and what
+  forms are involved, so that the adjoint model may be constructed automatically by libadjoint. 
 
-    diag_name = hashlib.md5(str(eq.lhs)).hexdigest()
-    diag_deps = [adj_variables[coeff] for coeff in ufl.algorithms.extract_coefficients(eq.lhs) if hasattr(coeff, "function_space")]
-    diag_coeffs = [coeff for coeff in ufl.algorithms.extract_coefficients(eq.lhs) if hasattr(coeff, "function_space")]
-    diag_block = libadjoint.Block(diag_name, dependencies=diag_deps)
+  To disable the annotation, just pass annotate=False to this routine, and it acts exactly
+  like the Dolfin solve call. This is useful in cases where the solve is known to be irrelevant
+  or diagnostic for the purposes of the adjoint computation (such as projecting fields to
+  other function spaces for the purposes of visualisation).'''
 
-    rhs=RHS(eq.rhs)
+  # First, decide if we should annotate or not.
+  annotate = True
+  if "annotate" in kwargs:
+    annotate = kwargs["annotate"]
+    del kwargs["annotate"] # so we don't pass it on to the real solver
 
-    # we need to check if this is the first equation,
-    # so that we can register the appropriate initial conditions
-    #if adjointer.equation_count == 0:
-    for rhs_coeff, rhs_dep in zip(rhs.coefficients(),rhs.dependencies()):
-      # If rhs_coeff is not in adj_coeffs, it musts be an initial condition.
-      if rhs_dep.timestep == 0:
-        fn_space = rhs_coeff.function_space()
-        block_name = "Identity: %s" % str(fn_space)
-        identity_block = libadjoint.Block(block_name)
-      
-        phi=dolfin.TestFunction(fn_space)
-        psi=dolfin.TrialFunction(fn_space)
+  if annotate:
+    if isinstance(args[0], ufl.classes.Equation):
+      # annotate !
 
-        init_rhs=Vector(rhs_coeff).duplicate()
-        init_rhs.axpy(1.0,Vector(rhs_coeff))
+      # Unpack the arguments, using the same routine as the real Dolfin solve call
+      unpacked_args = dolfin.fem.solving._extract_args(*args, **kwargs)
+      eq = unpacked_args[0]
+      u  = unpacked_args[1]
+      bcs = unpacked_args[2]
+      J = unpacked_args[3]
 
-        def identity_assembly_cb(variables, dependencies, hermitian, coefficient, context):
+      # Set up the data associated with the matrix on the left-hand side. This goes on the diagonal
+      # of the 'large' system that incorporates all of the timelevels, which is why it is prefixed
+      # with diag.
+      diag_name = hashlib.md5(str(eq.lhs)).hexdigest() # we don't have a useful human-readable name, so take the md5sum of the string representation of the form
+      diag_deps = [adj_variables[coeff] for coeff in ufl.algorithms.extract_coefficients(eq.lhs) if hasattr(coeff, "function_space")]
+      diag_coeffs = [coeff for coeff in ufl.algorithms.extract_coefficients(eq.lhs) if hasattr(coeff, "function_space")]
+      diag_block = libadjoint.Block(diag_name, dependencies=diag_deps)
 
-          assert coefficient == 1
-          #return (Matrix(dolfin.inner(phi,psi)*dolfin.dx), Vector(None))
-          return (Matrix(ufl.Identity(fn_space.dim())), Vector(dolfin.Function(fn_space)))
+      # Similarly, create the object associated with the right-hand side data.
+      rhs=RHS(eq.rhs)
+
+      # We need to check if this is the first equation,
+      # so that we can register the appropriate initial conditions.
+      # These equations are necessary so that libadjoint can assemble the
+      # relevant adjoint equations for the adjoint variables associated with
+      # the initial conditions.
+      for rhs_coeff, rhs_dep in zip(rhs.coefficients(),rhs.dependencies()):
+        # If rhs_coeff is not in adj_coeffs, it musts be an initial condition.
+        if rhs_dep.timestep == 0:
+          fn_space = rhs_coeff.function_space()
+          block_name = "Identity: %s" % str(fn_space)
+          identity_block = libadjoint.Block(block_name)
         
-        identity_block.assemble=identity_assembly_cb
+          phi=dolfin.TestFunction(fn_space)
+          psi=dolfin.TrialFunction(fn_space)
+
+          init_rhs=Vector(rhs_coeff).duplicate()
+          init_rhs.axpy(1.0,Vector(rhs_coeff))
+
+          def identity_assembly_cb(variables, dependencies, hermitian, coefficient, context):
+
+            assert coefficient == 1
+            #return (Matrix(dolfin.inner(phi,psi)*dolfin.dx), Vector(None))
+            return (Matrix(ufl.Identity(fn_space.dim())), Vector(dolfin.Function(fn_space)))
+          
+          identity_block.assemble=identity_assembly_cb
 
 
-        if debugging["record_all"]:
-          adjointer.record_variable(rhs_dep, libadjoint.MemoryStorage(Vector(rhs_coeff)))
+          if debugging["record_all"]:
+            adjointer.record_variable(rhs_dep, libadjoint.MemoryStorage(Vector(rhs_coeff)))
 
-        initial_eq = libadjoint.Equation(rhs_dep, blocks=[identity_block], targets=[rhs_dep], rhs=RHS(init_rhs))
-        adjointer.register_equation(initial_eq)
+          initial_eq = libadjoint.Equation(rhs_dep, blocks=[identity_block], targets=[rhs_dep], rhs=RHS(init_rhs))
+          adjointer.register_equation(initial_eq)
 
-    var = adj_variables.next(u)
+      var = adj_variables.next(u)
 
-    def diag_assembly_cb(dependencies, values, hermitian, coefficient, context):
+      # With the initial conditions out of the way, let us now define the callbacks that
+      # define the action of the operator the user has passed in on the lhs of this equation.
 
-      assert coefficient == 1
-      fn_space = u.function_space()
+      def diag_assembly_cb(dependencies, values, hermitian, coefficient, context):
+        '''This callback must conform to the libadjoint Python block assembly
+        interface. It returns either the form or its transpose, depending on
+        the value of the logical hermitian.'''
 
-      value_coeffs=[v.data for v in values]
+        assert coefficient == 1
 
-      eq_l=dolfin.replace(eq.lhs, dict(zip(diag_coeffs, value_coeffs)))
+        value_coeffs=[v.data for v in values]
 
-      if hermitian:
-        adjoint_bcs = [dolfin.homogenize(bc) for bc in bcs if isinstance(bc, dolfin.DirichletBC)]
-        if len(adjoint_bcs) == 0: adjoint_bcs = None
-        return (Matrix(dolfin.fem.formmanipulations.adjoint(eq_l), bcs=adjoint_bcs), Vector(None))
-      else:
-        return (Matrix(eq_l, bcs=bcs), Vector(None))
+        eq_l=dolfin.replace(eq.lhs, dict(zip(diag_coeffs, value_coeffs)))
 
-    diag_block.assemble=diag_assembly_cb
+        if hermitian:
+          # Homogenise the adjoint boundary conditions. This creates the adjoint
+          # solution associated with the lifted discrete system that is actually solved.
+          adjoint_bcs = [dolfin.homogenize(bc) for bc in bcs if isinstance(bc, dolfin.DirichletBC)]
+          if len(adjoint_bcs) == 0: adjoint_bcs = None
+          return (Matrix(dolfin.fem.formmanipulations.adjoint(eq_l), bcs=adjoint_bcs), Vector(None))
+        else:
+          return (Matrix(eq_l, bcs=bcs), Vector(None))
 
-    eqn = libadjoint.Equation(var, blocks=[diag_block], targets=[var], rhs=rhs)
+      diag_block.assemble=diag_assembly_cb
 
-    adjointer.register_equation(eqn)
+      eqn = libadjoint.Equation(var, blocks=[diag_block], targets=[var], rhs=rhs)
+
+      adjointer.register_equation(eqn)
 
   dolfin.fem.solving.solve(*args, **kwargs)
 
-  if isinstance(args[0], ufl.classes.Equation):
-    
+  # Finally, if we want to record all of the solutions of the real forward model
+  # (for comparison with a libadjoint replay later),
+  # then we should record the value of the variable we just solved for.
+  if isinstance(args[0], ufl.classes.Equation) and annotate:
     if debugging["record_all"]:
       adjointer.record_variable(var, libadjoint.MemoryStorage(Vector(u)))
 
 
 def adj_html(*args, **kwargs):
+  '''This routine dumps the current state of the adjointer to a HTML visualisation.
+  Use it like:
+    adj_html("forward.html", "forward") # for the equations recorded on the forward run
+    adj_html("adjoint.html", "adjoint") # for the equations to be assembled on the adjoint run
+  '''
   return adjointer.to_html(*args, **kwargs)
 
 
 class Vector(libadjoint.Vector):
+  '''This class implements the libadjoint.Vector abstract base class for the Dolfin adjoint.
+  In particular, it must implement the data callbacks for tasks such as adding two vectors
+  together, duplicating vectors, taking norms, etc., that occur in the process of constructing
+  the adjoint equations.'''
+
   def __init__(self, data, zero=False):
 
     self.data=data
@@ -179,6 +227,11 @@ class Vector(libadjoint.Vector):
     return dolfin.assemble(dolfin.inner(self.data, y.data)*dolfin.dx)
 
 class Matrix(libadjoint.Matrix):
+  '''This class implements the libadjoint.Matrix abstract base class for the Dolfin adjoint.
+  In particular, it must implement the data callbacks for tasks such as adding two matrices
+  together, duplicating matrices, etc., that occur in the process of constructing
+  the adjoint equations.'''
+
   def __init__(self, data, bcs=None):
 
     self.bcs=bcs
@@ -204,6 +257,10 @@ class Matrix(libadjoint.Matrix):
     return ufl.algorithms.extract_arguments(self.data)[-1]
 
 class Functional(libadjoint.Functional):
+  '''This class implements the libadjoint.Functional abstract base class for the Dolfin adjoint.
+  It takes in a form, and implements the necessary routines such as calling the functional
+  and taking its derivative.'''
+
   def __init__(self, form):
 
     self.form=form
@@ -244,6 +301,9 @@ class Functional(libadjoint.Functional):
     return hashlib.md5(str(self.form)).hexdigest()
 
 class RHS(libadjoint.RHS):
+  '''This class implements the libadjoint.RHS abstract base class for the Dolfin adjoint.
+  It takes in a form, and implements the necessary routines such as calling the right-hand side
+  and taking its derivative.'''
   def __init__(self, form):
 
     self.form=form
