@@ -45,7 +45,7 @@ def run_forward(initial_condition=None, annotate=True, dump=True):
   return u_0
 
 
-u_0 = run_forward()
+final_forward = run_forward()
 
 adj_html("forward.html", "forward")
 adj_html("adjoint.html", "adjoint")
@@ -69,14 +69,13 @@ def run_replay():
 run_replay()
 
 # The functional is only a function of final state.
-functional=Functional(u_0*u_0*dx)
+functional=Functional(final_forward*final_forward*dx)
 f_direct = adjointer.evaluate_functional(functional, adjointer.equation_count-1)
 
 print "Running adjoint model ..."
 
 def run_adjoint():
   z_out = File("adjoint.pvd", "compressed")
-  f_adj=0.0
 
   for i in range(adjointer.equation_count)[::-1]:
 
@@ -85,19 +84,14 @@ def run_adjoint():
       storage = libadjoint.MemoryStorage(output)
       adjointer.record_variable(adj_var, storage)
 
+      # if we cared about memory, here is where we would put the call to forget
+      # any variables we no longer need.
+
       z_out << output.data
 
-      if i!=0:
-          # f is only the RHS from equation 1 onwards. At equation 0, the
-          # RHS is the zero vector, so we don't bother. 
-          f_adj+=assemble(-f*output.data*dx)
+  return output.data
 
-  return (f_adj, output.data)
-
-(f_adj, final_adjoint) = run_adjoint()
-
-#print "Evaluating functional only using adjoint ... "
-#print "Difference between the functional evaluatons (should be 0): ", f_adj-f_direct
+final_adjoint = run_adjoint()
 
 def convergence_order(errors):
   import math
