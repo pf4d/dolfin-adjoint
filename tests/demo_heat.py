@@ -35,8 +35,8 @@ def run_forward(initial_condition=None, annotate=True, dump=True):
 
   while t <= T:
 
-      #solve(a == L, u_0, bc, annotate=annotate)
-      solve(a == L, u_0, annotate=annotate)
+      solve(a == L, u_0, bc, annotate=annotate)
+      #solve(a == L, u_0, annotate=annotate)
 
       t += float(dt)
       if dump:
@@ -125,7 +125,7 @@ def test_ic_gradient(final_adjoint):
   # Run the forward problem for various perturbed initial conditions
   functional_values = []
   perturbations = []
-  for perturbation_size in [0.001/(2**i) for i in range(5)]:
+  for perturbation_size in [10.0/(2**i) for i in range(5)]:
     perturbation = Function(perturbation_direction)
     vec = perturbation.vector()
     vec *= perturbation_size
