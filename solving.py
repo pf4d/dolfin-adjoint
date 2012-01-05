@@ -102,7 +102,9 @@ def solve(*args, **kwargs):
       eq_l=dolfin.replace(eq.lhs, dict(zip(diag_coeffs, value_coeffs)))
 
       if hermitian:
-        return (Matrix(dolfin.fem.formmanipulations.adjoint(eq_l)), Vector(None))
+        adjoint_bcs = [dolfin.homogenize(bc) for bc in bcs if isinstance(bc, dolfin.DirichletBC)]
+        if len(adjoint_bcs) == 0: adjoint_bcs = None
+        return (Matrix(dolfin.fem.formmanipulations.adjoint(eq_l), bcs=adjoint_bcs), Vector(None))
       else:
         return (Matrix(eq_l, bcs=bcs), Vector(None))
 

@@ -14,10 +14,11 @@ u_1 = Function(V)
 
 dt = Constant(0.1)
 
-f = Expression("sin(pi*x[0])")
+#f = Expression("sin(pi*x[0])")
+f = Expression("x[0]*(x[0]-1)*x[1]*(x[1]-1)")
 F = ( (u - u_0)/dt*v + inner(grad(u), grad(v)) + f*v)*dx
 
-#bc = DirichletBC(V, 1.0, "on_boundary")
+bc = DirichletBC(V, 1.0, "on_boundary")
 
 a, L = lhs(F), rhs(F)
 
@@ -31,6 +32,7 @@ u_out << u_0
 
 while( t <= T):
 
+    #solve(a == L, u_0, bc)
     solve(a == L, u_0)
 
     t += float(dt)
@@ -44,6 +46,7 @@ print "Replay forward model"
 functional=Functional(u_0*dx)
 
 u_out = File("u_replay.pvd", "compressed")
+f_out = File("f_source.pvd", "compressed")
 
 f_direct=0.0
 
@@ -61,7 +64,6 @@ for i in range(adjointer.equation_count):
 f_direct+=adjointer.evaluate_functional(functional, i)
 
 print "Run adjoint model"
-
 
 f_adj=0.0
 
