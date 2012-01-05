@@ -38,7 +38,14 @@ class InitialConditions(Expression):
     def value_shape(self):
         return (3,)
 
-mesh=Mesh("basin.xml")
+try:
+  mesh=Mesh("basin.xml")
+except RuntimeError:
+  import sys
+  import os.path
+
+  mesh=Mesh(os.path.dirname(sys.argv[0]) + os.path.sep + "basin.xml")
+
 mesh.order()
 mesh.init()
 
