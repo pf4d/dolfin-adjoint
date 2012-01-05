@@ -98,20 +98,14 @@ def solve(*args, **kwargs):
           block_name = "Identity: %s" % str(fn_space)
           identity_block = libadjoint.Block(block_name)
         
-          phi=dolfin.TestFunction(fn_space)
-          psi=dolfin.TrialFunction(fn_space)
-
           init_rhs=Vector(rhs_coeff).duplicate()
           init_rhs.axpy(1.0,Vector(rhs_coeff))
 
           def identity_assembly_cb(variables, dependencies, hermitian, coefficient, context):
-
             assert coefficient == 1
-            #return (Matrix(dolfin.inner(phi,psi)*dolfin.dx), Vector(None))
             return (Matrix(ufl.Identity(fn_space.dim())), Vector(dolfin.Function(fn_space)))
-          
-          identity_block.assemble=identity_assembly_cb
 
+          identity_block.assemble=identity_assembly_cb
 
           if debugging["record_all"]:
             adjointer.record_variable(rhs_dep, libadjoint.MemoryStorage(Vector(rhs_coeff)))
