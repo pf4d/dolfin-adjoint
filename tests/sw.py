@@ -131,11 +131,11 @@ def timeloop_theta(M,G,state,params):
 
     # Project the solution to P1 for visualisation.
     rhs=assemble(inner(v_out,state.split()[0])*dx)
-    solve(M_u_out, u_out_state.vector(),rhs,"cg","sor") 
+    solve(M_u_out, u_out_state.vector(),rhs,"cg","sor", annotate=False) 
     
     # Project the solution to P1 for visualisation.
     rhs=assemble(inner(q_out,state.split()[1])*dx)
-    solve(M_p_out, p_out_state.vector(),rhs,"cg","sor") 
+    solve(M_p_out, p_out_state.vector(),rhs,"cg","sor", annotate=False) 
     
     u_out << u_out_state
     p_out << p_out_state
@@ -146,17 +146,12 @@ def timeloop_theta(M,G,state,params):
     step=0    
 
     tmpstate=Function(state.function_space())
-    state.adj_name="state"
-    tmpstate.adj_name="state"
 
     while (t < params["finish_time"]):
         t+=dt
         step+=1
         print t
         rhs=action(A_r,state)
-
-        state.adj_timestep=step-1
-        tmpstate.adj_timestep=step
         
         # Solve the shallow water equations.
         solve(A==rhs, tmpstate)
@@ -168,11 +163,11 @@ def timeloop_theta(M,G,state,params):
         
             # Project the solution to P1 for visualisation.
             rhs=assemble(inner(v_out,state.split()[0])*dx)
-            solve(M_u_out, u_out_state.vector(),rhs,"cg","sor") 
+            solve(M_u_out, u_out_state.vector(),rhs,"cg","sor", annotate=False) 
 
             # Project the solution to P1 for visualisation.
             rhs=assemble(inner(q_out,state.split()[1])*dx)
-            solve(M_p_out, p_out_state.vector(),rhs,"cg","sor") 
+            solve(M_p_out, p_out_state.vector(),rhs,"cg","sor", annotate=False) 
             
             u_out << u_out_state
             p_out << p_out_state
@@ -180,10 +175,12 @@ def timeloop_theta(M,G,state,params):
 
 def replay(state,params):
 
+    print "Replaying forward run"
+
     u_out,p_out=output_files(params["basename"]+"_replay")
 
-    #for i in range(adjointer.equation_count):
-    for i in range(3):
+    for i in range(adjointer.equation_count):
+    #for i in range(3):
         (fwd_var, output) = adjointer.get_forward_solution(i)
 
         s=libadjoint.MemoryStorage(output)

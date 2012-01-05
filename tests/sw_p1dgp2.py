@@ -20,5 +20,8 @@ M,G=sw.construct_shallow_water(W,kelvin.params)
 
 sw.timeloop_theta(M,G,state,kelvin.params)
 
+adj_html("forward.html", "forward")
+adj_html("adjoint.html", "adjoint")
+
 sw.replay(state,kelvin.params)
 

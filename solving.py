@@ -364,3 +364,56 @@ class RHS(libadjoint.RHS):
   def __str__(self):
     
     return hashlib.md5(str(self.form)).hexdigest()
+
+dolfin_assign = dolfin.Function.assign
+def dolfin_adjoint_assign(self, other):
+  '''We also need to monkeypatch the Function.assign method, as it is often used inside 
+  the main time loop, and not annotating it means you get the adjoint wrong for totally
+  nonobvious reasons. If anyone objects to me monkeypatching your objects, my apologies
+  in advance.'''
+
+  # ignore anything not a dolfin.Function
+  if not isinstance(other, dolfin.Function):
+    return dolfin_assign(self, other)
+
+  # ignore anything that is an interpolation, rather than a straight assignment
+  if self.function_space() != other.function_space():
+    return dolfin_assign(self, other)
+
+  other_var = adj_variables[other]
+  # ignore any functions we haven't seen before -- we DON'T want to
+  # annotate the assignment of initial conditions here. That happens
+  # in the main solve wrapper.
+  if not adjointer.variable_known(other_var):
+    return dolfin_assign(self, other)
+
+  # OK, so we have a variable we've seen before. Beautiful.
+  fn_space = other.function_space()
+  block_name = "Identity: %s" % str(fn_space)
+
+  diag_identity_block = libadjoint.Block(block_name)
+  def identity_assembly_cb(variables, dependencies, hermitian, coefficient, context):
+    assert coefficient == 1
+    return (Matrix(ufl.Identity(fn_space.dim())), Vector(dolfin.Function(fn_space)))
+  diag_identity_block.assemble = identity_assembly_cb
+
+  offdiag_identity_block = libadjoint.Block(block_name, coefficient=-1.0)
+  def identity_action_cb(variables, dependencies, hermitian, coefficient, input, context):
+    new = input.duplicate()
+    new.axpy(coefficient, input)
+    return new
+  offdiag_identity_block.action = identity_action_cb
+
+  self_var = adj_variables.next(self)
+
+  if debugging["record_all"]:
+    adjointer.record_variable(self_var, libadjoint.MemoryStorage(Vector(other)))
+
+  assign_eq = libadjoint.Equation(self_var, blocks=[offdiag_identity_block, diag_identity_block], targets=[other_var, self_var])
+  adjointer.register_equation(assign_eq)
+
+  # And we're done.
+
+  return dolfin_assign(self, other)
+
+dolfin.Function.assign = dolfin_adjoint_assign
