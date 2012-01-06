@@ -23,5 +23,6 @@ sw.timeloop_theta(M,G,state,kelvin.params)
 adj_html("forward.html", "forward")
 adj_html("adjoint.html", "adjoint")
 
-sw.replay(state,kelvin.params)
-
+state = sw.replay(state, kelvin.params)
+J = Functional(dot(state.split()[0], state.split()[0])*dx)
+adj_state = sw.adjoint(state, kelvin.params, J)

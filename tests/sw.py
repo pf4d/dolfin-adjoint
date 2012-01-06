@@ -177,10 +177,7 @@ def replay(state,params):
 
     print "Replaying forward run"
 
-    u_out,p_out=output_files(params["basename"]+"_replay")
-
     for i in range(adjointer.equation_count):
-    #for i in range(3):
         (fwd_var, output) = adjointer.get_forward_solution(i)
 
         s=libadjoint.MemoryStorage(output)
@@ -189,20 +186,19 @@ def replay(state,params):
 
         adjointer.record_variable(fwd_var, s)
 
-        M_u_out, v_out, u_out_state=u_output_projector(state.function_space())
-        
-        M_p_out, q_out, p_out_state=p_output_projector(state.function_space())
-        
-        # Project the solution to P1 for visualisation.
-        rhs=assemble(inner(v_out,state.split()[0])*dx)
-        solve(M_u_out, u_out_state.vector(),rhs,"cg","sor") 
-    
-        # Project the solution to P1 for visualisation.
-        rhs=assemble(inner(q_out,state.split()[1])*dx)
-        solve(M_p_out, p_out_state.vector(),rhs,"cg","sor") 
+    return output.data # return the last forward solution
 
-        u_out << u_out_state
-        p_out << p_out_state
+def adjoint(state, params, functional):
+
+    print "Running adjoint"
+
+    for i in range(adjointer.equation_count)[::-1]:
+        (adj_var, output) = adjointer.get_adjoint_solution(i, functional)
+
+        s=libadjoint.MemoryStorage(output)
+        adjointer.record_variable(adj_var, s)
+
+    return output.data # return the adjoint solution associated with the initial condition
 
 
 def u_output_projector(W):
