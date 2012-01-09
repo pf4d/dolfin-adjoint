@@ -143,6 +143,6 @@ def test_ic_gradient(final_adjoint):
     with_gradient.append(remainder)
 
   print "Taylor remainder with adjoint information: ", with_gradient
-  print "Convergence orders for Taylor remainder wth adjoint information (should all be 2): ", convergence_order(with_gradient)
+  print "Convergence orders for Taylor remainder with adjoint information (should all be 2): ", convergence_order(with_gradient)
 
 test_ic_gradient(final_adjoint)
