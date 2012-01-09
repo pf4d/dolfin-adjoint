@@ -150,7 +150,6 @@ def timeloop_theta(M,G,state,params):
     while (t < params["finish_time"]):
         t+=dt
         step+=1
-        print t
         rhs=action(A_r,state)
         
         # Solve the shallow water equations.
@@ -172,6 +171,8 @@ def timeloop_theta(M,G,state,params):
             u_out << u_out_state
             p_out << p_out_state
 
+    return state # return the state at the final time
+
 
 def replay(state,params):
 
@@ -186,13 +187,12 @@ def replay(state,params):
 
         adjointer.record_variable(fwd_var, s)
 
-    return output.data # return the last forward solution
-
 def adjoint(state, params, functional):
 
     print "Running adjoint"
 
     for i in range(adjointer.equation_count)[::-1]:
+        print "  solving adjoint equation ", i
         (adj_var, output) = adjointer.get_adjoint_solution(i, functional)
 
         s=libadjoint.MemoryStorage(output)

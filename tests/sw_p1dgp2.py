@@ -18,11 +18,11 @@ kelvin.params["dump_period"]=1
 
 M,G=sw.construct_shallow_water(W,kelvin.params)
 
-sw.timeloop_theta(M,G,state,kelvin.params)
+state = sw.timeloop_theta(M,G,state,kelvin.params)
 
 adj_html("forward.html", "forward")
 adj_html("adjoint.html", "adjoint")
 
-state = sw.replay(state, kelvin.params)
-J = Functional(dot(state.split()[0], state.split()[0])*dx)
+sw.replay(state, kelvin.params)
+J = Functional(dot(state, state)*dx)
 adj_state = sw.adjoint(state, kelvin.params, J)

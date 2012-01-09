@@ -92,8 +92,8 @@ def solve(*args, **kwargs):
       # relevant adjoint equations for the adjoint variables associated with
       # the initial conditions.
       for rhs_coeff, rhs_dep in zip(rhs.coefficients(),rhs.dependencies()):
-        # If rhs_coeff is not in adj_coeffs, it musts be an initial condition.
-        if rhs_dep.timestep == 0:
+        # If rhs_coeff is not known, it must be an initial condition.
+        if not adjointer.variable_known(rhs_dep):
           fn_space = rhs_coeff.function_space()
           block_name = "Identity: %s" % str(fn_space)
           identity_block = libadjoint.Block(block_name)
@@ -389,31 +389,37 @@ def dolfin_adjoint_assign(self, other):
 
   # OK, so we have a variable we've seen before. Beautiful.
   fn_space = other.function_space()
-  block_name = "Identity: %s" % str(fn_space)
+  u, v = dolfin.TestFunction(fn_space), dolfin.TrialFunction(fn_space)
+  M = dolfin.inner(u, v)*dolfin.dx
+  return solve(M == dolfin.action(M, other), self) # this takes care of all the annotation etc
 
-  diag_identity_block = libadjoint.Block(block_name)
-  def identity_assembly_cb(variables, dependencies, hermitian, coefficient, context):
-    assert coefficient == 1
-    return (Matrix(ufl.Identity(fn_space.dim())), Vector(dolfin.Function(fn_space)))
-  diag_identity_block.assemble = identity_assembly_cb
+  # -----------------------------------------------------------
+  #block_name = "Identity: %s" % str(fn_space)
 
-  offdiag_identity_block = libadjoint.Block(block_name, coefficient=-1.0)
-  def identity_action_cb(variables, dependencies, hermitian, coefficient, input, context):
-    new = input.duplicate()
-    new.axpy(coefficient, input)
-    return new
-  offdiag_identity_block.action = identity_action_cb
+  #diag_identity_block = libadjoint.Block(block_name)
+  #def identity_assembly_cb(variables, dependencies, hermitian, coefficient, context):
+  #  assert coefficient == 1
+  #  return (Matrix(ufl.Identity(fn_space.dim())), Vector(dolfin.Function(fn_space)))
+  #diag_identity_block.assemble = identity_assembly_cb
 
-  self_var = adj_variables.next(self)
+  #offdiag_identity_block = libadjoint.Block(block_name, coefficient=-1.0)
+  #def identity_action_cb(variables, dependencies, hermitian, coefficient, input, context):
+  #  new = input.duplicate()
+  #  new.axpy(coefficient, input)
+  #  return new
+  #offdiag_identity_block.action = identity_action_cb
 
-  if debugging["record_all"]:
-    adjointer.record_variable(self_var, libadjoint.MemoryStorage(Vector(other)))
+  #self_var = adj_variables.next(self)
 
-  assign_eq = libadjoint.Equation(self_var, blocks=[offdiag_identity_block, diag_identity_block], targets=[other_var, self_var])
-  adjointer.register_equation(assign_eq)
+  #if debugging["record_all"]:
+  #  adjointer.record_variable(self_var, libadjoint.MemoryStorage(Vector(other)))
+
+  #assign_eq = libadjoint.Equation(self_var, blocks=[offdiag_identity_block, diag_identity_block], targets=[other_var, self_var])
+  #adjointer.register_equation(assign_eq)
+  # -----------------------------------------------------------
 
   # And we're done.
 
-  return dolfin_assign(self, other)
+  # return dolfin_assign(self, other)
 
 dolfin.Function.assign = dolfin_adjoint_assign
