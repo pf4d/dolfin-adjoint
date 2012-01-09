@@ -366,14 +366,14 @@ class RHS(libadjoint.RHS):
     return hashlib.md5(str(self.form)).hexdigest()
 
 dolfin_assign = dolfin.Function.assign
-def dolfin_adjoint_assign(self, other):
+def dolfin_adjoint_assign(self, other, annotate=True):
   '''We also need to monkeypatch the Function.assign method, as it is often used inside 
   the main time loop, and not annotating it means you get the adjoint wrong for totally
   nonobvious reasons. If anyone objects to me monkeypatching your objects, my apologies
   in advance.'''
 
   # ignore anything not a dolfin.Function
-  if not isinstance(other, dolfin.Function):
+  if not isinstance(other, dolfin.Function) or annotate is False:
     return dolfin_assign(self, other)
 
   # ignore anything that is an interpolation, rather than a straight assignment

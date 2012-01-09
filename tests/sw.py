@@ -116,7 +116,7 @@ def construct_shallow_water(W,params):
 
     return (M, C+Ct+F)
 
-def timeloop_theta(M,G,state,params):
+def timeloop_theta(M, G, state, params, annotate=True):
     '''Solve M*dstate/dt = G*state using a theta scheme.'''
     
     A=M+params["theta"]*params["dt"]*G
@@ -153,10 +153,10 @@ def timeloop_theta(M,G,state,params):
         rhs=action(A_r,state)
         
         # Solve the shallow water equations.
-        solve(A==rhs, tmpstate)
+        solve(A==rhs, tmpstate, annotate=annotate)
         #solve(A, state.vector(), rhs, "preonly", "lu")
 
-        state.assign(tmpstate)
+        state.assign(tmpstate, annotate=annotate)
 
         if step%params["dump_period"] == 0:
         
@@ -172,7 +172,6 @@ def timeloop_theta(M,G,state,params):
             p_out << p_out_state
 
     return state # return the state at the final time
-
 
 def replay(state,params):
 
