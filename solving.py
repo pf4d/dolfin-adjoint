@@ -278,6 +278,27 @@ class Vector(libadjoint.Vector):
     for i in range(len(vec)):
       vec[i] = random.random()
 
+  def size(self):
+    if hasattr(self, "fn_space"):
+      return self.fn_space.dim()
+
+    if isinstance(self.data, dolfin.Function):
+      return len(self.data.vector())
+
+    if isinstance(self.data, ufl.form.Form):
+      return len(dolfin.assemble(self.data))
+
+    raise LibadjointErrorNotImplemented("Don't know how to get the size.")
+
+  def set_values(self, array):
+    if isinstance(self.data, dolfin.Function):
+      vec = self.data.vector()
+      for i in range(len(array)):
+        vec[i] = array[i]
+      return
+
+    raise LibadjointErrorNotImplemented("Don't know how to set values.")
+
 class Matrix(libadjoint.Matrix):
   '''This class implements the libadjoint.Matrix abstract base class for the Dolfin adjoint.
   In particular, it must implement the data callbacks for tasks such as adding two matrices
