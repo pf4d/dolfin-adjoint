@@ -135,7 +135,7 @@ def solve(*args, **kwargs):
           # solution associated with the lifted discrete system that is actually solved.
           adjoint_bcs = [dolfin.homogenize(bc) for bc in bcs if isinstance(bc, dolfin.DirichletBC)]
           if len(adjoint_bcs) == 0: adjoint_bcs = None
-          return (Matrix(dolfin.fem.formmanipulations.adjoint(eq_l), bcs=adjoint_bcs), Vector(None))
+          return (Matrix(dolfin.adjoint(eq_l), bcs=adjoint_bcs), Vector(None))
         else:
           return (Matrix(eq_l, bcs=bcs), Vector(None))
       diag_block.assemble=diag_assembly_cb
@@ -150,7 +150,7 @@ def solve(*args, **kwargs):
           deriv = ufl.derivative(current_form, dolfin_variable, contraction_vector.data)
 
           if hermitian:
-            deriv = dolfin.fem.formmanipulations.adjoint(deriv)
+            deriv = dolfin.adjoint(deriv)
 
           action = coefficient * dolfin.action(deriv, input.data)
 
