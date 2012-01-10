@@ -44,6 +44,7 @@ adj_variables=CoeffStore()
 # run. This is primarily useful for debugging.
 debugging["record_all"] = False
 debugging["test_hermitian"] = None
+debugging["test_derivative"] = None
 
 # Create the adjointer, the central object that records the forward solve
 # as it happens.
@@ -82,7 +83,7 @@ def solve(*args, **kwargs):
       diag_name = hashlib.md5(str(eq.lhs)).hexdigest() # we don't have a useful human-readable name, so take the md5sum of the string representation of the form
       diag_deps = [adj_variables[coeff] for coeff in ufl.algorithms.extract_coefficients(eq.lhs) if hasattr(coeff, "function_space")]
       diag_coeffs = [coeff for coeff in ufl.algorithms.extract_coefficients(eq.lhs) if hasattr(coeff, "function_space")]
-      diag_block = libadjoint.Block(diag_name, dependencies=diag_deps, test_hermitian=debugging["test_hermitian"])
+      diag_block = libadjoint.Block(diag_name, dependencies=diag_deps, test_hermitian=debugging["test_hermitian"], test_derivative=debugging["test_derivative"])
 
       # Similarly, create the object associated with the right-hand side data.
       rhs=RHS(eq.rhs)
@@ -128,7 +129,6 @@ def solve(*args, **kwargs):
         assert coefficient == 1
 
         value_coeffs=[v.data for v in values]
-
         eq_l=dolfin.replace(eq.lhs, dict(zip(diag_coeffs, value_coeffs)))
 
         if hermitian:
@@ -139,7 +139,17 @@ def solve(*args, **kwargs):
           return (Matrix(dolfin.adjoint(eq_l), bcs=adjoint_bcs), Vector(None, fn_space=u.function_space()))
         else:
           return (Matrix(eq_l, bcs=bcs), Vector(None, fn_space=u.function_space()))
-      diag_block.assemble=diag_assembly_cb
+      diag_block.assemble = diag_assembly_cb
+
+      def diag_action_cb(dependencies, values, hermitian, coefficient, input, context):
+        value_coeffs = [v.data for v in values]
+        eq_l = dolfin.replace(eq.lhs, dict(zip(diag_coeffs, value_coeffs)))
+
+        if hermitian:
+          eq_l = dolfin.adjoint(eq_l, reordered_arguments=ufl.algorithms.extract_arguments(eq_l))
+
+        return Vector(coefficient * dolfin.action(eq_l, input.data))
+      diag_block.action = diag_action_cb
 
       if len(diag_deps) > 0:
         def derivative_action(dependencies, values, variable, contraction_vector, hermitian, input, coefficient, context):
