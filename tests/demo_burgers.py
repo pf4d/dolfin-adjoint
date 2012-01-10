@@ -5,6 +5,9 @@ Naive implementation of Burgers' equation, goes oscillatory later
 # Last changed: 2012-01-09
 
 from dolfin import *
+from dolfin_adjoint import *
+
+debugging["record_all"] = True
 
 def Dt(u, u_, timestep):
     return (u - u_)/timestep
@@ -38,12 +41,14 @@ def main(n):
         u_.assign(u)
 
         t += float(timestep)
-        plot(u)
+        #plot(u)
 
-    interactive()
+    #interactive()
 
 if __name__ == "__main__":
 
     main(100)
+    adj_html("forward.html", "forward")
+    adj_html("adjoint.html", "adjoint")
 
 

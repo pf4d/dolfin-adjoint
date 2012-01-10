@@ -91,15 +91,15 @@ def solve(*args, **kwargs):
       # These equations are necessary so that libadjoint can assemble the
       # relevant adjoint equations for the adjoint variables associated with
       # the initial conditions.
-      for rhs_coeff, rhs_dep in zip(rhs.coefficients(),rhs.dependencies()):
-        # If rhs_coeff is not known, it must be an initial condition.
-        if not adjointer.variable_known(rhs_dep):
-          fn_space = rhs_coeff.function_space()
+      for coeff, dep in zip(rhs.coefficients(),rhs.dependencies()) + zip(diag_coeffs, diag_deps):
+        # If coeff is not known, it must be an initial condition.
+        if not adjointer.variable_known(dep):
+          fn_space = coeff.function_space()
           block_name = "Identity: %s" % str(fn_space)
           identity_block = libadjoint.Block(block_name)
         
-          init_rhs=Vector(rhs_coeff).duplicate()
-          init_rhs.axpy(1.0,Vector(rhs_coeff))
+          init_rhs=Vector(coeff).duplicate()
+          init_rhs.axpy(1.0,Vector(coeff))
 
           def identity_assembly_cb(variables, dependencies, hermitian, coefficient, context):
             assert coefficient == 1
@@ -108,10 +108,11 @@ def solve(*args, **kwargs):
           identity_block.assemble=identity_assembly_cb
 
           if debugging["record_all"]:
-            adjointer.record_variable(rhs_dep, libadjoint.MemoryStorage(Vector(rhs_coeff)))
+            adjointer.record_variable(dep, libadjoint.MemoryStorage(Vector(coeff)))
 
-          initial_eq = libadjoint.Equation(rhs_dep, blocks=[identity_block], targets=[rhs_dep], rhs=RHS(init_rhs))
+          initial_eq = libadjoint.Equation(dep, blocks=[identity_block], targets=[dep], rhs=RHS(init_rhs))
           adjointer.register_equation(initial_eq)
+          assert adjointer.variable_known(dep)
 
       var = adj_variables.next(u)
 
