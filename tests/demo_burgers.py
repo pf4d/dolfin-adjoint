@@ -50,5 +50,5 @@ if __name__ == "__main__":
     main(100)
     adj_html("forward.html", "forward")
     adj_html("adjoint.html", "adjoint")
-
-
+    print "Running forward replay .... "
+    replay_dolfin()
