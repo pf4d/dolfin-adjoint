@@ -150,7 +150,7 @@ def solve(*args, **kwargs):
           deriv = ufl.derivative(current_form, dolfin_variable, contraction_vector.data)
 
           if hermitian:
-            deriv = dolfin.adjoint(deriv)
+            deriv = dolfin.adjoint(deriv, reordered_arguments=ufl.algorithms.extract_arguments(deriv))
 
           action = coefficient * dolfin.action(deriv, input.data)
 
@@ -207,14 +207,6 @@ class Vector(libadjoint.Vector):
 
   def axpy(self, alpha, x):
 
-    if isinstance(self.data, ufl.form.Form):
-      import numpy
-      print "x: ", x.data
-      print "x.__class__: ", x.data.__class__
-      print "Assembled x: ", numpy.array(dolfin.assemble(x.data))
-      print "y: ", self.data
-      print "y.__class__: ", self.data.__class__
-      print "Assembled y: ", numpy.array(dolfin.assemble(self.data))
     if x.zero:
       return
 
@@ -236,10 +228,6 @@ class Vector(libadjoint.Vector):
       self.data+=alpha*x.data
 
     self.zero = False
-
-    if isinstance(self.data, ufl.form.Form):
-      print "output: ", self.data
-      print "Assembled output: ", list(dolfin.assemble(self.data))
 
   def norm(self):
 
@@ -373,7 +361,7 @@ class RHS(libadjoint.RHS):
       d_rhs=ufl.derivative(current_form, dolfin_variable, trial)
 
       if hermitian:
-        action = dolfin.action(dolfin.adjoint(d_rhs),contraction_vector.data)
+        action = dolfin.action(dolfin.adjoint(d_rhs, reordered_arguments=ufl.algorithms.extract_arguments(d_rhs)),contraction_vector.data)
       else:
         action = dolfin.action(d_rhs,contraction_vector.data)
 
