@@ -7,17 +7,18 @@ Naive implementation of Burgers' equation, goes oscillatory later
 from dolfin import *
 from dolfin_adjoint import *
 
+n = 100
+mesh = UnitInterval(n)
+V = FunctionSpace(mesh, "CG", 2)
+
 debugging["record_all"] = True
 
 def Dt(u, u_, timestep):
     return (u - u_)/timestep
 
-def main(n):
+def main(ic, annotate=False):
 
-    mesh = UnitInterval(n)
-    V = FunctionSpace(mesh, "CG", 2)
-
-    u_ = project(Expression("sin(2*pi*x[0])"),  V)
+    u_ = Function(ic)
     u = TrialFunction(V)
     v = TestFunction(V)
 
@@ -36,9 +37,9 @@ def main(n):
     end = 0.2
     u = Function(V)
     while (t <= end):
-        solve(a == L, u, bc)
+        solve(a == L, u, bc, annotate=annotate)
 
-        u_.assign(u)
+        u_.assign(u, annotate=annotate)
 
         t += float(timestep)
         #plot(u)
@@ -48,12 +49,19 @@ def main(n):
 
 if __name__ == "__main__":
 
-    forward = main(100)
-    adj_html("forward.html", "forward")
-    adj_html("adjoint.html", "adjoint")
+    ic = project(Expression("sin(2*pi*x[0])"),  V)
+    forward = main(ic, annotate=True)
+    adj_html("burgers_forward.html", "forward")
+    adj_html("burgers_adjoint.html", "adjoint")
     print "Running forward replay .... "
     replay_dolfin()
     print "Running adjoint ... "
 
     J = Functional(forward*forward*dx)
     adjoint = adjoint_dolfin(J)
+
+    def Jfunc(ic):
+      forward = main(ic, annotate=False)
+      return assemble(forward*forward*dx)
+
+    minconv = test_initial_condition(Jfunc, ic, adjoint, seed=1.0e-7)

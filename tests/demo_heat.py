@@ -47,8 +47,8 @@ def run_forward(initial_condition=None, annotate=True, dump=True):
 
 final_forward = run_forward()
 
-adj_html("forward.html", "forward")
-adj_html("adjoint.html", "adjoint")
+adj_html("heat_forward.html", "forward")
+adj_html("heat_adjoint.html", "adjoint")
 
 def run_replay():
   print "Replaying forward model (will error if differs from correct solution) ..."
@@ -93,46 +93,8 @@ def run_adjoint():
 
 final_adjoint = run_adjoint()
 
-def test_ic_gradient(final_adjoint):
-  # We will compute the gradient of the functional with respect to the initial condition,
-  # and check its correctness with the Taylor remainder convergence test.
-  print "Running Taylor remainder convergence analysis ... "
-  import random
-  import numpy
+def J(ic):
+  perturbed_u0 = run_forward(initial_condition=ic, annotate=False, dump=False)
+  return assemble(perturbed_u0*perturbed_u0*dx)
 
-  # Randomise the perturbation direction:
-  perturbation_direction = Function(V)
-  vec = perturbation_direction.vector()
-  for i in range(len(vec)):
-    vec[i] = random.random()
-
-  # Run the forward problem for various perturbed initial conditions
-  functional_values = []
-  perturbations = []
-  for perturbation_size in [10.0/(2**i) for i in range(5)]:
-    perturbation = Function(perturbation_direction)
-    vec = perturbation.vector()
-    vec *= perturbation_size
-    perturbations.append(perturbation)
-
-    perturbed_u0 = run_forward(initial_condition=perturbation, annotate=False, dump=False)
-    functional_values.append(assemble(perturbed_u0*perturbed_u0*dx))
-
-  # First-order Taylor remainders (not using adjoint)
-  no_gradient = [abs(perturbed_f - f_direct) for perturbed_f in functional_values]
-  no_gradient_conv = convergence_order(no_gradient)
-
-  print "Taylor remainder without adjoint information: ", no_gradient
-  print "Convergence orders for Taylor remainder without adjoint information (should all be 1): ", no_gradient_conv
-
-  adjoint_vector = numpy.array(final_adjoint.vector())
-
-  with_gradient = []
-  for i in range(len(perturbations)):
-    remainder = abs(functional_values[i] - f_direct - numpy.dot(adjoint_vector, numpy.array(perturbations[i].vector())))
-    with_gradient.append(remainder)
-
-  print "Taylor remainder with adjoint information: ", with_gradient
-  print "Convergence orders for Taylor remainder with adjoint information (should all be 2): ", convergence_order(with_gradient)
-
-test_ic_gradient(final_adjoint)
+test_initial_condition(J, Function(V), final_adjoint, seed=10.0)
