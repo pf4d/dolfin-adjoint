@@ -12,6 +12,7 @@ mesh = UnitInterval(n)
 V = FunctionSpace(mesh, "CG", 2)
 
 debugging["record_all"] = True
+debugging["test_hermitian"] = (100, 1.0e-14)
 
 def Dt(u, u_, timestep):
     return (u - u_)/timestep

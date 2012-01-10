@@ -43,6 +43,7 @@ adj_variables=CoeffStore()
 # Set record_all to true to enable recording all variables in the forward
 # run. This is primarily useful for debugging.
 debugging["record_all"] = False
+debugging["test_hermitian"] = None
 
 # Create the adjointer, the central object that records the forward solve
 # as it happens.
@@ -81,7 +82,7 @@ def solve(*args, **kwargs):
       diag_name = hashlib.md5(str(eq.lhs)).hexdigest() # we don't have a useful human-readable name, so take the md5sum of the string representation of the form
       diag_deps = [adj_variables[coeff] for coeff in ufl.algorithms.extract_coefficients(eq.lhs) if hasattr(coeff, "function_space")]
       diag_coeffs = [coeff for coeff in ufl.algorithms.extract_coefficients(eq.lhs) if hasattr(coeff, "function_space")]
-      diag_block = libadjoint.Block(diag_name, dependencies=diag_deps)
+      diag_block = libadjoint.Block(diag_name, dependencies=diag_deps, test_hermitian=debugging["test_hermitian"])
 
       # Similarly, create the object associated with the right-hand side data.
       rhs=RHS(eq.rhs)
@@ -135,9 +136,9 @@ def solve(*args, **kwargs):
           # solution associated with the lifted discrete system that is actually solved.
           adjoint_bcs = [dolfin.homogenize(bc) for bc in bcs if isinstance(bc, dolfin.DirichletBC)]
           if len(adjoint_bcs) == 0: adjoint_bcs = None
-          return (Matrix(dolfin.adjoint(eq_l), bcs=adjoint_bcs), Vector(None))
+          return (Matrix(dolfin.adjoint(eq_l), bcs=adjoint_bcs), Vector(None, fn_space=u.function_space()))
         else:
-          return (Matrix(eq_l, bcs=bcs), Vector(None))
+          return (Matrix(eq_l, bcs=bcs), Vector(None, fn_space=u.function_space()))
       diag_block.assemble=diag_assembly_cb
 
       if len(diag_deps) > 0:
@@ -186,7 +187,7 @@ class Vector(libadjoint.Vector):
   together, duplicating vectors, taking norms, etc., that occur in the process of constructing
   the adjoint equations.'''
 
-  def __init__(self, data, zero=False):
+  def __init__(self, data, zero=False, fn_space=None):
 
     self.data=data
     # self.zero is true if we can prove that the vector is zero.
@@ -195,15 +196,24 @@ class Vector(libadjoint.Vector):
     else:
       self.zero=zero
 
+    if fn_space is not None:
+      self.fn_space = fn_space
+
   def duplicate(self):
 
     if isinstance(self.data, ufl.form.Form):
       # The data type will be determined by the first addto.
-      data=None
+      data = None
+    elif isinstance(self.data, dolfin.Function):
+      data = dolfin.Function(self.data.function_space())
     else:
-      data=dolfin.Function(self.data.function_space())
+      data = None
 
-    return Vector(data, zero=True)
+    fn_space = None
+    if hasattr(self, "fn_space"):
+      fn_space = self.fn_space
+
+    return Vector(data, zero=True, fn_space=fn_space)
 
   def axpy(self, alpha, x):
 
@@ -235,7 +245,28 @@ class Vector(libadjoint.Vector):
 
   def dot_product(self,y):
 
-    return dolfin.assemble(dolfin.inner(self.data, y.data)*dolfin.dx)
+    if isinstance(self.data, ufl.form.Form):
+      return dolfin.assemble(dolfin.inner(self.data, y.data)*dolfin.dx)
+    elif isinstance(self.data, dolfin.Function):
+      import numpy
+      if isinstance(y.data, ufl.form.Form):
+        other = dolfin.assemble(y.data)
+      else:
+        other = y.data.vector()
+      return numpy.dot(numpy.array(self.data.vector()), numpy.array(other))
+    else:
+      raise LibadjointErrorNotImplemented("Don't know how to dot anything else.")
+
+  def set_random(self):
+    assert isinstance(self.data, dolfin.Function) or hasattr(self, "fn_space")
+    import random
+
+    if self.data is None:
+      self.data = dolfin.Function(self.fn_space)
+
+    vec = self.data.vector()
+    for i in range(len(vec)):
+      vec[i] = random.random()
 
 class Matrix(libadjoint.Matrix):
   '''This class implements the libadjoint.Matrix abstract base class for the Dolfin adjoint.
