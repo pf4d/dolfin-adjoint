@@ -93,16 +93,6 @@ def run_adjoint():
 
 final_adjoint = run_adjoint()
 
-def convergence_order(errors):
-  import math
-
-  orders = [0.0] * (len(errors)-1)
-  for i in range(len(errors)-1):
-    orders[i] = math.log(errors[i]/errors[i+1], 2)
-
-  return orders
-
-
 def test_ic_gradient(final_adjoint):
   # We will compute the gradient of the functional with respect to the initial condition,
   # and check its correctness with the Taylor remainder convergence test.
