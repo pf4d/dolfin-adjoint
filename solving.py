@@ -147,26 +147,12 @@ def solve(*args, **kwargs):
 
           current_form = dolfin.replace(eq.lhs, dict(zip(diag_coeffs, dolfin_values)))
 
-          print "eq.lhs: ", eq.lhs
-          #print "rank(eq.lhs): ", ufl.rank(eq.lhs)
-
-          print "current_form: ", current_form
-
-          def rank(x):
-            return len(ufl.algorithms.extract_arguments(x))
-
-          print "rank(current_form): ", rank(current_form)
           deriv = ufl.derivative(current_form, dolfin_variable, contraction_vector.data)
-          print "deriv: ", deriv
-          print "rank(deriv): ", rank(deriv)
 
           if hermitian:
             deriv = dolfin.fem.formmanipulations.adjoint(deriv)
 
           action = coefficient * dolfin.action(deriv, input.data)
-
-          print "action: ", action
-          print "rank(action): ", rank(action)
 
           return Vector(action)
         diag_block.derivative_action = derivative_action
@@ -221,6 +207,14 @@ class Vector(libadjoint.Vector):
 
   def axpy(self, alpha, x):
 
+    if isinstance(self.data, ufl.form.Form):
+      import numpy
+      print "x: ", x.data
+      print "x.__class__: ", x.data.__class__
+      print "Assembled x: ", numpy.array(dolfin.assemble(x.data))
+      print "y: ", self.data
+      print "y.__class__: ", self.data.__class__
+      print "Assembled y: ", numpy.array(dolfin.assemble(self.data))
     if x.zero:
       return
 
@@ -242,6 +236,10 @@ class Vector(libadjoint.Vector):
       self.data+=alpha*x.data
 
     self.zero = False
+
+    if isinstance(self.data, ufl.form.Form):
+      print "output: ", self.data
+      print "Assembled output: ", list(dolfin.assemble(self.data))
 
   def norm(self):
 
@@ -375,14 +373,15 @@ class RHS(libadjoint.RHS):
       d_rhs=ufl.derivative(current_form, dolfin_variable, trial)
 
       if hermitian:
-        return Vector(dolfin.action(dolfin.adjoint(d_rhs),contraction_vector.data))
+        action = dolfin.action(dolfin.adjoint(d_rhs),contraction_vector.data)
       else:
-        return Vector(dolfin.action(d_rhs,contraction_vector.data))
-      
+        action = dolfin.action(d_rhs,contraction_vector.data)
+
+      return Vector(action)
     else:
       # RHS is a Vector. Its derivative is therefore zero.
       raise exceptions.LibadjointErrorNotImplemented("No derivative method for constant RHS.")
-      
+
 
   def dependencies(self):
 
