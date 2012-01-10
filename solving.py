@@ -148,7 +148,13 @@ def solve(*args, **kwargs):
         if hermitian:
           eq_l = dolfin.adjoint(eq_l, reordered_arguments=ufl.algorithms.extract_arguments(eq_l))
 
-        return Vector(coefficient * dolfin.action(eq_l, input.data))
+        output_vec = dolfin.assemble(coefficient * dolfin.action(eq_l, input.data))
+        output_fn = dolfin.Function(input.data.function_space())
+        vec = output_fn.vector()
+        for i in range(len(vec)):
+          vec[i] = output_vec[i]
+
+        return Vector(output_fn)
       diag_block.action = diag_action_cb
 
       if len(diag_deps) > 0:
@@ -251,7 +257,13 @@ class Vector(libadjoint.Vector):
 
   def norm(self):
 
-    return (abs(dolfin.assemble(dolfin.inner(self.data, self.data)*dolfin.dx)))**0.5
+    if isinstance(self.data, dolfin.Function):
+      return (abs(dolfin.assemble(dolfin.inner(self.data, self.data)*dolfin.dx)))**0.5
+    elif isinstance(self.data, ufl.form.Form):
+      import scipy.linalg
+      vec = dolfin.assemble(self.data)
+      n = scipy.linalg.norm(vec)
+      return n
 
   def dot_product(self,y):
 
@@ -278,6 +290,8 @@ class Vector(libadjoint.Vector):
     for i in range(len(vec)):
       vec[i] = random.random()
 
+    self.zero = False
+
   def size(self):
     if hasattr(self, "fn_space"):
       return self.fn_space.dim()
@@ -295,9 +309,9 @@ class Vector(libadjoint.Vector):
       vec = self.data.vector()
       for i in range(len(array)):
         vec[i] = array[i]
-      return
-
-    raise LibadjointErrorNotImplemented("Don't know how to set values.")
+      self.zero = False
+    else:
+      raise LibadjointErrorNotImplemented("Don't know how to set values.")
 
 class Matrix(libadjoint.Matrix):
   '''This class implements the libadjoint.Matrix abstract base class for the Dolfin adjoint.
