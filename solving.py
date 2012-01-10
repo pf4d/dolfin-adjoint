@@ -138,8 +138,33 @@ def solve(*args, **kwargs):
           return (Matrix(dolfin.fem.formmanipulations.adjoint(eq_l), bcs=adjoint_bcs), Vector(None))
         else:
           return (Matrix(eq_l, bcs=bcs), Vector(None))
-
       diag_block.assemble=diag_assembly_cb
+
+      if len(diag_deps) > 0:
+        def derivative_action(dependencies, values, variable, contraction_vector, hermitian, input, coefficient, context):
+          dolfin_variable = values[dependencies.index(variable)].data
+          dolfin_values = [val.data for val in values]
+
+          current_form = dolfin.replace(eq.lhs, dict(zip(diag_coeffs, dolfin_values)))
+          trial = dolfin.TrialFunction(dolfin_variable.function_space())
+
+          print "eq.lhs: ", eq.lhs
+          print "rank(eq.lhs): ", ufl.rank(eq.lhs)
+
+          print "current_form: ", current_form
+          print "rank(current_form): ", ufl.rank(current_form)
+          deriv = ufl.derivative(current_form, dolfin_variable, trial)
+          print "deriv: ", deriv
+          print "rank(deriv): ", ufl.rank(deriv)
+          contracted_deriv = dolfin.action(deriv, contraction_vector.data)
+          print "contracted_deriv: ", contracted_deriv
+          print "rank(contracted_deriv): ", ufl.rank(contracted_deriv)
+
+          if hermitian:
+            contracted_deriv = ufl.transpose(contracted_deriv)
+
+          return Vector(coefficient * dolfin.action(contracted_deriv, input.data))
+        diag_block.derivative_action = derivative_action
 
       eqn = libadjoint.Equation(var, blocks=[diag_block], targets=[var], rhs=rhs)
 
