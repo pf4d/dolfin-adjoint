@@ -6,6 +6,7 @@ timestep
 # Last changed: 2012-01-11
 
 from dolfin import *
+from dolfin_adjoint import *
 
 n = 100
 mesh = UnitInterval(n)
@@ -32,13 +33,13 @@ def main(ic, annotate=False):
     end = 0.2
     #J = derivative(F, u)
     while (t <= end):
-        solve(F == 0, u, bc)#, annotate=annotate)
+        solve(F == 0, u, bc, annotate=annotate)
         # Alt (if you want to give the Jacobian
         # solve(F == 0, u, bc, J=J)
-        u_.assign(u)#, annotate=annotate)
+        u_.assign(u, annotate=annotate)
 
         t += float(timestep)
-        plot(u)
+        #plot(u)
 
     #interactive()
     return u_
@@ -48,11 +49,11 @@ if __name__ == "__main__":
     ic = project(Expression("sin(2*pi*x[0])"),  V)
     forward = main(ic, annotate=True)
 
-    #adj_html("burgers_nonlinear_forward.html", "forward")
-    #adj_html("burgers_nonlinear_adjoint.html", "adjoint")
+    adj_html("burgers_newton_forward.html", "forward")
+    adj_html("burgers_newton_adjoint.html", "adjoint")
 
-    #print "Running forward replay .... "
-    #replay_dolfin()
+    print "Running forward replay .... "
+    replay_dolfin()
     #print "Running adjoint ... "
 
     #J = Functional(forward*forward*dx)
