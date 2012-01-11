@@ -146,7 +146,7 @@ def solve(*args, **kwargs):
         eq_l = dolfin.replace(eq.lhs, dict(zip(diag_coeffs, value_coeffs)))
 
         if hermitian:
-          eq_l = dolfin.adjoint(eq_l, reordered_arguments=ufl.algorithms.extract_arguments(eq_l))
+          eq_l = dolfin.adjoint(eq_l)
 
         output_vec = dolfin.assemble(coefficient * dolfin.action(eq_l, input.data))
         output_fn = dolfin.Function(input.data.function_space())
@@ -164,12 +164,12 @@ def solve(*args, **kwargs):
 
           current_form = dolfin.replace(eq.lhs, dict(zip(diag_coeffs, dolfin_values)))
 
-          deriv = ufl.derivative(current_form, dolfin_variable)
+          deriv = dolfin.derivative(current_form, dolfin_variable)
           args = ufl.algorithms.extract_arguments(deriv)
           deriv = dolfin.replace(deriv, {args[1]: contraction_vector.data}) # contract over the middle index
 
           if hermitian:
-            deriv = dolfin.adjoint(deriv, reordered_arguments=ufl.algorithms.extract_arguments(deriv))
+            deriv = dolfin.adjoint(deriv)
 
           action = coefficient * dolfin.action(deriv, input.data)
 
@@ -253,7 +253,23 @@ class Vector(libadjoint.Vector):
       # self is a non-empty form.
       assert(isinstance(x.data, ufl.form.Form))
       assert(isinstance(self.data, ufl.form.Form))
-      self.data+=alpha*x.data
+
+      # Let's do a bit of argument shuffling, shall we?
+      xargs = ufl.algorithms.extract_arguments(x.data)
+      sargs = ufl.algorithms.extract_arguments(self.data)
+
+      if xargs != sargs:
+        # OK, let's check that all of the function spaces are happy and so on.
+        for i in range(len(xargs)):
+          assert xargs[i].element() == sargs[i].element()
+          assert xargs[i].function_space() == sargs[i].function_space()
+
+        # Now that we are happy, let's replace the xargs with the sargs ones.
+        x_form = dolfin.replace(x.data, dict(zip(xargs, sargs)))
+      else:
+        x_form = x.data
+
+      self.data+=alpha*x_form
 
     self.zero = False
 
@@ -374,7 +390,7 @@ class Functional(libadjoint.Functional):
     current_form = dolfin.replace(self.form, dict(zip(dolfin_dependencies, dolfin_values)))
     test = dolfin.TestFunction(dolfin_variable.function_space())
 
-    return Vector(ufl.derivative(current_form, dolfin_variable, test))
+    return Vector(dolfin.derivative(current_form, dolfin_variable, test))
 
   def dependencies(self, adjointer, timestep):
 
@@ -436,10 +452,10 @@ class RHS(libadjoint.RHS):
       current_form = dolfin.replace(self.form, dict(zip(dolfin_dependencies, dolfin_values)))
       trial = dolfin.TrialFunction(dolfin_variable.function_space())
 
-      d_rhs=ufl.derivative(current_form, dolfin_variable, trial)
+      d_rhs=dolfin.derivative(current_form, dolfin_variable, trial)
 
       if hermitian:
-        action = dolfin.action(dolfin.adjoint(d_rhs, reordered_arguments=ufl.algorithms.extract_arguments(d_rhs)),contraction_vector.data)
+        action = dolfin.action(dolfin.adjoint(d_rhs),contraction_vector.data)
       else:
         action = dolfin.action(d_rhs,contraction_vector.data)
 

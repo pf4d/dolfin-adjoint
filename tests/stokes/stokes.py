@@ -130,9 +130,12 @@ if __name__ == "__main__":
     # Replay model
     replay()
 
+    print "Running adjoint ... "
     adjoint = adjoint_dolfin(Functional(T*T*dx))
 
     def J(ic):
       T = main(ic, annotate=False)
       return assemble(T*T*dx)
+
+    minconv = test_initial_condition(J, ic, adjoint)
 
