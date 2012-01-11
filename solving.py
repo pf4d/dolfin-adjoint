@@ -442,10 +442,8 @@ class RHS(libadjoint.RHS):
 
     else:
       # RHS is a Vector.
-      if isinstance(self.form, Vector):
-        return self.form
-      else:
-        return Vector(self.form, zero=(self.form==0))
+      assert isinstance(self.form, Vector)
+      return self.form
     
 
   def derivative_action(self, dependencies, values, variable, contraction_vector, hermitian):
