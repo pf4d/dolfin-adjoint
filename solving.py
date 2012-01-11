@@ -164,7 +164,9 @@ def solve(*args, **kwargs):
 
           current_form = dolfin.replace(eq.lhs, dict(zip(diag_coeffs, dolfin_values)))
 
-          deriv = ufl.derivative(current_form, dolfin_variable, contraction_vector.data)
+          deriv = ufl.derivative(current_form, dolfin_variable)
+          args = ufl.algorithms.extract_arguments(deriv)
+          deriv = dolfin.replace(deriv, {args[1]: contraction_vector.data}) # contract over the middle index
 
           if hermitian:
             deriv = dolfin.adjoint(deriv, reordered_arguments=ufl.algorithms.extract_arguments(deriv))
