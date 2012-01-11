@@ -7,6 +7,7 @@ import dolfin.fem.solving
 import dolfin
 
 import libadjoint
+import libadjoint.exceptions
 
 import hashlib
 
@@ -64,108 +65,114 @@ def annotate(*args, **kwargs):
     bcs = unpacked_args[2]
     J = unpacked_args[3]
 
-    # Set up the data associated with the matrix on the left-hand side. This goes on the diagonal
-    # of the 'large' system that incorporates all of the timelevels, which is why it is prefixed
-    # with diag.
-    diag_name = hashlib.md5(str(eq.lhs)).hexdigest() # we don't have a useful human-readable name, so take the md5sum of the string representation of the form
-    diag_deps = [adj_variables[coeff] for coeff in ufl.algorithms.extract_coefficients(eq.lhs) if hasattr(coeff, "function_space")]
-    diag_coeffs = [coeff for coeff in ufl.algorithms.extract_coefficients(eq.lhs) if hasattr(coeff, "function_space")]
-    diag_block = libadjoint.Block(diag_name, dependencies=diag_deps, test_hermitian=debugging["test_hermitian"], test_derivative=debugging["test_derivative"])
+    if isinstance(eq.lhs, ufl.Form) and isinstance(eq.rhs, ufl.Form):
+      # Solving a linear problem.
 
-    # Similarly, create the object associated with the right-hand side data.
-    rhs=RHS(eq.rhs)
+      # Set up the data associated with the matrix on the left-hand side. This goes on the diagonal
+      # of the 'large' system that incorporates all of the timelevels, which is why it is prefixed
+      # with diag.
+      diag_name = hashlib.md5(str(eq.lhs)).hexdigest() # we don't have a useful human-readable name, so take the md5sum of the string representation of the form
+      diag_deps = [adj_variables[coeff] for coeff in ufl.algorithms.extract_coefficients(eq.lhs) if hasattr(coeff, "function_space")]
+      diag_coeffs = [coeff for coeff in ufl.algorithms.extract_coefficients(eq.lhs) if hasattr(coeff, "function_space")]
+      diag_block = libadjoint.Block(diag_name, dependencies=diag_deps, test_hermitian=debugging["test_hermitian"], test_derivative=debugging["test_derivative"])
 
-    # We need to check if this is the first equation,
-    # so that we can register the appropriate initial conditions.
-    # These equations are necessary so that libadjoint can assemble the
-    # relevant adjoint equations for the adjoint variables associated with
-    # the initial conditions.
-    for coeff, dep in zip(rhs.coefficients(),rhs.dependencies()) + zip(diag_coeffs, diag_deps):
-      # If coeff is not known, it must be an initial condition.
-      if not adjointer.variable_known(dep):
-        fn_space = coeff.function_space()
-        block_name = "Identity: %s" % str(fn_space)
-        identity_block = libadjoint.Block(block_name)
-      
-        init_rhs=Vector(coeff).duplicate()
-        init_rhs.axpy(1.0,Vector(coeff))
+      # Similarly, create the object associated with the right-hand side data.
+      rhs=RHS(eq.rhs)
 
-        def identity_assembly_cb(variables, dependencies, hermitian, coefficient, context):
-          assert coefficient == 1
-          return (Matrix(ufl.Identity(fn_space.dim())), Vector(dolfin.Function(fn_space)))
+      # We need to check if this is the first equation,
+      # so that we can register the appropriate initial conditions.
+      # These equations are necessary so that libadjoint can assemble the
+      # relevant adjoint equations for the adjoint variables associated with
+      # the initial conditions.
+      for coeff, dep in zip(rhs.coefficients(),rhs.dependencies()) + zip(diag_coeffs, diag_deps):
+        # If coeff is not known, it must be an initial condition.
+        if not adjointer.variable_known(dep):
+          fn_space = coeff.function_space()
+          block_name = "Identity: %s" % str(fn_space)
+          identity_block = libadjoint.Block(block_name)
+        
+          init_rhs=Vector(coeff).duplicate()
+          init_rhs.axpy(1.0,Vector(coeff))
 
-        identity_block.assemble=identity_assembly_cb
+          def identity_assembly_cb(variables, dependencies, hermitian, coefficient, context):
+            assert coefficient == 1
+            return (Matrix(ufl.Identity(fn_space.dim())), Vector(dolfin.Function(fn_space)))
 
-        if debugging["record_all"]:
-          adjointer.record_variable(dep, libadjoint.MemoryStorage(Vector(coeff)))
+          identity_block.assemble=identity_assembly_cb
 
-        initial_eq = libadjoint.Equation(dep, blocks=[identity_block], targets=[dep], rhs=RHS(init_rhs))
-        adjointer.register_equation(initial_eq)
-        assert adjointer.variable_known(dep)
+          if debugging["record_all"]:
+            adjointer.record_variable(dep, libadjoint.MemoryStorage(Vector(coeff)))
 
-    var = adj_variables.next(u)
+          initial_eq = libadjoint.Equation(dep, blocks=[identity_block], targets=[dep], rhs=RHS(init_rhs))
+          adjointer.register_equation(initial_eq)
+          assert adjointer.variable_known(dep)
 
-    # With the initial conditions out of the way, let us now define the callbacks that
-    # define the action of the operator the user has passed in on the lhs of this equation.
+      var = adj_variables.next(u)
 
-    def diag_assembly_cb(dependencies, values, hermitian, coefficient, context):
-      '''This callback must conform to the libadjoint Python block assembly
-      interface. It returns either the form or its transpose, depending on
-      the value of the logical hermitian.'''
+      # With the initial conditions out of the way, let us now define the callbacks that
+      # define the action of the operator the user has passed in on the lhs of this equation.
 
-      assert coefficient == 1
+      def diag_assembly_cb(dependencies, values, hermitian, coefficient, context):
+        '''This callback must conform to the libadjoint Python block assembly
+        interface. It returns either the form or its transpose, depending on
+        the value of the logical hermitian.'''
 
-      value_coeffs=[v.data for v in values]
-      eq_l=dolfin.replace(eq.lhs, dict(zip(diag_coeffs, value_coeffs)))
+        assert coefficient == 1
 
-      if hermitian:
-        # Homogenise the adjoint boundary conditions. This creates the adjoint
-        # solution associated with the lifted discrete system that is actually solved.
-        adjoint_bcs = [dolfin.homogenize(bc) for bc in bcs if isinstance(bc, dolfin.DirichletBC)]
-        if len(adjoint_bcs) == 0: adjoint_bcs = None
-        return (Matrix(dolfin.adjoint(eq_l), bcs=adjoint_bcs), Vector(None, fn_space=u.function_space()))
-      else:
-        return (Matrix(eq_l, bcs=bcs), Vector(None, fn_space=u.function_space()))
-    diag_block.assemble = diag_assembly_cb
-
-    def diag_action_cb(dependencies, values, hermitian, coefficient, input, context):
-      value_coeffs = [v.data for v in values]
-      eq_l = dolfin.replace(eq.lhs, dict(zip(diag_coeffs, value_coeffs)))
-
-      if hermitian:
-        eq_l = dolfin.adjoint(eq_l)
-
-      output_vec = dolfin.assemble(coefficient * dolfin.action(eq_l, input.data))
-      output_fn = dolfin.Function(input.data.function_space())
-      vec = output_fn.vector()
-      for i in range(len(vec)):
-        vec[i] = output_vec[i]
-
-      return Vector(output_fn)
-    diag_block.action = diag_action_cb
-
-    if len(diag_deps) > 0:
-      def derivative_action(dependencies, values, variable, contraction_vector, hermitian, input, coefficient, context):
-        dolfin_variable = values[dependencies.index(variable)].data
-        dolfin_values = [val.data for val in values]
-
-        current_form = dolfin.replace(eq.lhs, dict(zip(diag_coeffs, dolfin_values)))
-
-        deriv = dolfin.derivative(current_form, dolfin_variable)
-        args = ufl.algorithms.extract_arguments(deriv)
-        deriv = dolfin.replace(deriv, {args[1]: contraction_vector.data}) # contract over the middle index
+        value_coeffs=[v.data for v in values]
+        eq_l=dolfin.replace(eq.lhs, dict(zip(diag_coeffs, value_coeffs)))
 
         if hermitian:
-          deriv = dolfin.adjoint(deriv)
+          # Homogenise the adjoint boundary conditions. This creates the adjoint
+          # solution associated with the lifted discrete system that is actually solved.
+          adjoint_bcs = [dolfin.homogenize(bc) for bc in bcs if isinstance(bc, dolfin.DirichletBC)]
+          if len(adjoint_bcs) == 0: adjoint_bcs = None
+          return (Matrix(dolfin.adjoint(eq_l), bcs=adjoint_bcs), Vector(None, fn_space=u.function_space()))
+        else:
+          return (Matrix(eq_l, bcs=bcs), Vector(None, fn_space=u.function_space()))
+      diag_block.assemble = diag_assembly_cb
 
-        action = coefficient * dolfin.action(deriv, input.data)
+      def diag_action_cb(dependencies, values, hermitian, coefficient, input, context):
+        value_coeffs = [v.data for v in values]
+        eq_l = dolfin.replace(eq.lhs, dict(zip(diag_coeffs, value_coeffs)))
 
-        return Vector(action)
-      diag_block.derivative_action = derivative_action
+        if hermitian:
+          eq_l = dolfin.adjoint(eq_l)
 
-    eqn = libadjoint.Equation(var, blocks=[diag_block], targets=[var], rhs=rhs)
+        output_vec = dolfin.assemble(coefficient * dolfin.action(eq_l, input.data))
+        output_fn = dolfin.Function(input.data.function_space())
+        vec = output_fn.vector()
+        for i in range(len(vec)):
+          vec[i] = output_vec[i]
 
-    adjointer.register_equation(eqn)
+        return Vector(output_fn)
+      diag_block.action = diag_action_cb
+
+      if len(diag_deps) > 0:
+        def derivative_action(dependencies, values, variable, contraction_vector, hermitian, input, coefficient, context):
+          dolfin_variable = values[dependencies.index(variable)].data
+          dolfin_values = [val.data for val in values]
+
+          current_form = dolfin.replace(eq.lhs, dict(zip(diag_coeffs, dolfin_values)))
+
+          deriv = dolfin.derivative(current_form, dolfin_variable)
+          args = ufl.algorithms.extract_arguments(deriv)
+          deriv = dolfin.replace(deriv, {args[1]: contraction_vector.data}) # contract over the middle index
+
+          if hermitian:
+            deriv = dolfin.adjoint(deriv)
+
+          action = coefficient * dolfin.action(deriv, input.data)
+
+          return Vector(action)
+        diag_block.derivative_action = derivative_action
+
+      eqn = libadjoint.Equation(var, blocks=[diag_block], targets=[var], rhs=rhs)
+
+      adjointer.register_equation(eqn)
+
+    else: # not a linear problem
+      raise libadjoint.exceptions.LibadjointErrorNotImplemented("Don't know how to annotate your equation, sorry!")
 
 def solve(*args, **kwargs):
   '''This solve routine comes from the dolfin_adjoint package, and wraps the real Dolfin
@@ -302,7 +309,7 @@ class Vector(libadjoint.Vector):
         other = y.data.vector()
       return numpy.dot(numpy.array(self.data.vector()), numpy.array(other))
     else:
-      raise LibadjointErrorNotImplemented("Don't know how to dot anything else.")
+      raise libadjoint.exceptions.LibadjointErrorNotImplemented("Don't know how to dot anything else.")
 
   def set_random(self):
     assert isinstance(self.data, dolfin.Function) or hasattr(self, "fn_space")
@@ -327,7 +334,7 @@ class Vector(libadjoint.Vector):
     if isinstance(self.data, ufl.form.Form):
       return len(dolfin.assemble(self.data))
 
-    raise LibadjointErrorNotImplemented("Don't know how to get the size.")
+    raise libadjoint.exceptions.LibadjointErrorNotImplemented("Don't know how to get the size.")
 
   def set_values(self, array):
     if isinstance(self.data, dolfin.Function):
@@ -336,7 +343,7 @@ class Vector(libadjoint.Vector):
         vec[i] = array[i]
       self.zero = False
     else:
-      raise LibadjointErrorNotImplemented("Don't know how to set values.")
+      raise libadjoint.exceptions.LibadjointErrorNotImplemented("Don't know how to set values.")
 
 class Matrix(libadjoint.Matrix):
   '''This class implements the libadjoint.Matrix abstract base class for the Dolfin adjoint.
