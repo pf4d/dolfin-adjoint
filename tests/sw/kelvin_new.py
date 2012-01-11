@@ -1,9 +1,9 @@
 from dolfin import Mesh, Expression
 from math import exp, sqrt, pi
 
-import sw
+import sw_lib
 
-params=sw.parameters({
+params=sw_lib.parameters({
     'depth' : 5.,
     'g' : 10.,
     'f' : 1.0313e-4,
