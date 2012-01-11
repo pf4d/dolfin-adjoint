@@ -1,0 +1,65 @@
+"""
+Implementation of Burger's equation with nonlinear solve in each
+timestep
+"""
+
+# Last changed: 2012-01-11
+
+from dolfin import *
+
+n = 100
+mesh = UnitInterval(n)
+V = FunctionSpace(mesh, "CG", 2)
+
+def Dt(u, u_, timestep):
+    return (u - u_)/timestep
+
+def main(ic, annotate=False):
+
+    u_ = Function(ic)
+    u = Function(V)
+    v = TestFunction(V)
+
+    nu = Constant(0.0001)
+
+    timestep = Constant(1.0/n)
+
+    F = (Dt(u, u_, timestep)*v
+         + u*grad(u)*v + nu*grad(u)*grad(v))*dx
+    bc = DirichletBC(V, 0.0, "on_boundary")
+
+    t = 0.0
+    end = 0.2
+    #J = derivative(F, u)
+    while (t <= end):
+        solve(F == 0, u, bc)#, annotate=annotate)
+        # Alt (if you want to give the Jacobian
+        # solve(F == 0, u, bc, J=J)
+        u_.assign(u)#, annotate=annotate)
+
+        t += float(timestep)
+        plot(u)
+
+    #interactive()
+    return u_
+
+if __name__ == "__main__":
+
+    ic = project(Expression("sin(2*pi*x[0])"),  V)
+    forward = main(ic, annotate=True)
+
+    #adj_html("burgers_nonlinear_forward.html", "forward")
+    #adj_html("burgers_nonlinear_adjoint.html", "adjoint")
+
+    #print "Running forward replay .... "
+    #replay_dolfin()
+    #print "Running adjoint ... "
+
+    #J = Functional(forward*forward*dx)
+    #adjoint = adjoint_dolfin(J)
+
+    #def Jfunc(ic):
+    #  forward = main(ic, annotate=False)
+    #  return assemble(forward*forward*dx)
+
+    #minconv = test_initial_condition(Jfunc, ic, adjoint, seed=1.0e-3)

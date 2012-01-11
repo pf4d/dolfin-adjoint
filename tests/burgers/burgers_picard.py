@@ -53,8 +53,8 @@ if __name__ == "__main__":
 
     ic = project(Expression("sin(2*pi*x[0])"),  V)
     forward = main(ic, annotate=True)
-    adj_html("burgers_forward.html", "forward")
-    adj_html("burgers_adjoint.html", "adjoint")
+    adj_html("burgers_picard_forward.html", "forward")
+    adj_html("burgers_picard_adjoint.html", "adjoint")
     print "Running forward replay .... "
     replay_dolfin()
     print "Running adjoint ... "
