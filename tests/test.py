@@ -11,11 +11,11 @@ subdirs = [x for x in os.listdir(basedir) if os.path.isdir(os.path.join(basedir,
 
 os.putenv('PYTHONPATH', os.path.abspath(os.path.join(basedir, os.path.pardir, os.path.pardir)))
 
-for subdir in subdirs:
+for subdir in sorted(subdirs):
   test_name = tests.get(subdir, subdir)
   print "--------------------------------------------------------"
   print "Running %s " % subdir
   print "--------------------------------------------------------"
   os.chdir(os.path.join(basedir, subdir))
-  os.system('python %s.py' % test_name)
-  #  subprocess.call('python %s.py' % test_name, env={'PYTHONPATH': os.path.abspath('../../..')})
+  exit = os.system('python %s.py' % test_name)
+  assert exit == 0

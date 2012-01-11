@@ -2,7 +2,7 @@
 Naive implementation of Burgers' equation, goes oscillatory later
 """
 
-# Last changed: 2012-01-09
+import sys
 
 from dolfin import *
 from dolfin_adjoint import *
@@ -67,3 +67,8 @@ if __name__ == "__main__":
       return assemble(forward*forward*dx)
 
     minconv = test_initial_condition(Jfunc, ic, adjoint, seed=1.0e-3)
+    if minconv < 1.9:
+      exit_code = 1
+    else:
+      exit_code = 0
+    sys.exit(exit_code)

@@ -16,7 +16,7 @@ for all s
 
 """
 
-# Last changed: 2012-01-09
+import sys
 
 from dolfin import *
 
@@ -138,4 +138,9 @@ if __name__ == "__main__":
       return assemble(T*T*dx)
 
     minconv = test_initial_condition(J, ic, adjoint)
+    if minconv < 1.9:
+      exit_code = 1
+    else:
+      exit_code = 0
+    sys.exit(exit_code)
 

@@ -1,3 +1,5 @@
+import sys
+
 from dolfin import *
 from dolfin_adjoint import *
 
@@ -97,4 +99,11 @@ def J(ic):
   perturbed_u0 = run_forward(initial_condition=ic, annotate=False, dump=False)
   return assemble(perturbed_u0*perturbed_u0*dx)
 
-test_initial_condition(J, Function(V), final_adjoint, seed=10.0)
+minconv = test_initial_condition(J, Function(V), final_adjoint, seed=10.0)
+
+if minconv < 1.9:
+  exit_code = 1
+else:
+  exit_code = 0
+
+sys.exit(exit_code)

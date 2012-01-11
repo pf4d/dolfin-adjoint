@@ -1,5 +1,8 @@
+import sys
+
 import kelvin_new as kelvin
 import sw_lib
+
 from dolfin import *
 from dolfin_adjoint import *
 
@@ -34,4 +37,9 @@ def J(ic):
   state = sw_lib.timeloop_theta(M, G, ic, kelvin.params, annotate=False)
   return assemble(dot(state, state)*dx)
 
-test_initial_condition(J, ic, adj_state, seed=0.001)
+minconv = test_initial_condition(J, ic, adj_state, seed=0.001)
+if minconv < 1.9:
+  exit_code = 1
+else:
+  exit_code = 0
+sys.exit(exit_code)
