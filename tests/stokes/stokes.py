@@ -50,24 +50,24 @@ def temperature_boundary_conditions(Q):
     bc = DirichletBC(Q, 0.0, "near(x[1], 1.0)")
     return [bc]
 
-def main(n, annotate=False):
+n = 16
+mesh = UnitSquare(n, n)
+X = FunctionSpace(mesh, "CG", 1)
+
+def main(ic, annotate=False):
 
     # Define meshes and function spaces
-    mesh = UnitSquare(n, n)
     V = VectorFunctionSpace(mesh, "CG", 2)
     Q = FunctionSpace(mesh, "CG", 1)
     W = V * Q
-    X = FunctionSpace(mesh, "CG", 1)
 
     # Define boundary conditions
     flow_bcs = flow_boundary_conditions(W)
     temp_bcs = temperature_boundary_conditions(X)
 
     # Temperature variables
-    T0_expr = "0.5*(1.0 - x[1]*x[1]) + 0.01*cos(pi*x[0]/l)*sin(pi*x[1]/h)"
-    T0 = Expression(T0_expr, l=1.0, h=1.0)
-    T_ = interpolate(T0, X)
-    T = Function(X)
+    T_ = Function(ic)
+    T = Function(ic)
 
     # Flow variable(s)
     w = Function(W)
@@ -99,6 +99,8 @@ def main(n, annotate=False):
 
         t += timestep
 
+    return T_
+
 def replay():
     print "Replaying forward run"
 
@@ -113,17 +115,24 @@ def replay():
 
 if __name__ == "__main__":
 
-    annotate = True
-
     from dolfin_adjoint import *
     debugging["record_all"] = True
 
     # Run model
-    main(16, annotate=annotate)
+    T0_expr = "0.5*(1.0 - x[1]*x[1]) + 0.01*cos(pi*x[0]/l)*sin(pi*x[1]/h)"
+    T0 = Expression(T0_expr, l=1.0, h=1.0)
+    ic = Function(interpolate(T0, X))
+    T = main(ic, annotate=True)
 
     adj_html("stokes_forward.html", "forward")
     adj_html("stokes_adjoint.html", "adjoint")
 
     # Replay model
     replay()
+
+    adjoint = adjoint_dolfin(Functional(T*T*dx))
+
+    def J(ic):
+      T = main(ic, annotate=False)
+      return assemble(T*T*dx)
 
