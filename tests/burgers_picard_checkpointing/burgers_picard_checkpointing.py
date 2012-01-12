@@ -6,12 +6,13 @@ import sys
 
 from dolfin import *
 from dolfin_adjoint import *
+from math import ceil
 
 n = 100
 mesh = UnitInterval(n)
 V = FunctionSpace(mesh, "CG", 2)
 
-debugging["record_all"] = True
+#debugging["record_all"] = True
 #debugging["test_hermitian"] = (100, 1.0e-14)
 #debugging["test_derivative"] = 6
 
@@ -36,7 +37,10 @@ def main(ic, annotate=False):
     bc = DirichletBC(V, 0.0, "on_boundary")
 
     t = 0.0
-    end = 0.025
+    end = 0.05
+    if annotate: 
+      adjoint_checkpointing('multistage', int(ceil(end/float(timestep)))+2, 0, 5, verbose=True)
+
     u = Function(V)
     while (t <= end):
         solve(a == L, u, bc, annotate=annotate)
@@ -51,12 +55,13 @@ def main(ic, annotate=False):
 
 if __name__ == "__main__":
 
+    
     ic = project(Expression("sin(2*pi*x[0])"),  V)
     forward = main(ic, annotate=True)
-    adj_html("burgers_picard_forward.html", "forward")
-    adj_html("burgers_picard_adjoint.html", "adjoint")
-    print "Running forward replay .... "
-    replay_dolfin()
+    adj_html("burgers_picard_checkpointing_forward.html", "forward")
+    adj_html("burgers_picard_checkpointing_adjoint.html", "adjoint")
+    #print "Running forward replay .... "
+    #replay_dolfin()
     print "Running adjoint ... "
 
     J = Functional(forward*forward*dx)

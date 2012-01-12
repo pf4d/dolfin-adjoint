@@ -209,7 +209,14 @@ def annotate(*args, **kwargs):
 
     eqn = libadjoint.Equation(var, blocks=[diag_block], targets=[var], rhs=rhs)
 
-    adjointer.register_equation(eqn)
+    cs = adjointer.register_equation(eqn)
+    print "Got cs: ", cs
+    if cs == int(libadjoint.constants.adj_constants["ADJ_CHECKPOINT_STORAGE_MEMORY"]):
+      for coeff in diag_coeffs + rhs.coefficients():
+        adjointer.record_variable(adj_variables[coeff], libadjoint.MemoryStorage(Vector(coeff), cs=True))
+
+    elif cs == int(libadjoint.constants.adj_constants["ADJ_CHECKPOINT_STORAGE_DISK"]):
+      raise libadjoint.exceptions.LibadjointErrorNotImplemented("Disk checkpointing not implemented yet.")
     return linear
 
 def solve(*args, **kwargs):
@@ -714,3 +721,7 @@ def nonlinear_post_solve_projection(*args, **kwargs):
   mass = dolfin.inner(test, trial)*dolfin.dx
 
   dolfin.fem.solving.solve(mass == dolfin.action(mass, u), u)
+
+def adjoint_checkpointing(strategy, steps, snaps_on_disk, snaps_in_ram, verbose=False):
+  adjointer.set_checkpoint_strategy(strategy)
+  adjointer.set_revolve_options(steps, snaps_on_disk, snaps_in_ram, verbose)
