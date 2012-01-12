@@ -3,12 +3,14 @@ Implementation of Burger's equation with nonlinear solve in each
 timestep
 """
 
-# Last changed: 2012-01-11
+import sys
 
 from dolfin import *
 from dolfin_adjoint import *
 
-n = 100
+debugging["record_all"] = True
+
+n = 30
 mesh = UnitInterval(n)
 V = FunctionSpace(mesh, "CG", 2)
 
@@ -31,12 +33,10 @@ def main(ic, annotate=False):
 
     t = 0.0
     end = 0.2
-    #J = derivative(F, u)
     while (t <= end):
         solve(F == 0, u, bc, annotate=annotate)
-        # Alt (if you want to give the Jacobian
-        # solve(F == 0, u, bc, J=J)
         u_.assign(u, annotate=annotate)
+        return u_ # for now
 
         t += float(timestep)
         #plot(u)
