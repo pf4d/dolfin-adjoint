@@ -4,7 +4,7 @@ import os, os.path
 import sys
 import subprocess
 
-tests = {'burgers': 'burgers_picard'}
+tests = {}
 
 basedir = os.path.dirname(os.path.abspath(sys.argv[0]))
 subdirs = [x for x in os.listdir(basedir) if os.path.isdir(os.path.join(basedir, x))]
