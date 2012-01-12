@@ -210,7 +210,6 @@ def annotate(*args, **kwargs):
     eqn = libadjoint.Equation(var, blocks=[diag_block], targets=[var], rhs=rhs)
 
     cs = adjointer.register_equation(eqn)
-    print "Got cs: ", cs
     if cs == int(libadjoint.constants.adj_constants["ADJ_CHECKPOINT_STORAGE_MEMORY"]):
       for coeff in diag_coeffs + rhs.coefficients():
         adjointer.record_variable(adj_variables[coeff], libadjoint.MemoryStorage(Vector(coeff), cs=True))
