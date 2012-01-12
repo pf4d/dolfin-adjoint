@@ -591,6 +591,19 @@ class NonlinearRHS(RHS):
 
     return Vector(dolfin.action(self.mass, u))
 
+  def derivative_action(self, dependencies, values, variable, contraction_vector, hermitian):
+    '''If variable is the variable for the initial condition, we want to ignore it,
+    and set the derivative to zero. Assuming the solver converges, the sensitivity of
+    the solution to the initial condition should be extremely small, and computing it
+    is very difficult (one would have to do a little adjoint solve to compute it).
+    Even I'm not that fussy.'''
+
+    if variable == self.ic_var:
+      deriv_value = values[dependencies.index(variable)].data
+      return Vector(None, fn_space=deriv_value.function_space())
+    else:
+      return RHS.derivative_action(self, dependencies, values, variable, contraction_vector, hermitian)
+
 dolfin_assign = dolfin.Function.assign
 def dolfin_adjoint_assign(self, other, annotate=True):
   '''We also need to monkeypatch the Function.assign method, as it is often used inside 
