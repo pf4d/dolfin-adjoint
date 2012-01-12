@@ -103,7 +103,7 @@ def annotate(*args, **kwargs):
     if linear:
       rhs = RHS(eq_rhs)
     else:
-      rhs = NonlinearRHS(eq_rhs, F, bcs, mass=eq_lhs)
+      rhs = NonlinearRHS(eq_rhs, F, u, bcs, mass=eq_lhs)
 
     # We need to check if this is the first equation,
     # so that we can register the appropriate initial conditions.
@@ -548,28 +548,43 @@ class NonlinearRHS(RHS):
   So in order to actually assemble the right-hand side term,
   we first need to solve F(u) = 0 to find the specific u,
   and then multiply that by the mass matrix.'''
-  def __init__(self, form, F, bcs, mass):
+  def __init__(self, form, F, u, bcs, mass):
     '''form is M.u - F(u). F is the nonlinear equation, F(u) := 0.'''
     RHS.__init__(self, form)
     self.F = F
+    self.u = u
     self.bcs = bcs
     self.mass = mass
+
+    # We want to mark that the RHS term /also/ depends on
+    # the previous value of u, as that's what we need to initialise
+    # the nonlinear solver.
+    var = adj_variables[self.u]
+    if var.timestep > 0 and debugging["fussy_replay"]:
+      var.c_object.timestep = var.c_object.timestep - 1
+      self.deps.append(var)
+      self.ic_var = var
+    else:
+      self.ic_var = None
 
   def __call__(self, dependencies, values):
     assert isinstance(self.form, ufl.form.Form)
 
+    ic = self.u.function_space() # by default, initialise with a blank function in the solution FunctionSpace
     replace_map = {}
+
     for i in range(len(self.deps)):
       if self.deps[i] in dependencies:
         j = dependencies.index(self.deps[i])
-        replace_map[self.coeffs[i]] = values[j].data
-      else:
-        nonlin_dependency = self.coeffs[i]
+        if self.deps[i] == self.ic_var:
+          ic = values[j].data # ahah, we have found an initial condition!
+        else:
+          replace_map[self.coeffs[i]] = values[j].data
 
     current_form = dolfin.replace(self.form, replace_map)
     current_F    = dolfin.replace(self.F, replace_map)
-    u = dolfin.Function(nonlin_dependency.function_space())
-    current_F    = dolfin.replace(current_F, {nonlin_dependency: u})
+    u = dolfin.Function(ic)
+    current_F    = dolfin.replace(current_F, {self.u: u})
 
     # OK, here goes nothing:
     dolfin.solve(current_F == 0, u, self.bcs)

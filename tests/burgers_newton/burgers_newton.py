@@ -36,7 +36,7 @@ def main(ic, annotate=False):
     while (t <= end):
         solve(F == 0, u, bc, annotate=annotate)
         u_.assign(u, annotate=annotate)
-        return u_ # for now
+#        return u_ # for now
 
         t += float(timestep)
         #plot(u)
