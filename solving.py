@@ -401,7 +401,10 @@ class Matrix(libadjoint.Matrix):
 
   def __init__(self, data, bcs=None):
 
-    self.bcs=bcs
+    if bcs is None:
+      self.bcs = []
+    else:
+      self.bcs=bcs
 
     self.data=data
 
@@ -436,6 +439,7 @@ class Matrix(libadjoint.Matrix):
       x_form = x.data
 
     self.data+=alpha*x_form
+    self.bcs += x.bcs # Err, I hope they are compatible ...
 
   def test_function(self):
     '''test_function(self)
@@ -639,8 +643,11 @@ class NonlinearRHS(RHS):
 
     if hermitian:
       deriv = dolfin.adjoint(deriv)
+      bcs = [dolfin.homogenize(bc) for bc in self.bcs if isinstance(bc, dolfin.DirichletBC)]
+    else:
+      bcs = self.bcs
 
-    return Matrix(deriv)
+    return Matrix(deriv, bcs=bcs)
 
 dolfin_assign = dolfin.Function.assign
 def dolfin_adjoint_assign(self, other, annotate=True):
