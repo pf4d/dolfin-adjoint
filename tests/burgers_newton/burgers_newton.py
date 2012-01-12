@@ -36,12 +36,9 @@ def main(ic, annotate=False):
     while (t <= end):
         solve(F == 0, u, bc, annotate=annotate)
         u_.assign(u, annotate=annotate)
-#        return u_ # for now
 
         t += float(timestep)
-        #plot(u)
 
-    #interactive()
     return u_
 
 if __name__ == "__main__":
@@ -54,13 +51,13 @@ if __name__ == "__main__":
 
     print "Running forward replay .... "
     replay_dolfin()
-    #print "Running adjoint ... "
+    print "Running adjoint ... "
 
-    #J = Functional(forward*forward*dx)
-    #adjoint = adjoint_dolfin(J)
+    J = Functional(forward*forward*dx)
+    adjoint = adjoint_dolfin(J)
 
-    #def Jfunc(ic):
-    #  forward = main(ic, annotate=False)
-    #  return assemble(forward*forward*dx)
+    def Jfunc(ic):
+      forward = main(ic, annotate=False)
+      return assemble(forward*forward*dx)
 
-    #minconv = test_initial_condition(Jfunc, ic, adjoint, seed=1.0e-3)
+    minconv = test_initial_condition(Jfunc, ic, adjoint, seed=1.0e-6)

@@ -416,6 +416,27 @@ class Matrix(libadjoint.Matrix):
 
     return x
 
+  def axpy(self, alpha, x):
+    assert isinstance(x.data, ufl.Form)
+    assert isinstance(self.data, ufl.Form)
+
+    # Let's do a bit of argument shuffling, shall we?
+    xargs = ufl.algorithms.extract_arguments(x.data)
+    sargs = ufl.algorithms.extract_arguments(self.data)
+
+    if xargs != sargs:
+      # OK, let's check that all of the function spaces are happy and so on.
+      for i in range(len(xargs)):
+        assert xargs[i].element() == sargs[i].element()
+        assert xargs[i].function_space() == sargs[i].function_space()
+
+      # Now that we are happy, let's replace the xargs with the sargs ones.
+      x_form = dolfin.replace(x.data, dict(zip(xargs, sargs)))
+    else:
+      x_form = x.data
+
+    self.data+=alpha*x_form
+
   def test_function(self):
     '''test_function(self)
 
@@ -581,7 +602,6 @@ class NonlinearRHS(RHS):
         else:
           replace_map[self.coeffs[i]] = values[j].data
 
-    current_form = dolfin.replace(self.form, replace_map)
     current_F    = dolfin.replace(self.F, replace_map)
     u = dolfin.Function(ic)
     current_F    = dolfin.replace(current_F, {self.u: u})
@@ -603,6 +623,24 @@ class NonlinearRHS(RHS):
       return Vector(None, fn_space=deriv_value.function_space())
     else:
       return RHS.derivative_action(self, dependencies, values, variable, contraction_vector, hermitian)
+
+  def derivative_assembly(self, dependencies, values, variable, hermitian):
+    replace_map = {}
+
+    for i in range(len(self.deps)):
+      if self.deps[i] == self.ic_var: continue
+      j = dependencies.index(self.deps[i])
+      replace_map[self.coeffs[i]] = values[j].data
+
+    diff_var = values[dependencies.index(variable)].data
+
+    current_form = dolfin.replace(self.form, replace_map)
+    deriv = dolfin.derivative(current_form, diff_var)
+
+    if hermitian:
+      deriv = dolfin.adjoint(deriv)
+
+    return Matrix(deriv)
 
 dolfin_assign = dolfin.Function.assign
 def dolfin_adjoint_assign(self, other, annotate=True):
