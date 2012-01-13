@@ -128,7 +128,7 @@ if __name__ == "__main__":
       T = main(ic, annotate=False)
       return assemble(T*T*dx)
 
-    minconv = test_initial_condition(J, ic, adjoint)
+    minconv = test_initial_condition_adjoint(J, ic, adjoint)
     if minconv < 1.9:
       exit_code = 1
     else:

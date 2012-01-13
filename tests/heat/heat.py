@@ -99,7 +99,7 @@ def J(ic):
   perturbed_u0 = run_forward(initial_condition=ic, annotate=False, dump=False)
   return assemble(perturbed_u0*perturbed_u0*dx)
 
-minconv = test_initial_condition(J, Function(V), final_adjoint, seed=10.0)
+minconv = test_initial_condition_adjoint(J, Function(V), final_adjoint, seed=10.0)
 
 if minconv < 1.9:
   exit_code = 1

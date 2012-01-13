@@ -9,7 +9,7 @@ mesh = UnitSquare(4, 4)
 V = FunctionSpace(mesh, "CG", 3)
 debugging["record_all"] = True
 
-def main(ic, annotate=True):
+def main(ic, annotate=False):
   u = TrialFunction(V)
   v = TestFunction(V)
 
@@ -22,7 +22,7 @@ def main(ic, annotate=True):
 if __name__ == "__main__":
 
   ic = project(Expression("x[0]*(x[0]-1)*x[1]*(x[1]-1)"), V)
-  soln = main(ic)
+  soln = main(ic, annotate=True)
 
   perturbation_direction = Function(V)
   vec = perturbation_direction.vector()
@@ -45,13 +45,22 @@ if __name__ == "__main__":
   perturbed_ic = Function(ic)
   vec = perturbed_ic.vector()
   vec.axpy(1.0, perturbation_direction.vector())
-  perturbed_soln = main(perturbed_ic)
+  perturbed_soln = main(perturbed_ic, annotate=False)
 
   Jdiff = J(perturbed_soln) - J(soln)
   print "J(ic+perturbation) - J(ic): ", Jdiff
-
   fail = abs(Jdiff - dJdm) > 1.0e-15
   if fail:
     sys.exit(1)
-  else:
-    sys.exit(0)
+
+  def J(ic):
+    soln = main(ic, annotate=False)
+    return assemble(soln*soln*dx)
+
+  dJ = assemble(derivative(soln*soln*dx, soln))
+
+  minconv = test_initial_condition_tlm(J, dJ, ic, seed=1.0e-4)
+  fail = minconv < 1.9
+  if fail:
+    sys.exit(1)
+

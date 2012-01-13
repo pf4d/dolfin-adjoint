@@ -60,4 +60,4 @@ if __name__ == "__main__":
       forward = main(ic, annotate=False)
       return assemble(forward*forward*dx)
 
-    minconv = test_initial_condition(Jfunc, ic, adjoint, seed=1.0e-6)
+    minconv = test_initial_condition_adjoint(Jfunc, ic, adjoint, seed=1.0e-6)
