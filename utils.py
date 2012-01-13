@@ -1,7 +1,7 @@
 import libadjoint
 from solving import *
 
-def replay_dolfin():
+def replay_dolfin(forget=False):
   if "record_all" not in debugging or debugging["record_all"] is not True:
     print "Warning: your replay test will be much more effective with debugging['record_all'] = True."
 
@@ -12,6 +12,9 @@ def replay_dolfin():
       storage.set_compare(tol=0.0)
       storage.set_overwrite(True)
       adjointer.record_variable(fwd_var, storage)
+
+      if forget:
+        adjointer.forget_forward_equation(i)
 
 def convergence_order(errors):
   import math
@@ -97,3 +100,17 @@ def test_initial_condition(J, ic, final_adjoint, seed=0.01, perturbation_directi
   print "Convergence orders for Taylor remainder with adjoint information (should all be 2): ", convergence_order(with_gradient)
 
   return min(convergence_order(with_gradient))
+
+def tlm_dolfin(parameter, forget=True):
+  for i in range(adjointer.equation_count):
+      (tlm_var, output) = adjointer.get_tlm_solution(i, parameter)
+
+      storage = libadjoint.MemoryStorage(output)
+      storage.set_compare(tol=0.0)
+      storage.set_overwrite(True)
+      adjointer.record_variable(tlm_var, storage)
+
+      if forget:
+        adjointer.forget_forward_equation(i)
+  return output
+
