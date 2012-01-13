@@ -25,19 +25,19 @@ class CoeffStore(object):
     coefficient and then return the corresponding libadjoint variable.'''
 
     try:
-      self.coeffs[str(coeff)]+=1
+      self.coeffs[coeff]+=1
     except KeyError:
-      self.coeffs[str(coeff)]=0
+      self.coeffs[coeff]=0
 
-    return libadjoint.Variable(str(coeff), self.coeffs[str(coeff)], 0)
+    return libadjoint.Variable(str(coeff), self.coeffs[coeff], 0)
 
   def __getitem__(self, coeff):
     '''Return the libadjoint variable corresponding to coeff.'''
 
-    if not self.coeffs.has_key(str(coeff)):
-      self.coeffs[str(coeff)]=0
+    if not self.coeffs.has_key(coeff):
+      self.coeffs[coeff]=0
 
-    return libadjoint.Variable(str(coeff), self.coeffs[str(coeff)], 0)
+    return libadjoint.Variable(str(coeff), self.coeffs[coeff], 0)
 
 adj_variables=CoeffStore()
 
@@ -211,7 +211,8 @@ def annotate(*args, **kwargs):
 
     cs = adjointer.register_equation(eqn)
     if cs == int(libadjoint.constants.adj_constants["ADJ_CHECKPOINT_STORAGE_MEMORY"]):
-      for coeff in diag_coeffs + rhs.coefficients():
+      for coeff in adj_variables.coeffs.keys(): 
+        if adj_variables[coeff] == var: continue
         adjointer.record_variable(adj_variables[coeff], libadjoint.MemoryStorage(Vector(coeff), cs=True))
 
     elif cs == int(libadjoint.constants.adj_constants["ADJ_CHECKPOINT_STORAGE_DISK"]):
