@@ -13,10 +13,12 @@ def main(ic, annotate=False):
   u = TrialFunction(V)
   v = TestFunction(V)
 
+  bc = DirichletBC(V, "-1.0", "on_boundary")
+
   mass = inner(u, v)*dx
   soln = Function(V)
 
-  solve(mass == action(mass, ic), soln, annotate=annotate)
+  solve(mass == action(mass, ic), soln, bc, annotate=annotate)
   return soln
 
 if __name__ == "__main__":
