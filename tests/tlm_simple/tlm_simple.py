@@ -2,6 +2,8 @@ import random
 
 from dolfin import *
 from dolfin_adjoint import *
+import numpy
+import sys
 
 mesh = UnitSquare(4, 4)
 V = FunctionSpace(mesh, "CG", 3)
@@ -28,4 +30,28 @@ if __name__ == "__main__":
     vec[i] = random.random()
 
   ICParam = InitialConditionParameter(ic, perturbation_direction)
-  final_tlm = tlm_dolfin(ICParam)
+  dudm = tlm_dolfin(ICParam)
+  dudm_np = numpy.array(dudm.data.vector())
+
+  dJdu = derivative(soln*dx, soln)
+  dJdu_np = numpy.array(assemble(dJdu))
+
+  dJdm = numpy.dot(dJdu_np, dudm_np)
+  print "Got dJdm: ", dJdm
+
+  def J(soln):
+    return assemble(soln*dx)
+
+  perturbed_ic = Function(ic)
+  vec = perturbed_ic.vector()
+  vec.axpy(1.0, perturbation_direction.vector())
+  perturbed_soln = main(perturbed_ic)
+
+  Jdiff = J(perturbed_soln) - J(soln)
+  print "J(ic+perturbation) - J(ic): ", Jdiff
+
+  fail = abs(Jdiff - dJdm) > 1.0e-15
+  if fail:
+    sys.exit(1)
+  else:
+    sys.exit(0)
