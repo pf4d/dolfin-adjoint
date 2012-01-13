@@ -20,7 +20,7 @@ def Dt(u, u_, timestep):
 
 def main(ic, annotate=False):
 
-    u_ = Function(ic)
+    u_ = ic
     u = TrialFunction(V)
     v = TestFunction(V)
 
@@ -42,6 +42,7 @@ def main(ic, annotate=False):
         solve(a == L, u, bc, annotate=annotate)
 
         u_.assign(u, annotate=annotate)
+        return u_
 
         t += float(timestep)
         #plot(u)
@@ -52,23 +53,24 @@ def main(ic, annotate=False):
 if __name__ == "__main__":
 
     ic = project(Expression("sin(2*pi*x[0])"),  V)
+    ic_copy = Function(ic)
     forward = main(ic, annotate=True)
     adj_html("burgers_picard_forward.html", "forward")
     adj_html("burgers_picard_adjoint.html", "adjoint")
-    print "Running forward replay .... "
-    replay_dolfin()
     print "Running adjoint ... "
 
     J = Functional(forward*forward*dx)
-    adjoint = adjoint_dolfin(J)
+    adjoint = adjoint_dolfin(J, forget=False)
 
     def Jfunc(ic):
       forward = main(ic, annotate=False)
       return assemble(forward*forward*dx)
 
+    ic.vector()[:] = ic_copy.vector()
     minconv = test_initial_condition_adjoint(Jfunc, ic, adjoint, seed=1.0e-3)
     if minconv < 1.9:
-      exit_code = 1
-    else:
-      exit_code = 0
-    sys.exit(exit_code)
+      sys.exit(1)
+
+    ic.vector()[:] = ic_copy.vector()
+    dJ = assemble(derivative(forward*forward*dx, forward))
+    minconv = test_initial_condition_tlm(Jfunc, dJ, ic, seed=1.0e-5)
