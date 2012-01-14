@@ -421,8 +421,13 @@ class Matrix(libadjoint.Matrix):
       x=b.duplicate()
       x.axpy(1.0, b)
     else:
+      if var.type in ['ADJ_TLM', 'ADJ_ADJOINT']:
+        bcs = [dolfin.homogenize(bc) for bc in self.bcs if isinstance(bc, dolfin.DirichletBC)]
+      else:
+        bcs = self.bcs
+
       x=Vector(dolfin.Function(self.test_function().function_space()))
-      dolfin.fem.solving.solve(self.data==b.data, x.data, self.bcs)
+      dolfin.fem.solving.solve(self.data==b.data, x.data, bcs)
 
     return x
 
