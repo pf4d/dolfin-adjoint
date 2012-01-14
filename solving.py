@@ -415,7 +415,7 @@ class Matrix(libadjoint.Matrix):
 
     self.data=data
 
-  def solve(self, b):
+  def solve(self, var, b):
       
     if isinstance(self.data, ufl.Identity):
       x=b.duplicate()
