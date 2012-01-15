@@ -46,12 +46,6 @@ def run_forward(initial_condition=None, annotate=True, dump=True):
 
   return u_0
 
-
-final_forward = run_forward()
-
-adj_html("heat_forward.html", "forward")
-adj_html("heat_adjoint.html", "adjoint")
-
 def run_replay():
   print "Replaying forward model (will error if differs from correct solution) ..."
 
@@ -67,14 +61,6 @@ def run_replay():
       adjointer.record_variable(fwd_var, storage)
 
       u_out << output.data
-
-run_replay()
-
-# The functional is only a function of final state.
-functional=Functional(final_forward*final_forward*dx)
-f_direct = adjointer.evaluate_functional(functional, adjointer.equation_count-1)
-
-print "Running adjoint model ..."
 
 def run_adjoint():
   z_out = File("adjoint.pvd", "compressed")
@@ -93,17 +79,37 @@ def run_adjoint():
 
   return output.data
 
-final_adjoint = run_adjoint()
+if __name__ == "__main__":
 
-def J(ic):
-  perturbed_u0 = run_forward(initial_condition=ic, annotate=False, dump=False)
-  return assemble(perturbed_u0*perturbed_u0*dx)
+  final_forward = run_forward()
 
-minconv = test_initial_condition_adjoint(J, Function(V), final_adjoint, seed=10.0)
+  adj_html("heat_forward.html", "forward")
+  adj_html("heat_adjoint.html", "adjoint")
 
-if minconv < 1.9:
-  exit_code = 1
-else:
-  exit_code = 0
+  # The functional is only a function of final state.
+  functional=Functional(final_forward*final_forward*dx)
+  f_direct = adjointer.evaluate_functional(functional, adjointer.equation_count-1)
 
-sys.exit(exit_code)
+  print "Running adjoint model ..."
+
+  final_adjoint = run_adjoint()
+
+  def J(ic):
+    perturbed_u0 = run_forward(initial_condition=ic, annotate=False, dump=False)
+    return assemble(perturbed_u0*perturbed_u0*dx)
+
+  minconv = test_initial_condition_adjoint(J, Function(V), final_adjoint, seed=10.0)
+
+  if minconv < 1.9:
+    sys.exit(1)
+
+  dJ = assemble(derivative(final_forward*final_forward*dx, final_forward))
+
+  ic = final_forward
+  ic.vector()[:] = 0
+
+  minconv = test_initial_condition_tlm(J, dJ, ic, seed=1.0)
+
+  if minconv < 1.9:
+    sys.exit(1)
+
