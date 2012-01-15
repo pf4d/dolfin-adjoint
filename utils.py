@@ -175,6 +175,6 @@ def test_initial_condition_tlm(J, dJ, ic, seed=0.01, perturbation_direction=None
     with_gradient.append(remainder)
 
   print "Taylor remainder with adjoint information: ", with_gradient
-  print "Convergence orders for Taylor remainder with adjoint information (should all be 2): ", convergence_order(with_gradient)
+  print "Convergence orders for Taylor remainder with tangent linear information (should all be 2): ", convergence_order(with_gradient)
 
   return min(convergence_order(with_gradient))
