@@ -8,7 +8,8 @@ from dolfin_adjoint import *
 
 debugging["record_all"]=True
 
-W=sw_lib.p1dgp2(kelvin.mesh)
+mesh = UnitSquare(6, 6)
+W=sw_lib.p1dgp2(mesh)
 
 state=Function(W)
 
