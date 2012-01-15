@@ -164,8 +164,8 @@ def test_initial_condition_tlm(J, dJ, ic, seed=0.01, perturbation_direction=None
   # First-order Taylor remainders (not using adjoint)
   no_gradient = [abs(perturbed_f - f_direct) for perturbed_f in functional_values]
 
-  print "Taylor remainder without adjoint information: ", no_gradient
-  print "Convergence orders for Taylor remainder without adjoint information (should all be 1): ", convergence_order(no_gradient)
+  print "Taylor remainder without tangent linear information: ", no_gradient
+  print "Convergence orders for Taylor remainder without tangent linear information (should all be 1): ", convergence_order(no_gradient)
 
   with_gradient = []
   for i in range(len(perturbations)):
@@ -174,7 +174,7 @@ def test_initial_condition_tlm(J, dJ, ic, seed=0.01, perturbation_direction=None
     remainder = abs(functional_values[i] - f_direct - numpy.dot(numpy.array(final_tlm.vector()), numpy.array(dJ)))
     with_gradient.append(remainder)
 
-  print "Taylor remainder with adjoint information: ", with_gradient
+  print "Taylor remainder with tangent linear information: ", with_gradient
   print "Convergence orders for Taylor remainder with tangent linear information (should all be 2): ", convergence_order(with_gradient)
 
   return min(convergence_order(with_gradient))
