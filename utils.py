@@ -101,7 +101,7 @@ def test_initial_condition_adjoint(J, ic, final_adjoint, seed=0.01, perturbation
 
   return min(convergence_order(with_gradient))
 
-def tlm_dolfin(parameter, forget=False):
+def tlm_dolfin(parameter, forget=True):
   for i in range(adjointer.equation_count):
       (tlm_var, output) = adjointer.get_tlm_solution(i, parameter)
 
