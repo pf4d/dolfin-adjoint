@@ -415,14 +415,19 @@ class Matrix(libadjoint.Matrix):
 
     self.data=data
 
-  def solve(self, b):
+  def solve(self, var, b):
       
     if isinstance(self.data, ufl.Identity):
       x=b.duplicate()
       x.axpy(1.0, b)
     else:
+      if var.type in ['ADJ_TLM', 'ADJ_ADJOINT']:
+        bcs = [dolfin.homogenize(bc) for bc in self.bcs if isinstance(bc, dolfin.DirichletBC)] + [bc for bc in self.bcs if not isinstance(bc, dolfin.DirichletBC)]
+      else:
+        bcs = self.bcs
+
       x=Vector(dolfin.Function(self.test_function().function_space()))
-      dolfin.fem.solving.solve(self.data==b.data, x.data, self.bcs)
+      dolfin.fem.solving.solve(self.data==b.data, x.data, bcs)
 
     return x
 
@@ -725,3 +730,24 @@ def nonlinear_post_solve_projection(*args, **kwargs):
 def adjoint_checkpointing(strategy, steps, snaps_on_disk, snaps_in_ram, verbose=False):
   adjointer.set_checkpoint_strategy(strategy)
   adjointer.set_revolve_options(steps, snaps_on_disk, snaps_in_ram, verbose)
+
+class InitialConditionParameter(libadjoint.Parameter):
+  '''This Parameter is used as input to the tangent linear model (TLM)
+  when one wishes to compute dJ/d(initial condition) in a particular direction (perturbation).'''
+  def __init__(self, coeff, perturbation):
+    '''coeff: the variable whose initial condition you wish to perturb.
+       perturbation: the perturbation direction in which you wish to compute the gradient. Must be a Function.'''
+    self.var = adj_variables[coeff]
+    self.var.c_object.timestep = 0 # we want to put in the source term only at the initial condition.
+    self.perturbation = Vector(perturbation).duplicate()
+    self.perturbation.axpy(1.0, Vector(perturbation))
+
+  def __call__(self, dependencies, values, variable):
+    # The TLM source term only kicks in at the start, for the initial condition:
+    if self.var == variable:
+      return self.perturbation
+    else:
+      return None
+
+  def __str__(self):
+    return self.var.name + ':InitialCondition'
