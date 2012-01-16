@@ -110,7 +110,7 @@ def tlm_dolfin(parameter, forget=False):
       adjointer.record_variable(tlm_var, storage)
 
       if forget:
-        adjointer.forget_forward_equation(i)
+        adjointer.forget_tlm_equation(i)
   return output
 
 def test_initial_condition_tlm(J, dJ, ic, seed=0.01, perturbation_direction=None):
