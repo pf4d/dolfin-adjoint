@@ -55,6 +55,7 @@ if __name__ == "__main__":
     ic = project(Expression("sin(2*pi*x[0])"),  V)
     ic_copy = Function(ic)
     forward = main(ic, annotate=True)
+    forward_copy = Function(forward)
     adj_html("burgers_picard_forward.html", "forward")
     adj_html("burgers_picard_adjoint.html", "adjoint")
     print "Running adjoint ... "
@@ -72,5 +73,5 @@ if __name__ == "__main__":
       sys.exit(1)
 
     ic.vector()[:] = ic_copy.vector()
-    dJ = assemble(derivative(forward*forward*dx, forward))
+    dJ = assemble(derivative(forward_copy*forward_copy*dx, forward_copy))
     minconv = test_initial_condition_tlm(Jfunc, dJ, ic, seed=1.0e-5)
