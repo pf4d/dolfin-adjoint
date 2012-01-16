@@ -75,3 +75,5 @@ if __name__ == "__main__":
     ic.vector()[:] = ic_copy.vector()
     dJ = assemble(derivative(forward_copy*forward_copy*dx, forward_copy))
     minconv = test_initial_condition_tlm(Jfunc, dJ, ic, seed=1.0e-5)
+    if minconv < 1.9:
+      sys.exit(1)
