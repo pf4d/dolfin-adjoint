@@ -42,7 +42,6 @@ def main(ic, annotate=False):
         solve(a == L, u, bc, annotate=annotate)
 
         u_.assign(u, annotate=annotate)
-        return u_
 
         t += float(timestep)
         #plot(u)
