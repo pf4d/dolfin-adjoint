@@ -407,9 +407,11 @@ class Vector(libadjoint.Vector):
       raise libadjoint.exceptions.LibadjointErrorNotImplemented("Don't know how to set values.")
   
   def write(self, var):
+    import os.path
 
     filename = var.__str__()
     suffix = "xml"
+    assert(not os.path.isfile(filename+".%s" % suffix))
     file = dolfin.File(filename+".%s" % suffix)
     file << self.data
 
@@ -431,6 +433,16 @@ class Vector(libadjoint.Vector):
     #file >> x
     #print x.__class__()
 
+  @staticmethod
+  def delete(var):
+    import os
+    import os.path
+
+    filename = var.__str__()
+    suffix = "xml"
+
+    assert(os.path.isfile(filename+".%s" % suffix))
+    os.remove(filename+".%s" % suffix)
 
 class Matrix(libadjoint.Matrix):
   '''This class implements the libadjoint.Matrix abstract base class for the Dolfin adjoint.
