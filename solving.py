@@ -411,7 +411,8 @@ class Vector(libadjoint.Vector):
 
     filename = var.__str__()
     suffix = "xml"
-    assert(not os.path.isfile(filename+".%s" % suffix))
+    if not os.path.isfile(filename+".%s" % suffix):
+      print "Warning: Overwritting checkpoint file "+filename+"."+suffix
     file = dolfin.File(filename+".%s" % suffix)
     file << self.data
 
