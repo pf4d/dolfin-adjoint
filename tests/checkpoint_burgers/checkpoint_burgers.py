@@ -39,7 +39,7 @@ def main(ic, annotate=False):
     t = 0.0
     end = 0.05
     if annotate: 
-      adjoint_checkpointing('multistage', int(ceil(end/float(timestep)))+2, 0, 5, verbose=True)
+      adjoint_checkpointing('offline', int(ceil(end/float(timestep)))+2, 2, 1, verbose=True)
 
     u = Function(V)
     while (t <= end):

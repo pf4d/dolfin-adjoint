@@ -52,6 +52,9 @@ debugging["fussy_replay"] = True
 # as it happens.
 adjointer = libadjoint.Adjointer()
 
+# A dictionary that saves the functionspaces of all checkpoint variables that have been saved to disk
+checkpoint_fs = {}
+
 def annotate(*args, **kwargs):
   '''This routine handles all of the annotation, recording the solves as they
   happen so that libadjoint can rewind them later.'''
@@ -216,7 +219,10 @@ def annotate(*args, **kwargs):
         adjointer.record_variable(adj_variables[coeff], libadjoint.MemoryStorage(Vector(coeff), cs=True))
 
     elif cs == int(libadjoint.constants.adj_constants["ADJ_CHECKPOINT_STORAGE_DISK"]):
-      raise libadjoint.exceptions.LibadjointErrorNotImplemented("Disk checkpointing not implemented yet.")
+      for coeff in adj_variables.coeffs.keys(): 
+        if adj_variables[coeff] == var: continue
+        adjointer.record_variable(adj_variables[coeff], libadjoint.DiskStorage(Vector(coeff), cs=True))
+
     return linear
 
 def solve(*args, **kwargs):
@@ -399,6 +405,32 @@ class Vector(libadjoint.Vector):
       self.zero = False
     else:
       raise libadjoint.exceptions.LibadjointErrorNotImplemented("Don't know how to set values.")
+  
+  def write(self, var):
+
+    filename = var.__str__()
+    suffix = "xml"
+    file = dolfin.File(filename+".%s" % suffix)
+    file << self.data
+
+    # Save the function space into checkpoint_fs. It will be needed when reading the variable back in.
+    checkpoint_fs[filename] = self.data.function_space()
+
+  @staticmethod
+  def read(var):
+
+    filename = var.__str__()
+    suffix = "xml"
+
+    V = checkpoint_fs[filename]
+    v = dolfin.Function(V, filename+".%s" % suffix)
+    return Vector(v)
+    
+    #file = dolfin.File(filename+".%s" % suffix)
+    #x = dolfin.Vector(V.dim())
+    #file >> x
+    #print x.__class__()
+
 
 class Matrix(libadjoint.Matrix):
   '''This class implements the libadjoint.Matrix abstract base class for the Dolfin adjoint.
@@ -522,7 +554,7 @@ class RHS(libadjoint.RHS):
     if isinstance(self.form, ufl.form.Form):
 
       dolfin_dependencies=[dep for dep in ufl.algorithms.extract_coefficients(self.form) if hasattr(dep, "function_space")]
-      
+
       dolfin_values=[val.data for val in values]
 
       return Vector(dolfin.replace(self.form, dict(zip(dolfin_dependencies, dolfin_values))))
