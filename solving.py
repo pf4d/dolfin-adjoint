@@ -428,11 +428,6 @@ class Vector(libadjoint.Vector):
     V = checkpoint_fs[filename]
     v = dolfin.Function(V, filename+".%s" % suffix)
     return Vector(v)
-    
-    #file = dolfin.File(filename+".%s" % suffix)
-    #x = dolfin.Vector(V.dim())
-    #file >> x
-    #print x.__class__()
 
   @staticmethod
   def delete(var):
