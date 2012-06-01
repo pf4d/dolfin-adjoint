@@ -30,7 +30,7 @@ from dolfin import *
 from dolfin_adjoint import *
 import sys
 
-debugging["record_all"] = True
+dolfin.parameters["adjoint"]["record_all"] = True
 
 def boundary_value(n):
     if n < 10:
@@ -140,7 +140,7 @@ if __name__ == "__main__":
 
   J = FinalFunctional(u*u*dx)
   param = ScalarParameter(f)
-  dJdf = compute_gradient(J, param)
+  dJdf = compute_gradient(J, param, forget=False)
 
   def J(param):
     u0 = Function(Q)

@@ -1,8 +1,10 @@
 import dolfin
 import ufl
-from solving import adjointer, adj_variables, debugging, solve, Vector, Matrix, annotate as solving_annotate
+from solving import solve, annotate as solving_annotate
 import libadjoint
 import assign
+import adjlinalg
+import adjglobals
 
 dolfin_assign = dolfin.Function.assign
 dolfin_split  = dolfin.Function.split
@@ -14,19 +16,21 @@ def dolfin_adjoint_assign(self, other, annotate=True):
   in advance.'''
 
   # ignore anything not a dolfin.Function
-  if not isinstance(other, dolfin.Function) or annotate is False or debugging["stop_annotating"]:
+  if not isinstance(other, dolfin.Function) or annotate is False or dolfin.parameters["adjoint"]["stop_annotating"]:
     return dolfin_assign(self, other)
 
   # ignore anything that is an interpolation, rather than a straight assignment
   if str(self.function_space()) != str(other.function_space()):
     return dolfin_assign(self, other)
 
-  other_var = adj_variables[other]
+  other_var = adjglobals.adj_variables[other]
+  self_var = adjglobals.adj_variables[self]
   # ignore any functions we haven't seen before -- we DON'T want to
   # annotate the assignment of initial conditions here. That happens
   # in the main solve wrapper.
-  if not adjointer.variable_known(other_var):
-    adj_variables.forget(other)
+  if not adjglobals.adjointer.variable_known(other_var) and not adjglobals.adjointer.variable_known(self_var):
+    adjglobals.adj_variables.forget(other)
+    adjglobals.adj_variables.forget(self)
     if hasattr(other, "split"):
       if other.split is True:
         errmsg = '''Cannot use Function.split() (yet). To adjoint this, we need functionality
@@ -54,6 +58,17 @@ def dolfin_adjoint_split(self, *args, **kwargs):
   return out
 
 class Function(dolfin.Function):
+  '''The Function class is overloaded so that you can give :py:class:`Functions` *names*. For example,
+
+    .. code-block:: python
+
+      u = Function(V, name="Velocity")
+
+    This allows you to refer to the :py:class:`Function` by name throughout dolfin-adjoint, rather than
+    needing to have the specific :py:class:`Function` instance available.
+
+    For more details, see :doc:`the dolfin-adjoint documentation </documentation/misc>`.'''
+
   def __init__(self, *args, **kwargs):
     if "name" in kwargs:
       self.adj_name = kwargs["name"]
@@ -63,17 +78,20 @@ class Function(dolfin.Function):
     if 'annotate' in kwargs:
       annotate = kwargs['annotate']
       del kwargs['annotate']
-    if debugging["stop_annotating"]:
+    if dolfin.parameters["adjoint"]["stop_annotating"]:
       annotate = False
 
     dolfin.Function.__init__(self, *args, **kwargs)
 
     if isinstance(args[0], dolfin.Function) and annotate:
-      other_var = adj_variables[args[0]]
-      if adjointer.variable_known(other_var):
+      other_var = adjglobals.adj_variables[args[0]]
+      if adjglobals.adjointer.variable_known(other_var):
         assign.register_assign(self, args[0])
 
   def assign(self, other, annotate=True):
+    '''To disable the annotation, just pass :py:data:`annotate=False` to this routine, and it acts exactly like the
+    Dolfin assign call.'''
+
     return dolfin_adjoint_assign(self, other, annotate=annotate)
 
   def split(self, *args, **kwargs):

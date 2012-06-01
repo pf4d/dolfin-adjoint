@@ -13,7 +13,7 @@ from dolfin_adjoint import *
 dolfin.parameters["adjoint"]["record_all"] = True
 dolfin.parameters["adjoint"]["fussy_replay"] = False
 
-n = 10
+n = 50
 mesh = UnitInterval(n)
 V = FunctionSpace(mesh, "CG", 1)
 
@@ -26,16 +26,16 @@ def main(ic, annotate=False):
     u = Function(V, name="NextState")
     v = TestFunction(V)
 
-    nu = Constant(0.0001)
+    nu = Constant(0.1)
 
     timestep = Constant(1.0/n)
 
     F = (Dt(u, u_, timestep)*v
-         + u*grad(u)*v + nu*grad(u)*grad(v))*dx
+        + u*grad(u)*v + nu*grad(u)*grad(v))*dx
     bc = DirichletBC(V, 0.0, "on_boundary")
 
     t = 0.0
-    end = 0.2
+    end = 1.0
     while (t <= end):
         solve(F == 0, u, bc, annotate=annotate)
         u_.assign(u, annotate=annotate)
@@ -55,27 +55,23 @@ if __name__ == "__main__":
     ic = forward
     ic.vector()[:] = ic_copy.vector()
 
-    perturbation = Function(ic)
-    vec = perturbation.vector()
-    for i in range(len(vec)):
-      vec[i] = random.random()
+    svd = adj_compute_propagator_svd("State", "State", nsv=1)
+    (sigma, u, v) = svd.get_svd(0, return_vectors=True)
 
-    info_blue("Computing the TLM the direct way ... ")
-    param = InitialConditionParameter(ic, perturbation)
-    for (tlm, var) in compute_tlm(param, forget=False):
-      pass
-    final_tlm = tlm
+    ic_norm = sqrt(assemble(inner(v, v)*dx))
 
-    ndof = V.dim()
-    info_blue("Computing the TLM the SVD way ... ")
-    svd = adj_compute_propagator_svd("State", "State", nsv=ndof)
+    perturbed_ic = Function(ic)
+    perturbed_ic.vector().axpy(1.0, v.vector())
+    perturbed_soln = main(perturbed_ic, annotate=False)
 
-    assert svd.ncv == ndof
+    soln_perturbation = perturbed_soln - forward_copy
+    final_norm = sqrt(assemble(inner(soln_perturbation, soln_perturbation)*dx))
+    print "Norm of initial perturbation: ", ic_norm
+    print "Norm of final perturbation: ", final_norm
+    ratio = final_norm / ic_norm
+    print "Ratio: ", ratio
+    print "Predicted growth of perturbation: ", sigma
 
-    mat = adj_compute_propagator_matrix(svd)
-    tlm_output = numpy.dot(mat, perturbation.vector().array())
-    norm = numpy.linalg.norm(final_tlm.vector().array() - tlm_output)
-
-    print "Error norm: ", norm
-
-    assert norm < 1.0e-13
+    prediction_error = abs(sigma - ratio)/ratio * 100
+    print "Prediction error: ", prediction_error,  "%"
+    assert prediction_error < 2

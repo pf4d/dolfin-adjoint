@@ -4,7 +4,7 @@ from dolfin import *
 from dolfin_adjoint import *
 from math import sqrt
 
-debugging["record_all"] = True
+dolfin.parameters["adjoint"]["record_all"] = True
 
 # Class representing the intial conditions
 class InitialConditions(Expression):
@@ -116,7 +116,9 @@ if __name__ == "__main__":
   adj_html("forward.html", "forward")
 
   J = TimeFunctional((1.0/(4*eps)) * (pow( (-1.0/eps) * forward[1], 2))*dx, dt=dt, verbose=True)
-  dJdic = compute_gradient(J, InitialConditionParameter(ic))
+  dJdic = compute_gradient(J, InitialConditionParameter(ic), forget=False)
+
+  print "Functional value: ", j
 
   def J(ic):
     u, j = main(ic, annotate=False)

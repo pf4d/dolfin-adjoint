@@ -12,9 +12,9 @@ n = 100
 mesh = UnitInterval(n)
 V = FunctionSpace(mesh, "CG", 2)
 
-#debugging["record_all"] = True
-#debugging["test_hermitian"] = (100, 1.0e-14)
-#debugging["test_derivative"] = 6
+#dolfin.parameters["adjoint"]["record_all"] = True
+#dolfin.parameters["adjoint"]["test_hermitian"] = (100, 1.0e-14)
+#dolfin.parameters["adjoint"]["test_derivative"] = 6
 
 def Dt(u, u_, timestep):
     return (u - u_)/timestep
@@ -39,7 +39,7 @@ def main(ic, annotate=False):
     t = 0.0
     end = 0.5
     if annotate: 
-      adj_checkpointing('multistage', int(ceil(end/float(timestep)))+1, 5, 10, verbose=True)
+      adj_checkpointing('multistage', int(ceil(end/float(timestep))), 5, 10, verbose=True)
 
     u = Function(V)
     j = 0

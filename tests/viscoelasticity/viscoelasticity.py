@@ -24,11 +24,11 @@ Give bc and Lame parameters in kPa -> displacements in mm, velocities
 in mm/s, stresses in kPa
 """
 
+# Last changed: 2012-05-29
+
 import sys
-import pylab
 
 from dolfin import *
-from dolfin import div as d
 
 # Adjoint stuff
 from dolfin_adjoint import *
@@ -45,14 +45,10 @@ mu11 = Constant(2.39) # kPa
 lamda11 = Constant(10**3) # kPa
 params = [mu00, lamda00, mu10, lamda10, mu11, lamda11]
 
-# Vectorized div
-def div(v):
-    return as_vector((d(v[0]), d(v[1]), d(v[2])))
-
 # Vectorized skew
 def skw(tau):
     s = 2*skew(tau) # FIXME: Why did I put a 2 here?
-    return as_vector((s[0][1], s[0][2], s[1][2]))
+    return as_vector((s[0, 1], s[0, 2], s[1, 2]))
 
 # Compliance tensors (Semi-arbitrarily chosen values and units)
 def A00_tensor(tau, mu, lamda):
@@ -284,7 +280,7 @@ if __name__ == "__main__":
     dt = 0.01
     set_log_level(PROGRESS)
 
-    debugging["record_all"] = True
+    dolfin.parameters["adjoint"]["record_all"] = True
     ic = Function(Z)
     ic_copy = Function(ic)
 
@@ -302,7 +298,7 @@ if __name__ == "__main__":
     sigma = sigma0 + sigma1
     J = FinalFunctional(inner(sigma0[2], sigma0[2])*dx)
     param = ScalarParameter(amplitude)
-    adjointer = solving.adjointer
+    adjointer = adjglobals.adjointer
 
 # Copy the code from compute_gradient:
     #dJdp = compute_gradient(J, ScalarParameter(amplitude))

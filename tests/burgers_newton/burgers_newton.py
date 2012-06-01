@@ -8,8 +8,8 @@ import sys
 from dolfin import *
 from dolfin_adjoint import *
 
-debugging["record_all"] = True
-debugging["fussy_replay"] = False
+dolfin.parameters["adjoint"]["record_all"] = True
+dolfin.parameters["adjoint"]["fussy_replay"] = False
 
 n = 30
 mesh = UnitInterval(n)
@@ -67,7 +67,7 @@ if __name__ == "__main__":
       forward = main(ic, annotate=False)
       return assemble(forward*forward*dx)
 
-    minconv = test_initial_condition_adjoint(Jfunc, ic, dJdic, seed=1.0e-5)
+    minconv = test_initial_condition_adjoint(Jfunc, ic, dJdic, seed=1.0e-3)
     if minconv < 1.9:
       sys.exit(1)
 
@@ -75,6 +75,6 @@ if __name__ == "__main__":
 
     ic = forward
     ic.vector()[:] = ic_copy.vector()
-    minconv = test_initial_condition_tlm(Jfunc, dJ, ic, seed=1.0e-5)
+    minconv = test_initial_condition_tlm(Jfunc, dJ, ic, seed=1.0e-3)
     if minconv < 1.9:
       sys.exit(1)

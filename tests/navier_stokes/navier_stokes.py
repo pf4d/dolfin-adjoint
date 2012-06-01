@@ -29,7 +29,7 @@ from dolfin import *
 from dolfin_adjoint import *
 
 # Record all variables solved for
-debugging["record_all"] = True
+dolfin.parameters["adjoint"]["record_all"] = True
 
 # Print log messages only from the root process in parallel
 parameters["std_out_all_processes"] = False;
@@ -143,6 +143,10 @@ if __name__ == "__main__":
   J = FinalFunctional(inner(final_soln, final_soln)*dx)
   for (final_adj, var) in compute_adjoint(J, forget=False):
     pass
+
+  j = assemble(inner(final_soln, final_soln)*dx)
+
+  print "Functional value: ", j
 
   def J(ic):
     soln = main(ic)

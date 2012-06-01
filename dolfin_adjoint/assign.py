@@ -1,7 +1,9 @@
 import dolfin
 import ufl
-from solving import adjointer, adj_variables, debugging, solve, Vector, Matrix, annotate as solving_annotate, do_checkpoint, IdentityMatrix
+from solving import solve, annotate as solving_annotate, do_checkpoint, register_initial_conditions
 import libadjoint
+import adjlinalg
+import adjglobals
 
 def register_assign(new, old):
   fn_space = new.function_space()
@@ -12,29 +14,31 @@ def register_assign(new, old):
 
   def identity_assembly_cb(variables, dependencies, hermitian, coefficient, context):
     assert coefficient == 1
-    return (Matrix(IdentityMatrix()), Vector(dolfin.Function(fn_space)))
+    return (adjlinalg.Matrix(adjlinalg.IdentityMatrix()), adjlinalg.Vector(dolfin.Function(fn_space)))
 
   identity_block.assemble = identity_assembly_cb
-  dep = adj_variables.next(new)
+  dep = adjglobals.adj_variables.next(new)
 
-  if debugging["record_all"]:
-    adjointer.record_variable(dep, libadjoint.MemoryStorage(Vector(old)))
+  if dolfin.parameters["adjoint"]["record_all"]:
+    adjglobals.adjointer.record_variable(dep, libadjoint.MemoryStorage(adjlinalg.Vector(old)))
 
-  initial_eq = libadjoint.Equation(dep, blocks=[identity_block], targets=[dep], rhs=IdentityRHS(old))
-  cs = adjointer.register_equation(initial_eq)
+  rhs = IdentityRHS(old)
+  register_initial_conditions(zip(rhs.coefficients(),rhs.dependencies()), linear=True)
+  initial_eq = libadjoint.Equation(dep, blocks=[identity_block], targets=[dep], rhs=rhs)
+  cs = adjglobals.adjointer.register_equation(initial_eq)
 
-  do_checkpoint(cs, dep)
+  do_checkpoint(cs, dep, rhs)
 
 class IdentityRHS(libadjoint.RHS):
   def __init__(self, var):
     self.var = var
-    self.dep = adj_variables[var]
+    self.dep = adjglobals.adj_variables[var]
 
   def __call__(self, dependencies, values):
-    return Vector(values[0].data)
+    return adjlinalg.Vector(values[0].data)
 
   def derivative_action(self, dependencies, values, variable, contraction_vector, hermitian):
-    return Vector(contraction_vector.data)
+    return adjlinalg.Vector(contraction_vector.data)
 
   def dependencies(self):
     return [self.dep]

@@ -1,10 +1,19 @@
 import solving
 import dolfin
 import libadjoint
+import adjglobals
+import adjlinalg
 
 def project(v, V=None, bcs=None, mesh=None, solver_type="cg", preconditioner_type="default", form_compiler_parameters=None, annotate=True):
+  '''The project call performs an equation solve, and so it too must be annotated so that the
+  adjoint and tangent linear models may be constructed automatically by libadjoint.
 
-  if solving.debugging["stop_annotating"]:
+  To disable the annotation of this function, just pass :py:data:`annotate=False`. This is useful in
+  cases where the solve is known to be irrelevant or diagnostic for the purposes of the adjoint
+  computation (such as projecting fields to other function spaces for the purposes of
+  visualisation).'''
+
+  if dolfin.parameters["adjoint"]["stop_annotating"]:
     annotate = False
 
   if isinstance(v, dolfin.Expression):
@@ -26,8 +35,8 @@ def project(v, V=None, bcs=None, mesh=None, solver_type="cg", preconditioner_typ
 
     solving.annotate(a == L, out, bcs, solver_parameters={"linear_solver": solver_type, "preconditioner": preconditioner_type, "symmetric": True})
 
-    if solving.debugging["record_all"]:
-      solving.adjointer.record_variable(solving.adj_variables[out], libadjoint.MemoryStorage(solving.Vector(out)))
+    if dolfin.parameters["adjoint"]["record_all"]:
+      adjglobals.adjointer.record_variable(adjglobals.adj_variables[out], libadjoint.MemoryStorage(adjlinalg.Vector(out)))
 
   return out
 

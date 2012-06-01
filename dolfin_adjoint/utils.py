@@ -1,26 +1,32 @@
 import libadjoint
-from solving import *
 from parameter import *
 from dolfin import info_red, info_blue, info
+import adjglobals
 import dolfin
 import numpy
+import constant
+import adjresidual
+import ufl.algorithms
 
-def replay_dolfin(forget=False, tol=0.0):
-  if "record_all" not in debugging or debugging["record_all"] is not True:
-    info_red("Warning: your replay test will be much more effective with debugging['record_all'] = True.")
+def replay_dolfin(forget=False, tol=0.0, stop=False):
+  if not dolfin.parameters["adjoint"]["record_all"]:
+    info_red("Warning: your replay test will be much more effective with dolfin.parameters['adjoint']['record_all'] = True.")
 
   success = True
-  for i in range(adjointer.equation_count):
-      (fwd_var, output) = adjointer.get_forward_solution(i)
+  for i in range(adjglobals.adjointer.equation_count):
+      (fwd_var, output) = adjglobals.adjointer.get_forward_solution(i)
 
       storage = libadjoint.MemoryStorage(output)
       storage.set_compare(tol=tol)
       storage.set_overwrite(True)
-      out = adjointer.record_variable(fwd_var, storage)
+      out = adjglobals.adjointer.record_variable(fwd_var, storage)
       success = success and out
 
       if forget:
-        adjointer.forget_forward_equation(i)
+        adjglobals.adjointer.forget_forward_equation(i)
+
+      if not out and stop:
+        return success
 
   return success
 
@@ -38,11 +44,11 @@ def convergence_order(errors):
 
 def compute_adjoint(functional, forget=True):
 
-  for i in range(adjointer.equation_count)[::-1]:
-      (adj_var, output) = adjointer.get_adjoint_solution(i, functional)
+  for i in range(adjglobals.adjointer.equation_count)[::-1]:
+      (adj_var, output) = adjglobals.adjointer.get_adjoint_solution(i, functional)
 
       storage = libadjoint.MemoryStorage(output)
-      adjointer.record_variable(adj_var, storage)
+      adjglobals.adjointer.record_variable(adj_var, storage)
 
       # forget is None: forget *nothing*.
       # forget is True: forget everything we can, forward and adjoint
@@ -50,20 +56,20 @@ def compute_adjoint(functional, forget=True):
       if forget is None:
         pass
       elif forget:
-        adjointer.forget_adjoint_equation(i)
+        adjglobals.adjointer.forget_adjoint_equation(i)
       else:
-        adjointer.forget_adjoint_values(i)
+        adjglobals.adjointer.forget_adjoint_values(i)
 
       yield (output.data, adj_var)
 
 def compute_tlm(parameter, forget=False):
 
-  for i in range(adjointer.equation_count):
-      (tlm_var, output) = adjointer.get_tlm_solution(i, parameter)
+  for i in range(adjglobals.adjointer.equation_count):
+      (tlm_var, output) = adjglobals.adjointer.get_tlm_solution(i, parameter)
 
       storage = libadjoint.MemoryStorage(output)
       storage.set_overwrite(True)
-      adjointer.record_variable(tlm_var, storage)
+      adjglobals.adjointer.record_variable(tlm_var, storage)
 
       # forget is None: forget *nothing*.
       # forget is True: forget everything we can, forward and adjoint
@@ -71,9 +77,9 @@ def compute_tlm(parameter, forget=False):
       if forget is None:
         pass
       elif forget:
-        adjointer.forget_tlm_equation(i)
+        adjglobals.adjointer.forget_tlm_equation(i)
       else:
-        adjointer.forget_tlm_values(i)
+        adjglobals.adjointer.forget_tlm_values(i)
 
       yield (output.data, tlm_var)
 
@@ -147,19 +153,19 @@ def test_initial_condition_adjoint(J, ic, final_adjoint, seed=0.01, perturbation
   return min(convergence_order(with_gradient))
 
 def tlm_dolfin(parameter, forget=False):
-  for i in range(adjointer.equation_count):
-      (tlm_var, output) = adjointer.get_tlm_solution(i, parameter)
+  for i in range(adjglobals.adjointer.equation_count):
+      (tlm_var, output) = adjglobals.adjointer.get_tlm_solution(i, parameter)
 
       storage = libadjoint.MemoryStorage(output)
       storage.set_overwrite(True)
-      adjointer.record_variable(tlm_var, storage)
+      adjglobals.adjointer.record_variable(tlm_var, storage)
 
       if forget is None:
         pass
       elif forget:
-        adjointer.forget_tlm_equation(i)
+        adjglobals.adjointer.forget_tlm_equation(i)
       else:
-        adjointer.forget_tlm_values(i)
+        adjglobals.adjointer.forget_tlm_values(i)
 
   return output
 
@@ -184,8 +190,8 @@ def test_initial_condition_tlm(J, dJ, ic, seed=0.01, perturbation_direction=None
   info_blue("Running Taylor remainder convergence analysis for the tangent linear model... ")
   import random
 
-  adj_var = adj_variables[ic]; adj_var.timestep = 0
-  if not adjointer.variable_known(adj_var):
+  adj_var = adjglobals.adj_variables[ic]; adj_var.timestep = 0
+  if not adjglobals.adjointer.variable_known(adj_var):
     raise libadjoint.exceptions.LibadjointErrorInvalidInputs("Your initial condition must be the /exact same Function/ as the initial condition used in the forward model.")
 
   # First run the problem unperturbed
@@ -321,15 +327,15 @@ def compute_gradient(J, param, forget=True):
     dJdparam = [None]
     lparam = [param]
 
-  for i in range(adjointer.equation_count)[::-1]:
-    (adj_var, output) = adjointer.get_adjoint_solution(i, J)
+  for i in range(adjglobals.adjointer.equation_count)[::-1]:
+    (adj_var, output) = adjglobals.adjointer.get_adjoint_solution(i, J)
 
     storage = libadjoint.MemoryStorage(output)
-    adjointer.record_variable(adj_var, storage)
+    adjglobals.adjointer.record_variable(adj_var, storage)
     fwd_var = libadjoint.Variable(adj_var.name, adj_var.timestep, adj_var.iteration)
 
     for j in range(len(lparam)):
-      out = lparam[j].inner_adjoint(adjointer, output.data, i, fwd_var)
+      out = lparam[j].inner_adjoint(adjglobals.adjointer, output.data, i, fwd_var)
       if dJdparam[j] is None:
         dJdparam[j] = out
       elif dJdparam[j] is not None and out is not None:
@@ -338,9 +344,9 @@ def compute_gradient(J, param, forget=True):
     if forget is None:
       pass
     elif forget:
-      adjointer.forget_adjoint_equation(i)
+      adjglobals.adjointer.forget_adjoint_equation(i)
     else:
-      adjointer.forget_adjoint_values(i)
+      adjglobals.adjointer.forget_adjoint_values(i)
 
   if scalar:
     return dJdparam[0]
@@ -417,3 +423,139 @@ def test_scalar_parameters_adjoint(J, a, dJda, seed=0.1):
 
   return min(convergence_order(with_gradient))
 
+def taylor_test(J, m, Jm, dJdm, seed=None, perturbation_direction=None, value=None):
+  '''J must be a function that takes in a parameter value m and returns the value
+     of the functional:
+
+       func = J(m)
+
+     Jm is the value of the function J at the parameter m. 
+     dJdm is the gradient of J evaluated at m, to be tested for correctness.
+
+     This function returns the order of convergence of the Taylor
+     series remainder, which should be 2 if the adjoint is working
+     correctly.'''
+
+  info_blue("Running Taylor remainder convergence test ... ")
+  import random
+
+  def get_const(val):
+    if isinstance(val, str):
+      return float(constant.constants[val])
+    else:
+      return float(val)
+
+  def get_value(param, value):
+    if value is not None:
+      return value
+    else:
+      try:
+        return adjglobals.adjointer.get_variable_value(param.var).data
+      except libadjoint.exceptions.LibadjointErrorNeedValue:
+        info_red("Do you need to pass forget=False to compute_gradient?")
+        raise
+
+  # First, compute perturbation sizes.
+  if seed is None:
+    if isinstance(m, ScalarParameter):
+      seed = get_const(m.a)/5.0
+
+      if seed == 0.0: seed = 0.1
+    else:
+      seed = 0.01
+
+  perturbation_sizes = [seed/(2**i) for i in range(5)]
+
+  # Next, compute the perturbation direction.
+  if perturbation_direction is None:
+    if isinstance(m, ScalarParameter):
+      perturbation_direction = 1
+    elif isinstance(m, ScalarParameters):
+      perturbation_direction = numpy.array([get_const(x)/5.0 for x in m.v])
+    elif isinstance(m, InitialConditionParameter):
+      ic = get_value(m, value)
+      perturbation_direction = dolfin.Function(ic)
+      vec = perturbation_direction.vector()
+      for i in range(len(vec)):
+        vec[i] = random.random()
+    else:
+      raise libadjoint.exceptions.LibadjointErrorNotImplemented("Don't know how to compute a perturbation direction")
+
+  # So now compute the perturbations:
+  if not isinstance(perturbation_direction, dolfin.Function):
+    perturbations = [x*perturbation_direction for x in perturbation_sizes]
+  else:
+    perturbations = []
+    for x in perturbation_sizes:
+      perturbation = dolfin.Function(perturbation_direction)
+      vec = perturbation.vector()
+      vec *= x
+      perturbations.append(perturbation)
+
+  # And now the perturbed inputs:
+  if isinstance(m, ScalarParameter):
+    pinputs = [dolfin.Constant(get_const(m.a) + x) for x in perturbations]
+  elif isinstance(m, ScalarParameters):
+    a = numpy.array([get_const(x) for x in m.v])
+
+    def make_const(arr):
+      return [dolfin.Constant(x) for x in arr]
+
+    pinputs = [make_const(a + x) for x in perturbations]
+  elif isinstance(m, InitialConditionParameter):
+    pinputs = []
+    for x in perturbations:
+      pinput = dolfin.Function(x)
+      pinput.vector()[:] += ic.vector()
+      pinputs.append(pinput)
+
+  # At last: the common bit!
+  functional_values = []
+  for pinput in pinputs:
+    Jp = J(pinput)
+    functional_values.append(Jp)
+
+  # First-order Taylor remainders (not using adjoint)
+  no_gradient = [abs(perturbed_J - Jm) for perturbed_J in functional_values]
+
+  info("Taylor remainder without adjoint information: " + str(no_gradient))
+  info("Convergence orders for Taylor remainder without adjoint information (should all be 1): " + str(convergence_order(no_gradient)))
+
+  with_gradient = []
+  if isinstance(m, ScalarParameter):
+    for i in range(len(perturbations)):
+      remainder = abs(functional_values[i] - Jm - dJdm*perturbations[i])
+      with_gradient.append(remainder)
+  elif isinstance(m, ScalarParameters):
+    for i in range(len(perturbations)):
+      remainder = abs(functional_values[i] - Jm - numpy.dot(dJdm, perturbations[i]))
+      with_gradient.append(remainder)
+  elif isinstance(m, InitialConditionParameter):
+    for i in range(len(perturbations)):
+      remainder = abs(functional_values[i] - Jm - dJdm.vector().inner(perturbations[i].vector()))
+      with_gradient.append(remainder)
+
+  info("Taylor remainder with adjoint information: " + str(with_gradient))
+  info("Convergence orders for Taylor remainder with adjoint information (should all be 2): " + str(convergence_order(with_gradient)))
+
+  return min(convergence_order(with_gradient))
+
+def estimate_error(J, forget=True):
+  err = 0.0
+  i = adjglobals.adjointer.equation_count - 1
+
+  for (adj, var) in compute_adjoint(J, forget=forget):
+    form = adjresidual.get_residual(i)
+    if form is not None:
+      Vplus = dolfin.increase_order(adj.function_space())
+      adj_h = dolfin.Function(Vplus)
+      adj_h.extrapolate(adj)
+
+      args = ufl.algorithms.extract_arguments(form)
+      assert len(args) == 1
+      estimator = dolfin.replace(form, {args[0]: adj_h})
+      err += dolfin.assemble(estimator)
+
+    i = i - 1
+
+  return err
