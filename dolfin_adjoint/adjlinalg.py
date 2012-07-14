@@ -4,6 +4,7 @@ import ufl
 import adjglobals
 import os
 import os.path
+import numpy
 
 class Vector(libadjoint.Vector):
   '''This class implements the libadjoint.Vector abstract base class for the Dolfin adjoint.
@@ -273,6 +274,14 @@ class Matrix(libadjoint.Matrix):
           dolfin.fem.solving.solve(self.data==b.data, x.data, bcs, solver_parameters=solver_params)
 
     return x
+
+  def action(self, x, y):
+    assert isinstance(x.data, dolfin.Function)
+    assert isinstance(y.data, dolfin.Function)
+
+    action_form = dolfin.action(self.data, x.data)
+    action_vec  = dolfin.assemble(action_form)
+    y.data.vector()[:] = action_vec
 
   def axpy(self, alpha, x):
     assert isinstance(x.data, ufl.Form)
