@@ -4,9 +4,10 @@ import sys
 
 from dolfin import *
 from dolfin_adjoint import *
+import libadjoint
 
 dolfin.set_log_level(ERROR)
-dolfin.parameters["optimisation"]["test_gradient"] = True 
+dolfin.parameters["optimization"]["test_gradient"] = True 
 
 n = 10
 mesh = UnitInterval(n)
@@ -30,12 +31,13 @@ def main(u, annotate=False):
 
     t = 0.0
     end = 0.2
+    adjointer.time.start(t)
     while (t <= end):
         solve(F == 0, u_next, bc, annotate=annotate)
         u.assign(u_next, annotate=annotate)
 
         t += float(timestep)
-        adj_inc_timestep()
+        adj_inc_timestep(time=t, finished = t>end)
 
 if __name__ == "__main__":
 
@@ -43,21 +45,29 @@ if __name__ == "__main__":
     u = Function(ic, name='Velocity')
 
     J = Functional(u*u*dx*dt[FINISH_TIME])
-    def Jfunc(ic):
-      u.assign(ic)
-      main(u, annotate=True)
-      return assemble(u*u*dx)
+
+    # Run the model once to create the annotation
+    u.assign(ic)
+    main(u, annotate=True)
 
     # Run the optimisation 
     lb = project(Expression("-1"),  V)
-    optimisation.minimise(Jfunc, J, InitialConditionParameter(u), ic, algorithm = 'scipy.l_bfgs_b', pgtol=1e-6, factr=1e5, bounds = (lb, 1), iprint = 1)
+    
+    # Define the reduced funtional
+    reduced_functional = ReducedFunctional(J, InitialConditionParameter(u))
+
+    # Run the optimisation problem with gradient tests and L-BFGS-B
+    u_opt = minimize(reduced_functional, algorithm = 'scipy.l_bfgs_b', pgtol=1e-6, factr=1e5, bounds = (lb, 1), iprint = 1)
     ic = project(Expression("sin(2*pi*x[0])"),  V)
 
-    # For performance reasons, switch the gradient test off
-    dolfin.parameters["optimisation"]["test_gradient"] = False 
-    optimisation.minimise(Jfunc, J, InitialConditionParameter(u), ic, algorithm = 'scipy.slsqp', bounds = (lb, 1), iprint = 2, acc = 1e-10)
+    # Run the problem again with SQP, this time for performance reasons with the gradient test switched off
+    dolfin.parameters["optimization"]["test_gradient"] = False 
+    u_opt = minimize(reduced_functional, algorithm = 'scipy.slsqp', bounds = (lb, 1), iprint = 2, acc = 1e-10)
 
     tol = 1e-9
-    if Jfunc(ic) > tol:
-        print 'Test failed: Optimised functional value exceeds tolerance: ' , Jfunc(ic), ' > ', tol, '.'
+    final_functional = reduced_functional(u_opt)
+    print "Final functional value: ", final_functional
+    if final_functional > tol:
+        print 'Test failed: Optimised functional value exceeds tolerance: ' , final_functional, ' > ', tol, '.'
         sys.exit(1)
+
