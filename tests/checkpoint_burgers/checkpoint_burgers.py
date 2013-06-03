@@ -29,9 +29,7 @@ def main(ic, annotate=False):
     u_ = Function(ic, annotate=annotate)
     u = TrialFunction(V)
     v = TestFunction(V)
-
     nu = Constant(0.0001)
-
 
     F = (Dt(u, u_, timestep)*v
          + u_*u.dx(0)*v + nu*u.dx(0)*v.dx(0))*dx
