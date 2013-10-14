@@ -19,7 +19,6 @@ from projection import project
 from function import Function
 from interpolation import interpolate
 from constant import Constant
-from unimplemented import *
 from timeforms import dt, TimeMeasure, START_TIME, FINISH_TIME
 if backend.__name__ == "dolfin":
   from reduced_functional import ReducedFunctional
