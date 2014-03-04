@@ -1,9 +1,13 @@
 from dolfin import *
 from dolfin_adjoint import *
+from distutils.version import LooseVersion
 import sys
 
 n = 30
 mesh = UnitIntervalMesh(n)
+if LooseVersion(dolfin.__version__) > LooseVersion('1.3.0'):
+    dx = dx(mesh)
+
 V = FunctionSpace(mesh, "CG", 2)
 
 def main(ic, nu):

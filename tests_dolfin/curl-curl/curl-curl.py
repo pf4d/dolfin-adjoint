@@ -1,11 +1,14 @@
 from dolfin import *
 from dolfin_adjoint import *
+from distutils.version import LooseVersion
 
 parameters["adjoint"]["cache_factorizations"] = True
+mesh = UnitCubeMesh(2, 2, 2)
+if LooseVersion(dolfin.__version__) > LooseVersion('1.3.0'):
+    dx = dx(mesh)
 
 # Create mesh
 def main(dbdt, annotate=False):
-  mesh = UnitCubeMesh(2, 2, 2)
 
   # Define function spaces
   PN = FunctionSpace(mesh, "Nedelec 1st kind H(curl)", 1)
