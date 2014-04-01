@@ -17,18 +17,8 @@ class ReducedFunctionalNumPy(ReducedFunctional):
             This "NumPy version" of the reduced functional is created from an existing ReducedFunctional object:
               rf_np = ReducedFunctionalNumPy(rf = rf)
 
-            If the optional parameter in_euclidian_space norm is True, the ReducedFunctionalNumPy will 
-            perform a transformation from the L2-inner product given by the discrete Functionspace to Euclidian space.
-            That is, the squared norm of the gradient can then for example be computed with:
-
-               numpy.dot(dj, dj)
-
-            instead of 
-
-              assemble(inner(dj, dj)*dx).
-
-            This is useful for example, if the reduced functional is to be used with a third party library (such as 
-            optimisation libraries) that expect the Euclidian norm. 
+            If the optional parameter in_euclidian_space norm is True, the Hilbert space of the control function
+            is equipped with the norm l2 inner product instead of the L2 inner product.
             '''
         super(ReducedFunctionalNumPy, self).__init__(rf.functional, rf.parameter, scale = rf.scale, 
                                                      eval_cb = rf.eval_cb, derivative_cb = rf.derivative_cb, 
