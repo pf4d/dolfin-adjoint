@@ -305,18 +305,19 @@ class ReducedFunctional(object):
 
 
       rf = self
+      tmp_ctrl = Function(rf.parameter[0].data())
+      tmp_ctrl_vec = as_backend_type(tmp_ctrl.vector()).vec()
 
       class AppCtx(object):
-          tmp_ctrl = Function(rf.parameter[0].data())
-          tmp_ctrl_vec = as_backend_type(tmp_ctrl.vector()).vec()
+          ''' Implements the application context for the TAO solver '''
 
           def objective(self, tao, x):
               ''' Evaluates the functional for the parameter value x. '''
 
-              self.tmp_ctrl_vec.set(0)
-              self.tmp_ctrl_vec.axpy(1, x)
+              tmp_ctrl_vec.set(0)
+              tmp_ctrl_vec.axpy(1, x)
 
-              return rf(self.tmp_ctrl)
+              return rf(tmp_ctrl)
 
 
           def gradient(self, tao, x, G):
@@ -346,6 +347,24 @@ class ReducedFunctional(object):
                   return hes
 
               return tao_hessian
+
+      class TAOProblem(object):
+        def __init__(self, tao, x):
+          self.tao = tao
+          self.x = x
+
+
+        def solve(self):
+          self.tao.solve(self.x)
+          sol_vec = self.tao.getSolution()
+          tmp_ctrl_vec.set(0)
+          tmp_ctrl_vec.axpy(1, sol_vec)
+          return tmp_ctrl
+
+
+        def __del__(self):
+          self.tao.destroy()
+
 
 
       # create user application context
@@ -380,11 +399,7 @@ class ReducedFunctional(object):
       #x.set(0) # zero initial guess
       #tao.setInitial(x)
 
-
-      print "Solving TAO problem"
-      tao.solve(x)
-      print "Destroying TAO problem"
-      tao.destroy()
+      return TAOProblem(tao, x)
 
 
 def replace_parameter_value(parameter, new_value):

@@ -4,13 +4,21 @@ from dolfin_adjoint import *
 try:
   from petsc4py import PETSc
   PETSc.TAO
-except ImportError:
+except Exception:
   import sys
   info_blue("PETSc bindings with TAO support unavailable, skipping test")
   sys.exit(0)
 
+
+# Set options
 dolfin.set_log_level(ERROR)
 parameters['std_out_all_processes'] = False
+tao_args = """
+            --petsc.tao_monitor
+            --petsc.tao_view
+           """.split()
+parameters.parse(tao_args)
+
 x = triangle.x
 
 def solve_pde(u, V, m):
@@ -39,15 +47,12 @@ if __name__ == "__main__":
     rf = ReducedFunctional(J, InitialConditionParameter(m, value=m))
     problem = rf.tao_problem()
     
-
-    import sys; sys.exit()
-
-    m_opt = sol['control'].data
+    m_opt = problem.solve()
 
     #assert max(abs(sol["Optimizer"].data + 1./2*np.pi)) < 1e-9
     #assert sol["Number of iterations"] < 50
 
-    #plot(m_opt, interactive=True)
+    plot(m_opt, interactive=True)
 
     solve_pde(u, V, m)
 
