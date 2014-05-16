@@ -272,6 +272,121 @@ class ReducedFunctional(object):
 
       return problem
 
+
+    def tao_problem(self, method="cg", tao_args=None):
+      '''Returns a TAO problem class that can be used with the TAO package,
+      http://www.mcs.anl.gov/research/projects/tao/
+      '''
+      from IPython import embed
+      from dolfin import as_backend_type, parameters
+
+      # Check that the required packages are installed and that options are valid
+      # Set TAO options
+      if tao_args is None: 
+          tao_args = """
+                      --petsc.tao_monitor
+                      --petsc.tao_view
+                     """.split()
+
+      print "Applying tao arguments: ", tao_args
+      parameters.parse(tao_args)
+      try:
+          import petsc4py
+          from petsc4py import PETSc
+      except:
+          raise Exception, "Could not find petsc4py. Please install it."
+      try:
+          TAO = PETSc.TAO
+      except:
+          raise Exception, "Your petsc4py version does not support TAO. Please upgrade to petsc4py >= 3.5."
+
+      if len(self.parameter) > 1:
+          raise ValueError, "Tao support is currently limited to 1 parameter"
+
+
+      rf = self
+
+      class AppCtx(object):
+          tmp_ctrl = Function(rf.parameter[0].data())
+          tmp_ctrl_vec = as_backend_type(tmp_ctrl.vector()).vec()
+
+          def objective(self, tao, x):
+              ''' Evaluates the functional for the parameter value x. '''
+
+              self.tmp_ctrl_vec.set(0)
+              self.tmp_ctrl_vec.axpy(1, x)
+
+              return rf(self.tmp_ctrl)
+
+
+          def gradient(self, tao, x, G):
+              ''' Evaluates the gradient for the parameter choice x. '''
+
+              self.objective(tao, x)
+              gradient = rf.derivative(forget=False)[0]
+              gradient_vec = as_backend_type(gradient.vector()).vec()
+
+              G.set(0)
+              G.axpy(1, gradient_vec)
+
+          def objective_and_gradient(self, tao, x, G):
+              ''' Evaluates the gradient for the parameter choice x. '''
+
+              j = self.objective(tao, x)
+              self.gradient(tao, x, G)
+              return j
+
+          def hessian(self, x):
+              ''' Evaluates the gradient for the parameter choice x. '''
+
+              self(x)
+
+              def tao_hessian(direction):
+                  hes = rf.hessian(direction)[0]
+                  return hes
+
+              return tao_hessian
+
+
+      # create user application context
+      # and configure user parameters
+      user = AppCtx()
+
+      # create solution vector
+      param_vec = as_backend_type(self.parameter[0].data().vector()).vec()
+      # Use value of parameter object as initial guess for the optimisation
+      x = param_vec.duplicate()
+
+      # create Hessian matrix
+      #H = PETSc.Mat().create(PETSc.COMM_SELF)
+      #H.setSizes([user.size, user.size])
+      #H.setFromOptions()
+      #H.setOption(PETSc.Mat.Option.SYMMETRIC, True)
+      #H.setUp()
+
+      # pass the following to command line:
+      #  $ ... -methods nm,lmvm,nls,ntr,cg,blmvm,tron
+      # to try many methods
+
+      tao = PETSc.TAO().create(PETSc.COMM_SELF)
+      tao.setType(method)
+
+      tao.setObjectiveGradient(user.objective_and_gradient)
+      tao.setObjective(user.objective)
+      tao.setGradient(user.gradient)
+      #embed()
+      #tao.setHessian(user.hessian, H)
+      #app.getKSP().getPC().setFromOptions()
+      #x.set(0) # zero initial guess
+      #tao.setInitial(x)
+
+
+      print "Solving TAO problem"
+      tao.solve(x)
+      print "Destroying TAO problem"
+      tao.destroy()
+
+
 def replace_parameter_value(parameter, new_value):
     ''' Replaces the parameter value with new_value. '''
     if hasattr(parameter, 'var'):
