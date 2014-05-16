@@ -49,7 +49,7 @@ if __name__ == "__main__":
     #assert max(abs(sol["Optimizer"].data + 1./2*np.pi)) < 1e-9
     #assert sol["Number of iterations"] < 50
 
-    #plot(m_opt, interactive=True)
+    plot(m_opt, interactive=True)
 
     solve_pde(u, V, m)
 

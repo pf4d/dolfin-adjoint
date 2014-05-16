@@ -127,6 +127,7 @@ class ReducedFunctional(object):
             info_red("Got a functional cache miss")
             self._cache["functional_cache"][hash] = self.scale*func_value
 
+        print "Evaluating functioal: ", func_value
         return self.scale*func_value
 
     def derivative(self, forget=True, project=False):
@@ -273,23 +274,23 @@ class ReducedFunctional(object):
       return problem
 
 
-    def tao_problem(self, method="cg", tao_args=None):
+    def tao_problem(self, method="lmvm", tao_args=None):
       '''Returns a TAO problem class that can be used with the TAO package,
       http://www.mcs.anl.gov/research/projects/tao/
       '''
-      from IPython import embed
       from dolfin import as_backend_type, parameters
-
-      # Check that the required packages are installed and that options are valid
       # Set TAO options
       if tao_args is None: 
-          tao_args = """
-                      --petsc.tao_monitor
-                      --petsc.tao_view
-                     """.split()
-
+        tao_args = """
+                --petsc.tao_monitor
+                --petsc.tao_view
+                   """.split()
+        
       print "Applying tao arguments: ", tao_args
       parameters.parse(tao_args)
+
+
+      # Check that the required packages are installed and that options are valid
       try:
           import petsc4py
           from petsc4py import PETSc
@@ -337,16 +338,22 @@ class ReducedFunctional(object):
               self.gradient(tao, x, G)
               return j
 
-          def hessian(self, x):
+          def hessian(self, tao, x, H, HP):
               ''' Evaluates the gradient for the parameter choice x. '''
+              
+              print "In hessian user action routine"
+              self.objective(tao, x)
 
-              self(x)
 
-              def tao_hessian(direction):
-                  hes = rf.hessian(direction)[0]
-                  return hes
+      class MatrixFreeHessian():
+          def mult(self, mat, X, Y):
+              tmp_ctrl_vec.set(0)
+              tmp_ctrl_vec.axpy(1, X)
+              hes = rf.hessian(tmp_ctrl)[0]
+              hes_vec = as_backend_type(hes.vector()).vec()
+              Y.set(0)
+              Y.axpy(1, hes_vec)
 
-              return tao_hessian
 
       class TAOProblem(object):
         def __init__(self, tao, x):
@@ -377,27 +384,27 @@ class ReducedFunctional(object):
       x = param_vec.duplicate()
 
       # create Hessian matrix
-      #H = PETSc.Mat().create(PETSc.COMM_SELF)
-      #H.setSizes([user.size, user.size])
-      #H.setFromOptions()
-      #H.setOption(PETSc.Mat.Option.SYMMETRIC, True)
-      #H.setUp()
+      H = PETSc.Mat().create(PETSc.COMM_SELF)
+      N = x.size
+      H.createPython([N,N], comm=PETSc.COMM_SELF)
+      hessian_context = MatrixFreeHessian()
+      hessian_context.name = "mymat"
+      H.setPythonContext(hessian_context)
+      H.setOption(PETSc.Mat.Option.SYMMETRIC, True)
+      H.setUp()
 
       # pass the following to command line:
       #  $ ... -methods nm,lmvm,nls,ntr,cg,blmvm,tron
       # to try many methods
-
       tao = PETSc.TAO().create(PETSc.COMM_SELF)
       tao.setType(method)
 
       tao.setObjectiveGradient(user.objective_and_gradient)
       tao.setObjective(user.objective)
       tao.setGradient(user.gradient)
-      #embed()
-      #tao.setHessian(user.hessian, H)
+      tao.setHessian(user.hessian, H)
       #app.getKSP().getPC().setFromOptions()
-      #x.set(0) # zero initial guess
-      #tao.setInitial(x)
+      tao.setInitial(x)
 
       return TAOProblem(tao, x)
 
