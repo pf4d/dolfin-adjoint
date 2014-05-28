@@ -208,52 +208,44 @@ class ReducedFunctional(object):
 
       class Functional(moola.Functional):
           latest_eval_hash = None
-          latest_eval_eval = None
+          latest_eval_val = None
           latest_eval_deriv = None
 
           def __call__(self, x):
               ''' Evaluates the functional for the parameter choice x. '''
 
-              if memoize:
-                  hashx = hash(x)
+              hashx = hash(x)
 
-                  if self.latest_eval_hash != hashx:
-                      self.latest_eval_hash = hashx
-                      self.latest_eval_eval = rf(x.data)
-                      self.latest_eval_deriv = None
-                      moola.events.increment("Functional evaluation")
-                  else:
-                      #print  "Using memoised functional evaluation" 
-                      pass
-
-                  return self.latest_eval_eval
-
-              else:
+              if self.latest_eval_hash != hashx or not memoize:
+                  self.latest_eval_hash = hashx
+                  self.latest_eval_val = rf(x.data)
+                  self.latest_eval_deriv = None
                   moola.events.increment("Functional evaluation")
-                  return rf(x.data)
+              else:
+                  #print  "Using memoised functional evaluation" 
+                  pass
+
+              return self.latest_eval_val
 
 
           def derivative(self, x):
               ''' Evaluates the gradient for the parameter choice x. '''
 
-              if memoize:
+              self(x)
 
-                  self(x)
+              if self.latest_eval_deriv is None or not memoize:
+                  #print "Using memoised forward solution for gradient evaluation"
+                  moola.events.increment("Derivative evaluation")
+                  deriv = rf.derivative(forget=False)[0]
+                  moola_deriv = moola.DolfinDualVector(deriv, riesz_map=x.riesz_map)
 
-                  if self.latest_eval_deriv is None:
-                      #print "Using memoised forward solution for gradient evaluation"
-                      moola.events.increment("Derivative evaluation")
-                      self.latest_eval_deriv = moola.DolfinDualVector(rf.derivative(forget=False)[0])
-
-                  else:
-                      #print "Using memoised gradient"
-                      pass
-
-                  return self.latest_eval_deriv
+                  self.latest_eval_deriv = moola_deriv
 
               else:
-                  moola.events.increment("Derivative evaluation")
-                  return moola.DolfinDualVector(rf.derivative(forget=False)[0])
+                  #print "Using memoised gradient"
+                  pass
+
+              return self.latest_eval_deriv
 
           def hessian(self, x):
               ''' Evaluates the gradient for the parameter choice x. '''
@@ -264,7 +256,7 @@ class ReducedFunctional(object):
                   assert isinstance(direction, moola.DolfinPrimalVector)
                   moola.events.increment("Hessian evaluation")
                   hes = rf.hessian(direction.data)[0]
-                  return moola.DolfinDualVector(hes)
+                  return moola.DolfinDualVector(hes, riesz_map=x.riesz_map)
 
               return moola_hessian
 
