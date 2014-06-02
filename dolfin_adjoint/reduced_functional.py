@@ -127,7 +127,6 @@ class ReducedFunctional(object):
             info_red("Got a functional cache miss")
             self._cache["functional_cache"][hash] = self.scale*func_value
 
-        print "Evaluating functioal: ", func_value
         return self.scale*func_value
 
     def derivative(self, forget=True, project=False):
