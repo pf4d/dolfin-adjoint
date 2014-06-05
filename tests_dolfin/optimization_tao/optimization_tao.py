@@ -13,12 +13,12 @@ except Exception:
 # Set options
 dolfin.set_log_level(ERROR)
 parameters['std_out_all_processes'] = False
-#tao_args = """--petsc.tao_monitor
-#            --petsc.tao_view
-#            --petsc.tao_nls_pc_type none""".split()
 tao_args = """--petsc.tao_monitor
             --petsc.tao_view
-            --petsc.tao_nls_pc_type none""".split()
+            --petsc.tao_nls_ksp_type gltr
+            --petsc.tao_nls_pc_type none
+            --petsc.tao_ntr_pc_type none
+           """.split()
 print "Tao arguments:", tao_args           
 parameters.parse(tao_args)
 
@@ -48,7 +48,7 @@ if __name__ == "__main__":
 
     # Run the optimisation 
     rf = ReducedFunctional(J, InitialConditionParameter(m, value=m))
-    problem = rf.tao_problem(method="lmvm")
+    problem = rf.tao_problem(method="nls")
     problem.tao.setFunctionTolerances(fatol=1e-100, frtol=1e-1000)
     
     m_opt = problem.solve()

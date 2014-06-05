@@ -268,18 +268,21 @@ class ReducedFunctional(object):
     def tao_problem(self, method="lmvm", tao_args=None):
       '''Returns a TAO problem class that can be used with the TAO package,
       http://www.mcs.anl.gov/research/projects/tao/
-      '''
-      from dolfin import as_backend_type, parameters
-      # Set TAO options
-      if tao_args is None: 
-        tao_args = """
-                --petsc.tao_monitor
-                --petsc.tao_view
-                   """.split()
-        
-      print "Applying tao arguments: ", tao_args
-      parameters.parse(tao_args)
 
+      Valid methods: 
+        ------ Unconstrained optimisation --------
+        nm:    Nelder-Mead method
+        lmvm:  Limited memory, variable metric method
+        nls:   Newton line-search method
+        cg:    Nonlinear conjugate gradient mehtod
+
+        ------ Bound constrained optimisation --------
+        ntr:   Newton trust-region method (supports bound constraints)
+        bqpib: Interior point Newton algorithm
+        blmvm: Limited memory, variable metric method with bound constraints
+
+      '''
+      from dolfin import as_backend_type
 
       # Check that the required packages are installed and that options are valid
       try:
@@ -293,8 +296,7 @@ class ReducedFunctional(object):
           raise Exception, "Your petsc4py version does not support TAO. Please upgrade to petsc4py >= 3.5."
 
       if len(self.parameter) > 1:
-          raise ValueError, "Tao support is currently limited to 1 parameter"
-
+          raise ValueError, "TAO support is currently limited to 1 parameter"
 
       rf = self
       tmp_ctrl = Function(rf.parameter[0].data())
@@ -331,7 +333,6 @@ class ReducedFunctional(object):
 
           def hessian(self, tao, x, H, HP):
               ''' Evaluates the gradient for the parameter choice x. '''
-              
               print "In hessian user action routine"
               self.objective(tao, x)
 
@@ -384,11 +385,9 @@ class ReducedFunctional(object):
       H.setOption(PETSc.Mat.Option.SYMMETRIC, True)
       H.setUp()
 
-      # pass the following to command line:
-      #  $ ... -methods nm,lmvm,nls,ntr,cg,blmvm,tron
-      # to try many methods
       tao = PETSc.TAO().create(PETSc.COMM_SELF)
       tao.setType(method)
+      tao.setFromOptions()
 
       tao.setObjectiveGradient(user.objective_and_gradient)
       tao.setObjective(user.objective)
