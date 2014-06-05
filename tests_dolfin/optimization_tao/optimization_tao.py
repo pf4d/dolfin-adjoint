@@ -20,7 +20,7 @@ tao_args = """--petsc.tao_monitor
             --petsc.tao_view
             --petsc.tao_nls_pc_type none""".split()
 print "Tao arguments:", tao_args           
-#parameters.parse(tao_args)
+parameters.parse(tao_args)
 
 x = triangle.x
 
@@ -58,7 +58,7 @@ if __name__ == "__main__":
 
     plot(m_opt, interactive=True)
 
-    solve_pde(u, V, m)
+    solve_pde(u, V, m_opt)
 
 
     # Define the analytical expressions
@@ -66,9 +66,8 @@ if __name__ == "__main__":
     u_analytic = Expression("1/(2*pi*pi)*sin(pi*x[0])*sin(pi*x[1])")
 
     # Compute the error
-    control_error = errornorm(m_analytic, m)
+    control_error = errornorm(m_analytic, m_opt)
     state_error = errornorm(u_analytic, u)
 
     print "Control error", control_error
     print "State error", state_error
-
