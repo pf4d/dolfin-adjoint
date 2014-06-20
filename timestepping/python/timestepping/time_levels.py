@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
+# Copyright (C) 2014 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -30,7 +31,7 @@ __all__ = \
     "n"
   ]
 
-class TimeLevel:
+class TimeLevel(object):
   """
   A single model time level, with a specified logical offset. Is supplied with
   rich comparison methods, which compares the offsets of two TimeLevel s.
@@ -38,24 +39,20 @@ class TimeLevel:
   returns a TimeLevel with the associated offset increased or decreased by the
   given integer or Fraction.
 
-  Constructor arguments: One of:
-    1. No arguments. The time level is assigned an offset of zero.
-  or:
-    2. An integer or Fraction, which is used to set the offset.
-  or:
-    3. A TimeLevel, acting as a copy constructor.
+  Constructor arguments:
+    arg: One of:
+        1. No arguments. The time level is assigned an offset of zero.
+      or:
+        2. An integer or Fraction, which is used to set the offset.
+      or:
+        3. A TimeLevel, acting as a copy constructor.
   """
   
-  def __init__(self, *args):
-    if len(args) == 0:
-      offset = 0
-    elif len(args) == 1:
-      if isinstance(args[0], (int, Fraction)):
-        offset = args[0]
-      elif isinstance(args[0], TimeLevel):
-        offset = args[0].__offset
-      else:
-        raise InvalidArgumentException("Require no arguments, or TimeLevel, integer, or Fraction")
+  def __init__(self, arg = 0):
+    if isinstance(arg, (int, Fraction)):
+      offset = arg
+    elif isinstance(arg, TimeLevel):
+      offset = arg.__offset
     else:
       raise InvalidArgumentException("Require no arguments, or TimeLevel, integer, or Fraction")
 
@@ -128,7 +125,7 @@ class TimeLevel:
     
     return self.__offset
 
-class FinalTimeLevel:
+class FinalTimeLevel(object):
   """
   A single final model time level, with a specified logical offset. Is supplied
   with rich comparison methods, which compares the offsets of two
@@ -136,24 +133,20 @@ class FinalTimeLevel:
   well defined, and returns a FinalTimeLevel with the associated offset
   increased or decreased by the given integer or Fraction.
 
-  Constructor arguments: One of:
-    1. No arguments. The final time level is assigned an offset of zero.
-  or:
-    2. An integer or Fraction, which is used to set the offset.
-  or:
-    3. A FinalTimeLevel, acting as a copy constructor.
+  Constructor arguments:
+    arg: One of:
+        1. No arguments. The final time level is assigned an offset of zero.
+      or:
+        2. An integer or Fraction, which is used to set the offset.
+      or:
+        3. A FinalTimeLevel, acting as a copy constructor.
   """
   
-  def __init__(self, *args):
-    if len(args) == 0:
-      offset = 0
-    elif len(args) == 1:
-      if isinstance(args[0], (int, Fraction)):
-        offset = args[0]
-      elif isinstance(args[0], FinalTimeLevel):
-        offset = args[0].__offset
-      else:
-        raise InvalidArgumentException("Require no arguments, or FinalTimeLevel, integer, or Fraction")
+  def __init__(self, arg = 0):
+    if isinstance(arg, (int, Fraction)):
+      offset = arg
+    elif isinstance(arg, FinalTimeLevel):
+      offset = arg.__offset
     else:
       raise InvalidArgumentException("Require no arguments, or FinalTimeLevel, integer, or Fraction")
 
@@ -231,7 +224,7 @@ class FinalTimeLevel:
 n = TimeLevel()
 N = FinalTimeLevel()
 
-class TimeLevels:
+class TimeLevels(object):
   """
   A unique set of time levels and a timestep variable cycle map. The cycle map
   defines the cycling of data at the end of a model time step.

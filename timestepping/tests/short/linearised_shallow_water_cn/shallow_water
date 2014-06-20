@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
+# Copyright (C) 2014 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -60,17 +61,17 @@ system.finalise()
 comp = assemble(dot(split(state)[0], split(state)[0]) * dx)
 ref = 4.10821370682097189e-05
 err = abs(comp - ref)
-print "%.17e" % comp
-print "%.17e" % ref
-print "%.17e" % err
+print("%.16e" % comp)
+print("%.16e" % ref)
+print("%.16e" % err)
 assert(err < 3.0e-16)
 
 comp = assemble(split(state)[1] * split(state)[1] * dx)
 ref = 8.51321895311346568e-07
 err = abs(comp - ref)
-print "%.17e" % comp
-print "%.17e" % ref
-print "%.17e" % err
+print("%.16e" % comp)
+print("%.16e" % ref)
+print("%.16e" % err)
 assert(err < 2.0e-14)
 
 system.verify_checkpoints()

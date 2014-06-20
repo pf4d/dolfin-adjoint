@@ -1,6 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Copyright (C) 2013 University of Oxford
+# Copyright (C) 2014 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -35,7 +36,7 @@ optionParser.add_option("-l", "--long-tests", action = "store_true", dest = "lon
 optionParser.add_option("-S", "--no-short-tests", action = "store_false", dest = "short", help = "Disable short tests", default = True)
 opts, args = optionParser.parse_args()
 if len(args) > 0:
-  print "Unexpected trailing argument"
+  print("Unexpected trailing argument")
   sys.exit(1)
 
 path = os.path.abspath(os.path.dirname(__file__))
@@ -71,7 +72,7 @@ def find_tests(rel_path, exclude = []):
   ntests = []
   for test in tests:
     handle = open(test, "r")
-    lines = [handle.readline() for i in range(3)]
+    lines = [handle.readline() for i in xrange(3)]
     handle.close()
     np = 1
     for line in lines:
@@ -109,7 +110,9 @@ def run_test(i, np, test, test_success):
   sys.stdout.write("Running test: %s\n" % test)
   
   env = copy.copy(os.environ)
-  env["PYTHONPATH"] = "%s:%s" % (os.path.join(path, "python"), os.environ["PYTHONPATH"])
+  env["PYTHONPATH"] = os.path.join(path, "python")
+  if "PYTHONPATH" in os.environ:
+    env["PYTHONPATH"] = "%s:%s" % (env["PYTHONPATH"], os.environ["PYTHONPATH"])
 
   cwd = os.getcwd()
   tmppath = tempfile.mkdtemp()
@@ -140,11 +143,11 @@ if N == 0:
   N = multiprocessing.cpu_count()
 
 test_success = multiprocessing.Array("i", len(tests))
-for i in range(len(test_success)):
+for i in xrange(len(test_success)):
   test_success[i] = 0
   
 if N == 1:
-  for i in range(len(tests)):
+  for i in xrange(len(tests)):
     np, nt, test = tests[i]
     proc = multiprocessing.Process(target = run_test, args = (i, np, test, test_success))
     proc.start()
@@ -157,7 +160,7 @@ else:
   
   n = 0
   procs = []
-  for i in range(len(tests)):
+  for i in xrange(len(tests)):
     np, nt, test = tests[i]
     if n + (np * nt) > N and len(procs) > 0:
       while True:
@@ -182,16 +185,16 @@ for success in test_success:
     successes += 1
   else:
     failures += 1
-print \
-"""\
+print(
+"""
 ----------------------------------------------------------------------
 Summary:
 
 Successes: %i
-Failures: %i""" % (successes, failures)
+Failures: %i""" % (successes, failures))
 if failures > 0:
-  print "Failures:"
+  print("Failures:")
   for i, success in enumerate(test_success):
     if not success == 1:
-      print tests[i][2]
+      print(tests[i][2])
   sys.exit(1)

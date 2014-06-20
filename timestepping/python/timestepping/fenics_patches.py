@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Copyright (C) 2007 Anders Logg
 # Copyright (C) 2007-2011 Anders Logg and Garth N. Wells
@@ -6,6 +6,7 @@
 # Copyright (C) 2010-2012 Anders Logg
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
+# Copyright (C) 2014 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -45,23 +46,23 @@ import dolfin
 import ffc
 import instant
 import numpy
+import types
 import ufl
 
 from embedded_cpp import *
-from exceptions import *
 from versions import *
 
 __all__ = []
 
-# Only versions 1.0.x, 1.1.x, and 1.2.x have been tested.
-if dolfin_version() < (1, 0, 0) or dolfin_version() >= (1, 3, 0):
-  raise VersionException("DOLFIN version %s not supported" % dolfin.__version__)
-if ufl_version() < (1, 0, 0) or ufl_version() >= (1, 3, 0):
-  raise VersionException("UFL version %s not supported" % ufl.__version__)
-if ffc_version() < (1, 0, 0) or ffc_version() >= (1, 3, 0):
-  raise VersionException("FFC version %s not supported" % ffc.__version__)
-if instant_version() < (1, 0, 0) or instant_version() >= (1, 3, 0):
-  raise VersionException("Instant version %s not supported" % instant.__version__)
+# Only versions 1.2.x and 1.3.x have been tested.
+if dolfin_version() < (1, 2, 0) or dolfin_version() >= (1, 5, 0):
+  dolfin.warning("DOLFIN version %s not supported" % dolfin.__version__)
+if ufl_version() < (1, 2, 0) or ufl_version() >= (1, 5, 0):
+  dolfin.warning("UFL version %s not supported" % ufl.__version__)
+if ffc_version() < (1, 2, 0) or ffc_version() >= (1, 5, 0):
+  dolfin.warning("FFC version %s not supported" % ffc.__version__)
+if instant_version() < (1, 2, 0) or instant_version() >= (1, 5, 0):
+  dolfin.warning("Instant version %s not supported" % instant.__version__)
 
 # DOLFIN patches.
 if dolfin_version() < (1, 1, 0):
@@ -174,7 +175,7 @@ if dolfin_version() < (1, 2, 0):
       return dolfin.as_vector([nm])
     else:
       return nm
-if dolfin_version() <= (1, 2, 0):    
+if dolfin_version() < (1, 3, 0):    
   __name_counter = [0]
   __Constant__init__orig = dolfin.Constant.__init__
   def Constant__init__(self, *args, **kwargs):
@@ -320,7 +321,22 @@ if dolfin_version() < (1, 1, 0):
     return
   dolfin.GenericMatrix.compress = GenericMatrix_compress
   del(GenericMatrix_compress)
-  
+elif dolfin_version() < (1, 4, 0):
+  __GenericMatrix_compress_orig = dolfin.GenericMatrix.compress
+  def GenericMatrix_compress(self):
+    if dolfin.MPI.num_processes() == 1 or self.size(0) == self.size(1):
+      __GenericMatrix_compress_orig(self)
+    return
+  dolfin.GenericMatrix.compress = GenericMatrix_compress
+  del(GenericMatrix_compress)
+elif dolfin_version() < (1, 5, 0):
+  def GenericMatrix_compress(self):
+    if dolfin.MPI.num_processes() == 1 or self.size(0) == self.size(1):
+      self.compressed(self)
+    return
+  dolfin.GenericMatrix.compress = GenericMatrix_compress
+  del(GenericMatrix_compress)
+if dolfin_version() < (1, 1, 0):
   # Modified version of code from DirichletBC.cpp, DOLFIN bzr 1.2.x branch
   # revision 7509
   __DirichletBC_zero_columns_code = EmbeddedCpp(
@@ -418,15 +434,7 @@ if dolfin_version() < (1, 1, 0):
     return
   dolfin.DirichletBC.zero_columns = DirichletBC_zero_columns
   del(DirichletBC_zero_columns)
-elif dolfin_version() < (1, 3, 0):
-  __GenericMatrix_compress_orig = dolfin.GenericMatrix.compress
-  def GenericMatrix_compress(self):
-    if dolfin.MPI.num_processes() == 1 or self.size(0) == self.size(1):
-      __GenericMatrix_compress_orig(self)
-    return
-  dolfin.GenericMatrix.compress = GenericMatrix_compress
-  del(GenericMatrix_compress)
-  
+elif dolfin_version() < (1, 5, 0):
   # Modified version of code from DirichletBC.cpp, DOLFIN bzr 1.2.x branch
   # revision 7509
   __DirichletBC_zero_columns_code = EmbeddedCpp(
@@ -524,6 +532,56 @@ elif dolfin_version() < (1, 3, 0):
     return
   dolfin.DirichletBC.zero_columns = DirichletBC_zero_columns
   del(DirichletBC_zero_columns)
+if dolfin_version() == (1, 4, 0):
+  __all__ += \
+    [
+      "info_blue",
+      "info_green",
+      "info_red"
+    ]
+  
+  info_blue = dolfin.info_blue = lambda message : dolfin.info(ufl.log.BLUE % message)
+  info_green = dolfin.info_green = lambda message : dolfin.info(ufl.log.GREEN % message)
+  info_red = dolfin.info_red = lambda message : dolfin.info(ufl.log.RED % message)
+  
+  def MPI_num_processes(self):
+    return dolfin.MPI.size(dolfin.mpi_comm_world())
+  dolfin.MPI.num_processes = types.MethodType(MPI_num_processes, dolfin.MPI)
+  del(MPI_num_processes)
+
+  def MPI_process_number(self):
+    return dolfin.MPI.rank(dolfin.mpi_comm_world())
+  dolfin.MPI.process_number = types.MethodType(MPI_process_number, dolfin.MPI)
+  del(MPI_process_number)
+
+  __MPI_sum_orig = dolfin.MPI.sum
+  def MPI_sum(self, *args):
+    if len(args) == 1:
+      return __MPI_sum_orig(dolfin.mpi_comm_world(), args[0])
+    else:
+      return __MPI_sum_orig(*args)
+  dolfin.MPI.sum = types.MethodType(MPI_sum, dolfin.MPI)
+  del(MPI_sum)
+  
+  __MPI_barrier_orig = dolfin.MPI.barrier
+  def MPI_barrier(self, *args):
+    if len(args) == 0:
+      __MPI_barrier_orig(dolfin.mpi_comm_world())
+    else:
+      __MPI_barrier_orig(*args)
+    return
+  dolfin.MPI.barrier = types.MethodType(MPI_barrier, dolfin.MPI)
+  del(MPI_barrier)
+  
+  __GenericVector_resize_orig = dolfin.GenericVector.resize
+  def GenericVector_resize(self, *args):
+    if len(args) == 1:
+      __GenericVector_resize_orig(self, dolfin.mpi_comm_world(), args[0])
+    else:
+      __GenericVector_resize_orig(self, *args)
+    return
+  dolfin.GenericVector.resize = GenericVector_resize
+  del(GenericVector_resize)
 
 # UFL patches.
 if ufl_version() < (1, 1, 0):
@@ -544,19 +602,6 @@ if ufl_version() < (1, 1, 0):
     return NotImplemented
   ufl.Form.__mul__ = Form__mul__
   del(Form__mul__)
-elif ufl_version() >= (1, 2, 0) and ufl_version() < (1, 3, 0):
-  __Form_compute_form_data_orig = ufl.Form.compute_form_data
-  def Form_compute_form_data(self, object_names = None, common_cell = None, element_mapping = None):
-    if element_mapping is None:
-      element_mapping = ffc.jitcompiler._compute_element_mapping(self, common_cell = common_cell)
-    return __Form_compute_form_data_orig(self, object_names = object_names, common_cell = common_cell, element_mapping = element_mapping)
-  ufl.Form.compute_form_data = Form_compute_form_data
-  del(Form_compute_form_data)
-  
-  def Cell_is_undefined(self):
-    return False
-  ufl.geometry.Cell.is_undefined = Cell_is_undefined
-  del(Cell_is_undefined)
 
 # FFC patches.
 if ffc_version() < (1, 2, 0):
@@ -566,26 +611,3 @@ if ffc_version() < (1, 2, 0):
   // Compute circumradius, in 1D it is equal to the cell volume/2.0.
   const double circumradius%(restriction)s = std::abs(detJ%(restriction)s)/2.0;"""
   ffc.codesnippets.circumradius[1] = ffc.codesnippets._circumradius_1D
-  
-## Instant patches.
-#if instant_version() >= (1, 2, 0) and instant_version() < (1, 3, 0):
-#  __build_module_orig = instant.build_module
-#  def build_module(*args, **kwargs):
-#    args = copy.copy(args)
-#    kwargs = copy.copy(kwargs)
-#    
-#    if len(args) >= 15:
-#      args[14] = args[14] + ["/usr/include"]
-#    elif "swig_include_dirs" in kwargs:
-#      kwargs["swig_include_dirs"] = kwargs["swig_include_dirs"] + ["/usr/include"]
-#    else:
-#      kwargs["swig_include_dirs"] = ["/usr/include"]
-#      
-#    if len(args) >= 22:
-#      args[21] = []
-#    else:
-#      kwargs["cmake_packages"]= []
-#      
-#    return __build_module_orig(*args, **kwargs)
-#  instant.build_module = build_module
-#  del(build_module)

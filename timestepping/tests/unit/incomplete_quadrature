@@ -1,6 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Copyright (C) 2013 University of Oxford
+# Copyright (C) 2014 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -60,5 +61,5 @@ assert(La.n_non_pre_assembled() == 1)
 comp = La.assemble()
 ref = assemble(L)
 err = (comp - ref).norm("linf")
-print "%.17e" % err
+print("%.16e" % err)
 assert(err < 3.0e-14)

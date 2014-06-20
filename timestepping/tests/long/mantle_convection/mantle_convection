@@ -1,9 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Copyright (C) 2011 Simula Research Laboratory and Lyudmyla Vynnytska and Marie
 #                    E. Rognes
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
+# Copyright (C) 2014 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -41,8 +42,6 @@ from dolfin import *; import dolfin
 from timestepping import *
 
 dolfin.parameters["form_compiler"]["representation"] = "quadrature"
-if dolfin_version() < (1, 1, 0):
-  dolfin.parameters["form_compiler"]["quadrature_degree"] = 6
 
 def viscosity(T):
     eta = eta0 * exp(-b_val*T/deltaT + c_val*(1.0 - triangle.x[1])/height )
@@ -67,7 +66,7 @@ W = stokes_space(mesh)
 V = W.sub(0).collapse()
 Q = FunctionSpace(mesh, "DG", 1)
 
-print "Number of degrees of freedom:", (W*Q).dim()
+print("Number of degrees of freedom:", (W*Q).dim())
 
 # Define boundary conditions for the temperature
 top_temperature = StaticDirichletBC(Q, 0.0, "x[1] == %g" % height, method = "geometric")
@@ -128,7 +127,7 @@ eta = viscosity(T[n + 1])
 system.add_solve(a == L, w[n + 1], bcs, solver_parameters={"linear_solver":"mumps"})
 
 def update(s, cs = None):
-  print "Time = %.5f" % (max(s - 1, 0) * float(dt))
+  print("Time = %.5f" % (max(s - 1, 0) * float(dt)))
   return
 system.set_update(update)
 
@@ -139,7 +138,10 @@ def Nusselt():
     # by 0
     markers = FacetFunction("size_t", mesh)
     markers.set_all(0)
-    top = compile_subdomains("near(x[1], %s)" % height)
+    if dolfin_version() < (1, 3, 0):
+      top = compile_subdomains("near(x[1], %s)" % height)
+    else:
+      top = CompiledSubDomain("near(x[1], %s)" % height)
     top.mark(markers, 2)
     ds = Measure("ds")[markers]
 
@@ -168,18 +170,12 @@ while (t + float(dt) <= finish):
 system.finalise()
 
 comp = system.compute_functional()
-if dolfin_version() < (1, 1, 0):
-  ref = 1.22249406767463906e+01
-else:
-  ref = 1.22249474184962530e+01
+ref = 1.22249474184962530e+01
 err = abs(comp - ref)
-print "%.17e" % comp
-print "%.17e" % ref
-print "%.17e" % err
-if dolfin_version() < (1, 1, 0):
-  assert(err < 5.0e-13)
-else:
-  assert(err < 8.0e-12)
+print("%.16e" % comp)
+print("%.16e" % ref)
+print("%.16e" % err)
+assert(err < 8.0e-12)
 
 dJdm = system.compute_gradient(T_ic, project = True)
 #write_vtu("mantle_convection_dJdm[1]", dJdm)
@@ -190,15 +186,9 @@ orders = system.taylor_test(T_ic, grad = dJdm, J = comp, fact = 5.0e-6)
 assert((orders > 1.99).all())
 
 comp = dJdm[0].norm("l2")
-if dolfin_version() < (1, 1, 0):
-  ref = 2.58801652091614098e+00
-else:
-  ref = 2.58833107778007188e+00
+ref = 2.58833107778007188e+00
 err = abs(comp - ref)
-print "%.17e" % comp
-print "%.17e" % ref
-print "%.17e" % err
-if dolfin_version() < (1, 1, 0):
-  assert(err < 5.0e-13)
-else:
-  assert(err < 7.0e-13)
+print("%.16e" % comp)
+print("%.16e" % ref)
+print("%.16e" % err)
+assert(err < 7.0e-13)

@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
+# Copyright (C) 2014 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -45,7 +46,7 @@ __all__ = \
     "TimeSystem"
   ]
 
-class TimeSystem:
+class TimeSystem(object):
   """
   Used to register timestep equations.
   """
@@ -232,8 +233,7 @@ class TimeSystem:
         x_deps += ufl.algorithms.extract_coefficients(eq.rhs)
       eq_lhs = eq.lhs
 
-      lhs_data = extract_form_data(eq_lhs)
-      if lhs_data.rank == 2:
+      if form_rank(eq_lhs) == 2:
         for dep in x_deps:
           if dep is x:
             raise DependencyException("Invalid non-linear solve")
@@ -499,7 +499,7 @@ class TimeSystem:
     
 _assemble_classes.append(TimeSystem)
 
-class ForwardModel:
+class ForwardModel(object):
   """
   Used to solve timestep equations with timestep specific optimisations applied.
 
@@ -634,7 +634,7 @@ class ForwardModel:
     Perform ns timesteps.
     """
     
-    for i in range(ns):
+    for i in xrange(ns):
       self.timestep_update()
       self.timestep_solve()
       self.timestep_cycle()
@@ -680,7 +680,7 @@ class ForwardModel:
       
     return
     
-class AdjointModel:
+class AdjointModel(object):
   """
   Used to solve adjoint timestep equations with timestep specific optimisations
   applied. This assumes that forward model data is updated externally.
@@ -868,7 +868,7 @@ class AdjointModel:
       self.__a_cycle.set_functional(None)
       self.__a_final_solves.set_functional(None)
     elif isinstance(functional, ufl.form.Form):
-      if not extract_form_data(functional).rank == 0:
+      if not form_rank(functional) == 0:
         raise InvalidArgumentException("functional must be rank 0")
 
       for f_dep in ufl.algorithms.extract_coefficients(functional):
@@ -946,7 +946,7 @@ class AdjointModel:
 
     return
   
-class ManagedModel:
+class ManagedModel(object):
   """
   Used to solve forward and adjoint timestep equations. This performs necessary
   storage and recovery management.
@@ -1095,7 +1095,7 @@ class ManagedModel:
         
         self.__memory_checkpointer.checkpoint((m, 0), lcp_cs(m * self.__disk_period))
         if m == self.__S // self.__disk_period:
-          for j in range(1, (self.__S % self.__disk_period) + 1):
+          for j in xrange(1, (self.__S % self.__disk_period) + 1):
             ls = m * self.__disk_period + j
             if m > 0 or j > 1:
               self.__forward.timestep_cycle()
@@ -1107,7 +1107,7 @@ class ManagedModel:
             self.__forward.timestep_update(s = s, cs = lupdate_cs(s))
             self.__memory_checkpointer.restore((m, i))
         else:
-          for j in range(1, self.__disk_period):
+          for j in xrange(1, self.__disk_period):
             ls = m * self.__disk_period + j
             if m > 0 or j > 1:
               self.__forward.timestep_cycle()
@@ -1192,7 +1192,7 @@ class ManagedModel:
     elif not self.__S is None:
       raise StateException("Timestep after finalisation")
     
-    for i in range(ns):
+    for i in xrange(ns):
       self.__s += 1
       self.__forward.timestep_update()
       self.__forward.timestep_solve()
@@ -1234,7 +1234,7 @@ class ManagedModel:
     self.__verify_timestep_checkpoint(-2, tolerance = tolerance)
 
 #    self.__verify_timestep_checkpoint(0, tolerance = tolerance)
-    for i in range(self.__S):
+    for i in xrange(self.__S):
       self.__forward.timestep_update()
       self.__forward.timestep_solve()
       self.__verify_timestep_checkpoint(i + 1, tolerance = tolerance)
@@ -1294,7 +1294,7 @@ class ManagedModel:
       self.__functional.initialise()
       self.__functional.addto(0)
       
-    for i in range(self.__S):
+    for i in xrange(self.__S):
       self.__forward.timestep_update()
       self.__forward.timestep_solve()
       if recheckpoint:
@@ -1376,7 +1376,8 @@ class ManagedModel:
          b. project is True: The derivative is returned as a (GenericVector,
             Function) pair, where the Function contains the derivative projected
             onto the trial space of parameters. project_solver_parameters
-            defines solver options for the associated mass matrix inversion.
+            defines linear solver options for the associated mass matrix
+            inversion.
       3. parameters is a list of Constant s or Function s: The derivative is
          returned as a list. If parameters[i] is a Constant, then element i
          of the returned list has a type as given by 1. above. If parameters[i]
@@ -1407,9 +1408,9 @@ class ManagedModel:
     f_solves = self.__forward._ForwardModel__solves
     f_final_solves = self.__forward._ForwardModel__final_solves
 
-    dFdm = {j:[OrderedDict() for i in range(len(parameters))] for j in range(-1, 2)}
+    dFdm = {j:[OrderedDict() for i in xrange(len(parameters))] for j in xrange(-1, 2)}
     for i, parameter in enumerate(parameters):
-      for j, solves in zip(range(-1, 2), [f_init_solves, f_solves, f_final_solves]):
+      for j, solves in zip(xrange(-1, 2), [f_init_solves, f_solves, f_final_solves]):
         for f_solve in solves:
           f_x = f_solve.x()
           if isinstance(f_solve, AssignmentSolver):
@@ -1431,7 +1432,7 @@ class ManagedModel:
             assert(isinstance(f_solve, EquationSolver))
             f_der = f_solve.derivative(parameter)
             if not is_empty_form(f_der):
-              rank = extract_form_data(f_der).rank
+              rank = form_rank(f_der)
               if rank == 1:
                 f_der = PALinearForm(f_der)
               else:
@@ -1442,7 +1443,7 @@ class ManagedModel:
 
     cp_cs = copy.copy(self.__nl_cp_cs)
     update_cs = copy.copy(self.__update_cs)
-    for i in range(len(parameters)):
+    for i in xrange(len(parameters)):
       for f_der in dFdm[0][i].values():
         if isinstance(f_der, PAForm):
           for c in f_der.dependencies(non_symbolic = True):
@@ -1482,7 +1483,7 @@ class ManagedModel:
             update_cs.add(c)
         return update_cs
 
-    grad = [None for i in range(len(parameters))]
+    grad = [None for i in xrange(len(parameters))]
     for i, parameter in enumerate(parameters):
       if self.__functional is None or isinstance(self.__functional, TimeFunctional):
         der = ufl.form.Form([])
@@ -1544,7 +1545,7 @@ class ManagedModel:
       callback(s = self.__S + 1)
 
     self.__restore_timestep_checkpoint(-3)
-    for i in range(self.__S):
+    for i in xrange(self.__S):
       self.__adjoint.update_functional(self.__S - i)
       self.__adjoint.timestep_cycle()
       self.__restore_timestep_checkpoint(self.__S - i, cp_cs = cp_cs, update_cs = update_cs)
@@ -1575,11 +1576,11 @@ class ManagedModel:
           ngrad.append((grad[i], dolfin.Function(space, name = "gradient_%s" % parameter.name())))
           mass = dolfin.inner(dolfin.TestFunction(space), dolfin.TrialFunction(space)) * dolfin.dx
           a = assembly_cache.assemble(mass)
-          solver = solver_cache.solver(mass,
+          linear_solver = linear_solver_cache.linear_solver(mass,
             project_solver_parameters,
             a = a)
-          solver.set_operator(a)
-          solver.solve(ngrad[-1][1].vector(), ngrad[-1][0])
+          linear_solver.set_operator(a)
+          linear_solver.solve(ngrad[-1][1].vector(), ngrad[-1][0])
         else:
           ngrad.append(grad[i])
     return ngrad
@@ -1665,12 +1666,12 @@ class ManagedModel:
         rfact = fact
       numpy.random.seed(0)
       perturb.set_local(rfact * numpy.random.random(shape) - (0.5 * rfact))
-      numpy.random.seed()
       perturb.apply("insert")
+      numpy.random.seed()
       
     errs_1 = []
     errs_2 = []
-    for i in range(ntest - 1, -1, -1):
+    for i in xrange(ntest - 1, -1, -1):
       if isinstance(parameter, dolfin.Constant):
         parameter.assign(dolfin.Constant(parameter_orig + (2 ** i) * perturb))
 
@@ -1708,10 +1709,10 @@ class ManagedModel:
       if err == 0.0:
         errs_2[i] = numpy.NAN
     orders_1 = numpy.empty(len(errs_1) - 1)
-    for i in range(1, len(errs_1)):
+    for i in xrange(1, len(errs_1)):
       orders_1[i - 1] = -numpy.log(errs_1[i] / errs_1[i - 1]) / numpy.log(2.0)
     orders_2 = numpy.empty(len(errs_2) - 1)
-    for i in range(1, len(errs_2)):
+    for i in xrange(1, len(errs_2)):
       orders_2[i - 1] = -numpy.log(errs_2[i] / errs_2[i - 1]) / numpy.log(2.0)
 
     if any(orders_1 < 0.9):
@@ -1800,7 +1801,7 @@ class ManagedModel:
       for i, bound in enumerate(bounds):
         if not isinstance(bound, tuple) or not len(bound) == 2:
           raise InvalidArgumentException("bounds must be a list of tuples of lower and upper bounds")
-        for j in range(2):
+        for j in xrange(2):
           if bound[j] is None:
             pass
           elif isinstance(parameters[i], dolfin.Constant):
@@ -1836,7 +1837,7 @@ class ManagedModel:
  
     dolfin.info("Running functional minimisation")
 
-    class Packer:
+    class Packer(object):
       def __init__(self, parameters):
         p = dolfin.MPI.process_number()
 
@@ -1857,7 +1858,8 @@ class ManagedModel:
         if n_p > 1:          
           p_N = dolfin.Vector()
           p_N.resize((p, p + 1))
-          p_N.set_local(numpy.array([l_N], dtype = numpy.float_));  p_N.apply("insert")
+          p_N.set_local(numpy.array([l_N], dtype = numpy.float_))
+          p_N.apply("insert")
           p_N = numpy.array([int(N + 0.5) for N in p_N.gather(numpy.arange(n_p, dtype = numpy.intc))], dtype = numpy.intc)
           g_N = p_N.sum()
 
@@ -1885,7 +1887,8 @@ class ManagedModel:
         if self.__n_p == 1:
           return arr.copy()
         else:
-          self.__l_vec.set_local(arr);  self.__l_vec.apply("insert")
+          self.__l_vec.set_local(arr)
+          self.__l_vec.apply("insert")
           return self.__l_vec.gather(self.__g_range)
 
       def serialised_bounds(self, bounds):
@@ -1919,7 +1922,7 @@ class ManagedModel:
           u_bounds = self.serialised(u_bounds)
 
         bounds = []
-        for i in range(self.__g_N):
+        for i in xrange(self.__g_N):
           l_bound = l_bounds[i]
           if numpy.isnan(l_bound):
             l_bound = None
@@ -2011,7 +2014,7 @@ class ManagedModel:
       else:
         fn = self.compute_functional()
       n_fun[0] += 1
-      dolfin.info("Functional evaluation %i       : %.17e" % (n_fun[0], fn))
+      dolfin.info("Functional evaluation %i       : %.16e" % (n_fun[0], fn))
       if numpy.isnan(fn):
         raise StateException("NaN functional value")      
       
@@ -2035,7 +2038,7 @@ class ManagedModel:
         
       n_jac[0] += 1
       grad_norm = abs(garr).max()
-      dolfin.info("Gradient calculation %i inf norm: %.17e" % (n_jac[0], grad_norm))
+      dolfin.info("Gradient calculation %i inf norm: %.16e" % (n_jac[0], grad_norm))
 
       return garr
 
@@ -2050,29 +2053,11 @@ class ManagedModel:
     x = packer.empty()
     packer.pack(parameters, x)
 
-    if hasattr(scipy.optimize, "minimize"):
-      res = scipy.optimize.minimize(fun, x, method = method, jac = jac, bounds = bounds, tol = tolerance, options = options)
-      if not res["success"]:
-        raise StateException("scipy.optimize.minimize failure")
-      dolfin.info("scipy.optimize.minimize success with %i functional evaluation(s)" % res["nfev"])
-      x = res["x"]
-    else:
-      if options is None:
-        options = {}
-      if method == "BFGS":
-        res = scipy.optimize.fmin_bfgs(fun, x, fprime = jac, gtol = tolerance, full_output = True, **options)
-        if not res[6] == 0:
-          raise StateException("scipy.optimize.fmin_bfgs failure")
-        dolfin.info("scipy.optimize.fmin_bfgs success with %i functional evaluation(s) and %i gradient calculation(s)" % (res[4], res[5]))
-        x = res[0]
-      elif method == "L-BFGS-B":
-        res = scipy.optimize.fmin_l_bfgs_b(fun, x, fprime = jac, bounds = bounds, pgtol = tolerance, **options)
-        if not res[2]["warnflag"] == 0:
-          raise StateException("scipy.optimize.fmin_l_bfgs_b failure")
-        dolfin.info("scipy.optimize.fmin_l_bfgs_b success with %i functional evaluation(s)" % res[2]["funcalls"])
-        x = res[0]
-      else:
-        raise NotImplementedException("%s optimisation method not supported with SciPy version %s" % (method, scipy.__version__))
+    res = scipy.optimize.minimize(fun, x, method = method, jac = jac, bounds = bounds, tol = tolerance, options = options)
+    if not res["success"]:
+      raise StateException("scipy.optimize.minimize failure")
+    dolfin.info("scipy.optimize.minimize success with %i functional evaluation(s)" % res["nfev"])
+    x = res["x"]
 
     reassemble_forward(x)
     if rerun_forward[0]:

@@ -1,9 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Copyright (C) 2007 Kristian B. Oelgaard
 # Copyright (C) 2008 Johan Hake
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
+# Copyright (C) 2014 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -156,11 +157,7 @@ def add_dTdt_solve(T, dTdt, u, v, kappa, s = None, bc = {}, initial_guess = None
          inner(test_u, s) * dx
          )
          
-  ver = petsc_version()
-  if not ver is None and ver >= (3, 2, 0):
-    pre_assembly_parameters = {"bilinear_forms":{"term_optimisation":True, "expand_form":True}}
-  else:
-    pre_assembly_parameters = {"bilinear_forms":{"term_optimisation":False}}
+  pre_assembly_parameters = {"bilinear_forms":{"term_optimisation":True, "expand_form":True}}
   system.add_solve(inner(test_u, dTdt) * dx == L, dTdt,
     solver_parameters = dTdt_solver, initial_guess = initial_guess,
     pre_assembly_parameters = pre_assembly_parameters)
@@ -169,19 +166,7 @@ def add_dTdt_solve(T, dTdt, u, v, kappa, s = None, bc = {}, initial_guess = None
 
 # Single point boundary condition, used to apply a reference node to pressure
 # solves
-cell = mesh.closest_cell(Point(0.5, 0.5))
-mesh_coords = mesh.coordinates()
-cells = mesh.cells()[cell]
-node = cells[0]
-r = numpy.sqrt((mesh_coords[node, 0] - 0.5) ** 2 + (mesh_coords[node, 1] - 0.5) ** 2)
-for lnode in cells[1:]:
-  lr = numpy.sqrt((mesh_coords[lnode, 0] - 0.5) ** 2 + (mesh_coords[lnode, 1] - 0.5) ** 2)
-  if lr < r:
-    node = lnode
-    r = lr
-p0_coord = mesh_coords[node, :]
-ref_bc = StaticDirichletBC(space_p, 0.0, "fabs(x[0] - %.17e) < DOLFIN_EPS && fabs(x[1] - %.17e) < DOLFIN_EPS" % (p0_coord[0], p0_coord[1]), method = "pointwise")
-del(mesh_coords)
+ref_bc = StaticDirichletBC(space_p, 0.0, "fabs(x[0]) < DOLFIN_EPS && fabs(x[1]) < DOLFIN_EPS", method = "pointwise")
 
 # Given a divergent velocity, compute the pressure increment and non-divergent
 # velocity
@@ -269,7 +254,7 @@ def diagnostics(t):
     linfo = info_red
   else:
     linfo = info
-  linfo("Time, ||u||_inf, ||v||_inf, eps, ||div U||_inf, min(psi), max(psi) = %.2f, %.17e, %.17e, %.7e, %.17e, %.17e, %.17e"
+  linfo("Time, ||u||_inf, ||v||_inf, eps, ||div U||_inf, min(psi), max(psi) = %.2f, %.16e, %.16e, %.7e, %.16e, %.16e, %.16e"
     % (t, u_norm[0], u_norm[1], eps, div_U_norm, psi_range[0], psi_range[1]))
   return
 def update(s, cs = None):
@@ -300,13 +285,13 @@ system.finalise()
 
 # Verify incompressibility
 err = div_U.vector().norm("linf")
-print "%.17e" % err
+print("%.16e" % err)
 assert(err < 7.0e-11)
 
 # Verify pressure zero point
 p0 = numpy.empty(1);  p0[:] = numpy.NAN
-p[N].eval(p0, numpy.array(p0_coord, dtype = numpy.float_))
-print "%.17e" % abs(p0)
+p[N].eval(p0, numpy.array([0.0, 0.0], dtype = numpy.float_))
+print("%.16e" % abs(p0))
 assert(abs(p0) < 1.0e-16)
 
 ## Verify the solution. Reference value from Botella and Peyret, Computers &
@@ -314,18 +299,18 @@ assert(abs(p0) < 1.0e-16)
 #ref = 0.1189366
 #comp = psi.vector().max()
 #err = abs(ref - comp)
-#print "%.17e" % comp
-#print "%.17e" % ref
-#print "%.17e" % err
+#print("%.16e" % comp)
+#print("%.16e" % ref)
+#print("%.16e" % err)
 
 ## Verify the solution. Reference value from Botella and Peyret, Computers &
 ## Fluids, 1998, 421 - 433, table 12.
 #ref = -1.729717e-3
 #comp = psi.vector().min()
 #err = abs(ref - comp)
-#print "%.17e" % comp
-#print "%.17e" % ref
-#print "%.17e" % err
+#print("%.16e" % comp)
+#print("%.16e" % ref)
+#print("%.16e" % err)
 
 # Verify the checkpoints
 system.verify_checkpoints()
@@ -336,7 +321,7 @@ g = system.compute_gradient(u_bc)
 ## Output the derivative
 #p0_space = FunctionSpace(mesh, "DG", 0)
 #p0_field = Function(p0_space)
-#arr = numpy.array([float(i) for i in range(*p0_field.vector().local_range(0))])
+#arr = numpy.array([float(i) for i in xrange(*p0_field.vector().local_range(0))])
 #p0_field.vector().set_local(arr)
 #p0_field.vector().apply("insert")
 #cell_field = Function(space_u)
@@ -346,8 +331,8 @@ g = system.compute_gradient(u_bc)
 #x_coords = interpolate(Expression("x[0]"), space_u).vector().array()
 #y_coords = interpolate(Expression("x[1]"), space_u).vector().array()
 #vals = g.array()
-#p = [[[], []] for i in range(len(cells))]
-#for i in range(len(x_coords)):
+#p = [[[], []] for i in xrange(len(cells))]
+#for i in xrange(len(x_coords)):
 #  if abs(y_coords[i] - 1.0) < 1.0e-6:
 #    c = p[int(cells[i] * (1.0 + 1.0e-6))]
 #    c[0].append(x_coords[i])
@@ -366,13 +351,13 @@ g = system.compute_gradient(u_bc)
 #    assert(x_1[0] == c[0][0] and x_1[1] == c[0][1])
 #    mass_1 = assemble(inner(TestFunction(space_u_1), TrialFunction(space_u_1)) * dx).array()
 #    c[1] = numpy.linalg.solve(mass_1, c[1])
-#    handle.write("%.17e %.17e %.17e %.17e\n" % (c[0][0], c[1][0], c[0][1], c[1][1]))
+#    handle.write("%.16e %.16e %.16e %.16e\n" % (c[0][0], c[1][0], c[0][1], c[1][1]))
 #    plot(c[0], c[1], color = "k")
 #handle.close()
 #savefig("g.png")
 
 # Verify the derivative
 J = system.compute_functional()
-print "J = %.17e" % J
+print("J = %.16e" % J)
 orders = system.taylor_test(u_bc, J = J, grad = g, ntest = 2)
-assert((orders > 2.00).all())
+assert((orders > 1.99).all())

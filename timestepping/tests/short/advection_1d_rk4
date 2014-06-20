@@ -1,8 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Copyright (C) 2008 Johan Hake
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
+# Copyright (C) 2014 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -118,7 +119,7 @@ system.verify_checkpoints()
 
 J = system.compute_functional()
 g = system.compute_gradient(T_bc)
-print float(g)
+print(float(g))
 
 orders = system.taylor_test(T_bc, J = J, grad = g)
 assert((orders > 1.99).all())

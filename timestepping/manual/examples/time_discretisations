@@ -1,6 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Copyright (C) 2013 University of Oxford
+# Copyright (C) 2014 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -40,7 +41,7 @@ def check(name, system, T_f, ns_i = 0, tol = 0.0):
       lT_f, solver_parameters = solver_parameters)
     T_f = lT_f
   err = (T_f.vector() - (T_ic.vector() + 0.5 * (ns_i + 2) * x.vector())).norm("linf")
-  print "%s: %.17e" % (name, err)
+  print("%s: %.16e" % (name, err))
   assert(err < tol)
   return
 
@@ -262,6 +263,6 @@ system.add_solve(
   inner(test2, 0.5 * T[n + 1][1] - 0.5 * T[n + 1][0]) * dx ==
   dt*(m_11 * F(test1, T[n + 1][0]) + m_12 * F(test1, T[n + 1][1]) +
       m_21 * F(test2, T[n + 1][0]) + m_22 * F(test2, T[n + 1][1])),
-  T[n + 1], solver_parameters = {"linear_solver":"lu"})
+  T[n + 1], solver_parameters = solver_parameters)
   
 check("P1_DG", system, split(T[n])[1], tol = 1.0e-14)

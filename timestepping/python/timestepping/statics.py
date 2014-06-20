@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
+# Copyright (C) 2014 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -80,7 +81,7 @@ def is_static_coefficient(c):
   Return whether the supplied argument is a static Coefficient.
   """
   
-  return isinstance(c, (ufl.constantvalue.FloatValue, ufl.constantvalue.IntValue)) or (hasattr(c, "_time_static") and c._time_static)
+  return isinstance(c, ufl.constantvalue.ConstantValue) or (hasattr(c, "_time_static") and c._time_static)
 
 def extract_non_static_coefficients(form):
   """

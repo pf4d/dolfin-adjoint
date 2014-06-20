@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
+# Copyright (C) 2014 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -38,7 +39,7 @@ __all__ = \
     "TimeFunctional"
   ]
 
-class AdjointVariableMap:
+class AdjointVariableMap(object):
   """
   A map between forward and adjoint variables. Indexing into the
   AdjointVariableMap with a forward Function yields an associated adjoint
@@ -49,9 +50,9 @@ class AdjointVariableMap:
   
   def __init__(self):
     self.__a_tfns = {}
-    self.__f_tfns = {}
+    self.__f_tfns = OrderedDict()
     self.__a_fns = {}
-    self.__f_fns = {}
+    self.__f_fns = OrderedDict()
 
     return
 
@@ -107,12 +108,14 @@ class AdjointVariableMap:
     """
 
     for a_fn in self.__f_fns:
-      if not hasattr(a_fn, "_time_level_data") or isinstance(a_fn._time_level_data[1], TimeLevel):
+      if not hasattr(a_fn, "_time_level_data"):
         a_fn.vector().zero()
-
+    for a_tfn in self.__f_tfns:
+      a_tfn.zero()
+        
     return
 
-class TimeFunctional:
+class TimeFunctional(object):
   """
   A template for a functional with an explicit time dependence.
   """
@@ -158,14 +161,14 @@ class TimeFunctional:
     
     raise AbstractMethodException("derivative method not overridden")
   
-class PAAdjointSolvers:
+class PAAdjointSolvers(object):
   """
   Defines a set of solves for adjoint equations, applying pre-assembly and
-  solver caching optimisations. Expects as input a list of earlier forward
-  equations and a list of later forward equations. If the earlier equations
-  solve for {x_1, x_2, ...}, then the Function s on which the later equations
-  depend should all be static or in the {x_1, x_2, ...}, although the failure
-  of this requirement is not treated as an error.
+  linear solver caching optimisations. Expects as input a list of earlier
+  forward equations and a list of later forward equations. If the earlier
+  equations solve for {x_1, x_2, ...}, then the Function s on which the later
+  equations depend should all be static or in the {x_1, x_2, ...}, although the
+  failure of this requirement is not treated as an error.
 
   Constructor arguments:
     f_solves_a: Earlier time forward equations, as a list of AssignmentSolver s
@@ -218,7 +221,7 @@ class PAAdjointSolvers:
       else:
         assert(isinstance(f_solve, EquationSolver))
         f_a = f_solve.tangent_linear()[0]
-        f_a_rank = extract_form_data(f_a).rank
+        f_a_rank = form_rank(f_a)
         if f_a_rank == 2:
           a_test, a_trial = dolfin.TestFunction(a_space), dolfin.TrialFunction(a_space)
           a_a = adjoint(f_a, adjoint_arguments = (a_test, a_trial))
@@ -294,7 +297,7 @@ class PAAdjointSolvers:
     Reassemble the adjoint solvers. If no arguments are supplied then all
     equations are re-assembled. Otherwise, only the LHSs or RHSs which depend
     upon the supplied Constant s or Function s are reassembled. Note that this
-    does not clear the assembly or solver caches -- hence if a static
+    does not clear the assembly or linear solver caches -- hence if a static
     Constant, Function, or DirichletBC is modified then one should clear the
     caches before calling reassemble on the PAAdjointSolvers.
     """
@@ -304,7 +307,7 @@ class PAAdjointSolvers:
         a_a = None
         a_solver = None
       else:
-        a_a_rank = extract_form_data(self.__a_a_forms[i]).rank
+        a_a_rank = form_rank(self.__a_a_forms[i])
         if a_a_rank == 2:
           static_bcs = n_non_static_bcs(self.__a_bcs[i]) == 0
           static_form = is_static_form(self.__a_a_forms[i])
@@ -312,7 +315,7 @@ class PAAdjointSolvers:
             a_a = assembly_cache.assemble(self.__a_a_forms[i],
               bcs = self.__a_bcs[i], symmetric_bcs = self.__a_pre_assembly_parameters[i]["equations"]["symmetric_boundary_conditions"],
               compress = self.__a_pre_assembly_parameters[i]["bilinear_forms"]["compress_matrices"])
-            a_solver = solver_cache.solver(self.__a_a_forms[i],
+            a_solver = linear_solver_cache.linear_solver(self.__a_a_forms[i],
               self.__a_solver_parameters[i],
               bcs = self.__a_bcs[i], symmetric_bcs = self.__a_pre_assembly_parameters[i]["equations"]["symmetric_boundary_conditions"],
               a = a_a)
@@ -320,13 +323,13 @@ class PAAdjointSolvers:
           elif len(self.__a_bcs[i]) == 0 and static_form:
             a_a = assembly_cache.assemble(self.__a_a_forms[i],
               compress = self.__a_pre_assembly_parameters[i]["bilinear_forms"]["compress_matrices"])
-            a_solver = solver_cache.solver(self.__a_a_forms[i],
+            a_solver = linear_solver_cache.linear_solver(self.__a_a_forms[i],
               self.__a_solver_parameters[i],
               a = a_a)
             a_solver.set_operator(a_a)            
           else:
             a_a = PABilinearForm(self.__a_a_forms[i], pre_assembly_parameters = self.__a_pre_assembly_parameters[i]["bilinear_forms"])
-            a_solver = solver_cache.solver(self.__a_a_forms[i],
+            a_solver = linear_solver_cache.linear_solver(self.__a_a_forms[i],
               self.__a_solver_parameters[i], self.__a_pre_assembly_parameters[i]["bilinear_forms"],
               static = a_a.is_static() and static_bcs,
               bcs = self.__a_bcs[i], symmetric_bcs = self.__a_pre_assembly_parameters[i]["equations"]["symmetric_boundary_conditions"])
@@ -345,7 +348,7 @@ class PAAdjointSolvers:
     if len(args) == 0:
       la_a, la_solvers = [], []
       la_L = []
-      for i in range(len(self.__a_x)):
+      for i in xrange(len(self.__a_x)):
         a_a, a_solver = assemble_lhs(i)
         a_L = assemble_rhs(i)
         la_a.append(a_a)
@@ -356,7 +359,7 @@ class PAAdjointSolvers:
     else:
       la_a, la_solvers = copy.copy(self.__a_a), copy.copy(self.__a_solvers)
       la_L = copy.copy(self.__a_L)
-      for i in range(len(self.__a_x)):
+      for i in xrange(len(self.__a_x)):
         for dep in args:
           if not self.__a_a_forms[i] is None and dep in ufl.algorithms.extract_coefficients(self.__a_a_forms[i]):
             la_a[i], la_solvers[i] = assemble_lhs(i)
@@ -391,7 +394,7 @@ class PAAdjointSolvers:
     Solve all adjoint equations.
     """
     
-    for i in range(len(self.__a_x)):
+    for i in xrange(len(self.__a_x)):
       a_a = self.__a_a[i]
       a_x = self.__a_x[i]
       a_L = self.__a_L[i]
@@ -414,7 +417,6 @@ class PAAdjointSolvers:
           else:
             L = evaluate_expr(a_L_as[i], copy = True)
             if isinstance(L, float):
-              assert(isinstance(L, float))
               l_L = L
               L = a_x.vector().copy()
               L[:] = l_L
@@ -453,7 +455,7 @@ class PAAdjointSolvers:
             L = assemble(a_L, copy = len(a_bcs) > 0)
         else:
           L = evaluate_a_L_as(0)
-          for i in range(1, len(a_L_as)):
+          for i in xrange(1, len(a_L_as)):
             add_a_L_as(i, L)
           if not a_L is None:
             L += assemble(a_L, copy = False)
@@ -464,7 +466,7 @@ class PAAdjointSolvers:
           L = assemble(a_L_rhs)
         if not a_L is None:
           L += assemble(a_L, copy = False)
-        for i in range(len(a_L_as)):
+        for i in xrange(len(a_L_as)):
           add_a_L_as(i, L)
 
       if a_a is None:
@@ -474,6 +476,7 @@ class PAAdjointSolvers:
       elif a_solver is None:
         assert(a_a.rank() == 1)
         a_a = assemble(a_a, copy = False)
+        assert(L.local_range() == a_a.local_range())
         a_x.vector().set_local(L.array() / a_a.array())
         a_x.vector().apply("insert")
         enforce_bcs(a_x.vector(), a_bcs)
@@ -494,10 +497,10 @@ class PAAdjointSolvers:
     """
     
     if functional is None:
-      self.__a_L_rhs = [None for i in range(len(self.__a_x))]
+      self.__a_L_rhs = [None for i in xrange(len(self.__a_x))]
       self.__functional = None
     elif isinstance(functional, ufl.form.Form):
-      if not extract_form_data(functional).rank == 0:
+      if not form_rank(functional) == 0:
         raise InvalidArgumentException("functional must be rank 0")
 
       a_rhs = OrderedDict()
@@ -512,13 +515,13 @@ class PAAdjointSolvers:
         else:
           raise DependencyException("Invalid dependency")
 
-      self.__a_L_rhs = [None for i in range(len(self.__a_x))]
+      self.__a_L_rhs = [None for i in xrange(len(self.__a_x))]
       for i, a_x in enumerate(a_rhs):
         if a_x in self.__a_keys:
           self.__a_L_rhs[self.__a_keys[a_x]] = PALinearForm(a_rhs[a_x], pre_assembly_parameters = self.__a_pre_assembly_parameters[i]["linear_forms"])
       self.__functional = functional
     elif isinstance(functional, TimeFunctional):
-      self.__a_L_rhs = [None for i in range(len(self.__a_x))]
+      self.__a_L_rhs = [None for i in xrange(len(self.__a_x))]
       self.__functional = functional
     else:
       raise InvalidArgumentException("functional must be a Form or a TimeFunctional")
@@ -549,7 +552,7 @@ class PAAdjointSolvers:
       else:
         raise DependencyException("Invalid dependency")
 
-    self.__a_L_rhs = [None for i in range(len(self.__a_x))]
+    self.__a_L_rhs = [None for i in xrange(len(self.__a_x))]
     for a_x in a_rhs:
       if not a_x in self.__a_keys:
         dolfin.warning("Missing functional dependency %s" % a_x.name())
