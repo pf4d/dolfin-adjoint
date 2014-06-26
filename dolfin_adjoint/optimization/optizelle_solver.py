@@ -142,7 +142,7 @@ try:
         @staticmethod
         def copy(x,y):
             """y <- x (Shallow.  No memory allocation.)"""
-            numpy.copyto(y,x) 
+            y[:] = x[:]
 
         @staticmethod
         def scal(alpha,x):
