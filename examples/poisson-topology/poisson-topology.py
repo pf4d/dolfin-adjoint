@@ -62,7 +62,10 @@ from dolfin_adjoint import *
 
 import sys
 args = [sys.argv[0]] + """
-                       --petsc.pc_gamg_type classical
+                       --petsc.pc_type gamg
+                       --petsc.pc_gamg_verbose 1
+                       --petsc.pc_gamg_agg_nsmooths 1
+                       --petsc.ksp_monitor_true_residual
                        """.split()
 parameters.parse(args)
 
@@ -79,8 +82,10 @@ When compiling IPOPT, make sure to link against HSL, as it \
 is a necessity for practical problems.""")
   raise
 
-# turn off redundant output in parallel
-parameters["std_out_all_processes"] = False
+# Form compiler options
+parameters["form_compiler"]["optimize"]     = True
+parameters["form_compiler"]["cpp_optimize"] = True
+parameters["form_compiler"]["cpp_optimize_flags"] = "-O3 -ffast-math -march=native"
 
 # Next we define some constants, and the Solid Isotropic Material with
 # Penalisation (SIMP) rule.
