@@ -60,6 +60,12 @@
 from dolfin import *
 from dolfin_adjoint import *
 
+import sys
+args = [sys.argv[0]] + """
+                       --petsc.pc_gamg_type classical
+                       """.split()
+parameters.parse(args)
+
 # Next we import the Python interface to IPOPT. If IPOPT is
 # unavailable on your system, we strongly :doc:`suggest you install it
 # <../../download/index>`; IPOPT is a well-established open-source
@@ -95,8 +101,9 @@ rule, equation (11)."""
 # Next we define the mesh (a unit square) and the function spaces to be
 # used for the control :math:`a` and forward solution :math:`T`.
 
-n = 100
-mesh = UnitSquareMesh(n, n)
+n = 50
+#mesh = UnitSquareMesh(n, n)
+mesh = UnitCubeMesh(n, n, n)
 A = FunctionSpace(mesh, "CG", 1)  # function space for control
 P = FunctionSpace(mesh, "CG", 1)  # function space for solution
 
@@ -105,7 +112,7 @@ P = FunctionSpace(mesh, "CG", 1)  # function space for solution
 class WestNorth(SubDomain):
   """The top and left boundary of the unitsquare, used to enforce the Dirichlet boundary condition."""
   def inside(self, x, on_boundary):
-    return (x[0] == 0.0 or x[1] == 1.0) and on_boundary
+    return (x[0] == 0.0 or x[1] == 1.0 or x[2] == 1.0) and on_boundary
 
 # the Dirichlet BC; the Neumann BC will be implemented implicitly by
 # dropping the surface integral after integration by parts
@@ -126,7 +133,9 @@ def forward(a):
 
   F = inner(grad(v), k(a)*grad(T))*dx - f*v*dx
   solve(F == 0, T, bc, solver_parameters={"newton_solver": {"absolute_tolerance": 1.0e-7,
-                                                            "maximum_iterations": 20}})
+                                                            "maximum_iterations": 20,
+                                                            "linear_solver": "cg",
+                                                            "preconditioner": "petsc_amg"}})
 
   return T
 
