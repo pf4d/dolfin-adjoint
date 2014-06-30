@@ -92,8 +92,8 @@ class PAEquationSolver(EquationSolver):
         else:
           # Linear solve, rank 2 LHS
           cache_info("Detected that solve for %s is linear" % x.name())
-          form = replace(form, {x:dolfin.TrialFunction(x.function_space())})
-          eq = lhs(form) == rhs(form)
+          form = dolfin.replace(form, {x:dolfin.TrialFunction(x.function_space())})
+          eq = dolfin.lhs(form) == dolfin.rhs(form)
           eq_lhs_rank = form_rank(eq.lhs)
           assert(eq_lhs_rank == 2)
           is_linear = True
@@ -106,7 +106,7 @@ class PAEquationSolver(EquationSolver):
         form -= eq.rhs
       if not x in ufl.algorithms.extract_coefficients(form):
         # Linear solve, rank 2 LHS
-        eq = lhs(form) == rhs(form)
+        eq = dolfin.lhs(form) == dolfin.rhs(form)
         eq_lhs_rank = form_rank(eq.lhs)
         assert(eq_lhs_rank == 2)
         is_linear = True
@@ -208,7 +208,7 @@ class PAEquationSolver(EquationSolver):
               a = a)
             linear_solver.set_operator(a)            
           else:
-            a = PABilinearForm(eq.lhs, pre_assembly_parameters = pre_assembly_parameters["bilinear_forms"])
+            a = PAForm(eq.lhs, pre_assembly_parameters = pre_assembly_parameters["bilinear_forms"])
             cache_info("Pre-assembled LHS terms in solve for %s    : %i" % (x.name(), a.n_pre_assembled()))
             cache_info("Non-pre-assembled LHS terms in solve for %s: %i" % (x.name(), a.n_non_pre_assembled()))
             linear_solver = linear_solver_cache.linear_solver(eq.lhs,
@@ -217,13 +217,13 @@ class PAEquationSolver(EquationSolver):
               bcs = bcs, symmetric_bcs = pre_assembly_parameters["equations"]["symmetric_boundary_conditions"])
         else:
           assert(eq_lhs_rank == 1)
-          a = PALinearForm(eq.lhs, pre_assembly_parameters = pre_assembly_parameters["linear_forms"])
+          a = PAForm(eq.lhs, pre_assembly_parameters = pre_assembly_parameters["linear_forms"])
           cache_info("Pre-assembled LHS terms in solve for %s    : %i" % (x.name(), a.n_pre_assembled()))
           cache_info("Non-pre-assembled LHS terms in solve for %s: %i" % (x.name(), a.n_non_pre_assembled()))
           linear_solver = None
         return a, linear_solver
       def assemble_rhs():
-        L = PALinearForm(eq.rhs, pre_assembly_parameters = pre_assembly_parameters["linear_forms"])
+        L = PAForm(eq.rhs, pre_assembly_parameters = pre_assembly_parameters["linear_forms"])
         cache_info("Pre-assembled RHS terms in solve for %s    : %i" % (x.name(), L.n_pre_assembled()))
         cache_info("Non-pre-assembled RHS terms in solve for %s: %i" % (x.name(), L.n_non_pre_assembled()))
         return L
@@ -248,7 +248,7 @@ class PAEquationSolver(EquationSolver):
       J, hbcs = self.J(), self.hbcs()
 
       def assemble_lhs():
-        a = PABilinearForm(J, pre_assembly_parameters = pre_assembly_parameters["bilinear_forms"])
+        a = PAForm(J, pre_assembly_parameters = pre_assembly_parameters["bilinear_forms"])
         cache_info("Pre-assembled LHS terms in solve for %s    : %i" % (x.name(), a.n_pre_assembled()))
         cache_info("Non-pre-assembled LHS terms in solve for %s: %i" % (x.name(), a.n_non_pre_assembled()))
         linear_solver = linear_solver_cache.linear_solver(J,
@@ -260,7 +260,7 @@ class PAEquationSolver(EquationSolver):
         L = -eq.lhs
         if not is_zero_rhs(eq.rhs):
           L += eq.rhs
-        L = PALinearForm(L, pre_assembly_parameters = pre_assembly_parameters["linear_forms"])
+        L = PAForm(L, pre_assembly_parameters = pre_assembly_parameters["linear_forms"])
         cache_info("Pre-assembled RHS terms in solve for %s    : %i" % (x.name(), L.n_pre_assembled()))
         cache_info("Non-pre-assembled RHS terms in solve for %s: %i" % (x.name(), L.n_non_pre_assembled()))
         return L

@@ -451,7 +451,7 @@ class EquationSolver(object):
 
     if self.__J is None:
       if self.is_linear():
-        form = action(self.__eq.lhs, self.__x)
+        form = dolfin.action(self.__eq.lhs, self.__x)
       else:
         form = self.__eq.lhs
       if not is_zero_rhs(self.__eq.rhs):
@@ -511,7 +511,7 @@ class EquationSolver(object):
     a_od = {}
 
     def add_lhs_dep(form, dep, x):
-      add_rhs_dep(action(-form, x), dep, x)
+      add_rhs_dep(dolfin.action(-form, x), dep, x)
       return
     def add_rhs_dep(form, dep, x):
       if isinstance(dep, dolfin.Function):
@@ -586,7 +586,7 @@ class EquationSolver(object):
         else:
           form = ufl.form.Form([])
       else:
-        form = action(self.__eq.lhs, self.__x)
+        form = dolfin.action(self.__eq.lhs, self.__x)
     else:
       form = self.__eq.lhs
     if not is_zero_rhs(self.__eq.rhs):

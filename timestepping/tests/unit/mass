@@ -63,7 +63,7 @@ for solve in system._ManagedModel__forward._ForwardModel__init_solves \
   if isinstance(solve, PAEquationSolver):
     a, L = solve._PAEquationSolver__a, solve._PAEquationSolver__L
     assert(isinstance(a, dolfin.GenericMatrix))
-    assert(isinstance(L, PALinearForm))
+    assert(isinstance(L, PAForm))
     print(solve.x().name(), L.n_pre_assembled(), L.n_non_pre_assembled())
     assert(L.n_non_pre_assembled() == 0)
 

@@ -45,6 +45,51 @@ def cache_info(msg, info = dolfin.info):
   if dolfin.parameters["timestepping"]["pre_assembly"]["verbose"]:
     info(msg)
   return
+
+def form_key(form, static):
+  """
+  Generate a hashable key from a Form.
+  """
+  
+  if not isinstance(form, ufl.form.Form):
+    raise InvalidArgumentException("form must be a Form")
+  
+  if static:
+    return expand(form)
+  else:
+    return extract_test_and_trial(form)
+
+def bc_key(bcs, symmetric_bcs):
+  """
+  Generate a hashable key from a list of DirichletBC s.
+  """
+
+  if not isinstance(bcs, list):
+    raise InvalidArgumentException("bcs must be a list of DirichletBC s")
+  for bc in bcs:
+    if not isinstance(bc, dolfin.cpp.DirichletBC):
+      raise InvalidArgumentException("bcs must be a list of DirichletBC s")
+  
+  if len(bcs) == 0:
+    return None
+  else:
+    return tuple(bcs), symmetric_bcs
+
+def parameters_key(parameters):
+  """
+  Generate a hashable key from a Parameters.
+  """
+  
+  if not isinstance(parameters, (dolfin.Parameters, dict)):
+    raise InvalidArgumentException("parameters must be a Parameters or dictionary")
+  
+  fparameters = []
+  for key in sorted(parameters.keys()):
+    if isinstance(parameters[key], (dolfin.Parameters, dict)):
+      fparameters.append(parameters_key(parameters[key]))
+    else:
+      fparameters.append((key, parameters[key]))
+  return tuple(fparameters)
     
 class AssemblyCache(object):
   """
@@ -60,12 +105,14 @@ class AssemblyCache(object):
 
     return
 
-  def assemble(self, form, bcs = [], symmetric_bcs = False, compress = False):
+  def assemble(self, form, form_compiler_parameters = {}, bcs = [],
+    symmetric_bcs = False, compress = False):
     """
     Return the result of assembling the supplied Form.
 
     Arguments:
       form: The form.
+      form_compiler_parameters: Form compiler parameters.
       bcs: Dirichlet BCs applied to a matrix.
       symmetric_bcs: Whether Dirichlet BCs should be applied so as to yield a
         symmetric matrix.
@@ -74,20 +121,26 @@ class AssemblyCache(object):
     
     if not isinstance(form, ufl.form.Form):
       raise InvalidArgumentException("form must be a Form")
+    if not isinstance(form_compiler_parameters, (dolfin.Parameters, dict)):
+      raise InvalidArgumentException("form_compiler_parameters must be a Parameters or dictionary")
     if not isinstance(bcs, list):
       raise InvalidArgumentException("bcs must be a list of DirichletBC s")
     for bc in bcs:
       if not isinstance(bc, dolfin.cpp.DirichletBC):
         raise InvalidArgumentException("bcs must be a list of DirichletBC s")
 
+    nform_compiler_parameters = dolfin.parameters["form_compiler"].copy()
+    nform_compiler_parameters.update(form_compiler_parameters)
+    form_compiler_parameters = nform_compiler_parameters;  del(nform_compiler_parameters)
+
     rank = form_rank(form)
     if len(bcs) == 0:
       if not rank == 2:
         compress = None
-      key = (expand(form), None, None, compress)
+      key = (form_key(form, True), parameters_key(form_compiler_parameters), bc_key(bcs, symmetric_bcs), compress)
       if not key in self.__cache:
         cache_info("Assembling form with rank %i" % rank, dolfin.info_red)
-        self.__cache[key] = assemble(form)
+        self.__cache[key] = assemble(form, form_compiler_parameters = form_compiler_parameters)
         if rank == 2 and compress:
           self.__cache[key].compress()
       else:
@@ -96,10 +149,10 @@ class AssemblyCache(object):
       if not rank == 2:
         raise InvalidArgumentException("form must be rank 2 when applying boundary conditions")
 
-      key = (expand(form), tuple(bcs), symmetric_bcs, compress)
+      key = (form_key(form, True), parameters_key(form_compiler_parameters), bc_key(bcs, symmetric_bcs), compress)
       if not key in self.__cache:
         cache_info("Assembling form with rank 2, with boundary conditions", dolfin.info_red)
-        mat = assemble(form)
+        mat = assemble(form, form_compiler_parameters = form_compiler_parameters)
         apply_bcs(mat, bcs, symmetric_bcs = symmetric_bcs)
         self.__cache[key] = mat
         if compress:
@@ -196,7 +249,7 @@ class SolverCache(object):
          If the default pre-assembly parameters are used, then an empty
          dictionary should be passed as the third argument. Assemble the form
          using:
-           pa_form = PABilinearForm(form,
+           pa_form = PAForm(form,
              pre_assembly_parameters = pre_assembly_parameters)
            a = assemble(pa_form, ...)
            apply_bcs(a, bcs, ..., symmetric_bcs = symmetric_bcs)
@@ -260,30 +313,6 @@ class SolverCache(object):
         
       return linear_solver_parameters
     
-    def form_key(form, static):
-      if static:
-        return expand(form)
-      else:
-        return extract_test_and_trial(form)
-    
-    def bc_key(bcs, symmetric_bcs):
-      if len(bcs) == 0:
-        return None
-      else:
-        return tuple(bcs), symmetric_bcs
-
-    def parameters_key(opts):
-      if opts is None:
-        return None
-      assert(isinstance(opts, (dolfin.Parameters, dict)))
-      fopts = []
-      for key in sorted(opts.keys()):
-        if isinstance(opts[key], (dolfin.Parameters, dict)):
-          fopts.append(parameters_key(opts[key]))
-        else:
-          fopts.append((key, opts[key]))
-      return tuple(fopts)
-    
     if not isinstance(form, ufl.form.Form):
       raise InvalidArgumentException("form must be a rank 2 Form")
     elif not form_rank(form) == 2:
@@ -311,7 +340,7 @@ class SolverCache(object):
               
       key = (form_key(form, static),
              parameters_key(linear_solver_parameters),
-             parameters_key(pre_assembly_parameters),
+             None if pre_assembly_parameters is None else parameters_key(pre_assembly_parameters),
              bc_key(bcs, symmetric_bcs),
              None)
     else:

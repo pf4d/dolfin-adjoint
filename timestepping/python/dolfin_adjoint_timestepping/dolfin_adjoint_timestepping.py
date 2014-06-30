@@ -195,7 +195,7 @@ def unwrap_fns(form):
     if isinstance(dep, WrappedFunction):
       repl[dep] = dep.fn()
       
-  return replace(form, repl)  
+  return dolfin.replace(form, repl)  
 
 # Based on the Functional class in functional.py
 class Functional(functional.Functional):    

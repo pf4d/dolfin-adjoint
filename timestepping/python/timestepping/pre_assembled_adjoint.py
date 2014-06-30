@@ -271,7 +271,7 @@ class PAAdjointSolvers(object):
           if a_x in la_keys:
             a_test = dolfin.TestFunction(a_x.function_space())
             a_key = la_keys[a_x]
-            a_form = -action(adjoint(f_a_od[f_dep], adjoint_arguments = (a_test, a_trial)), a_dep)
+            a_form = -dolfin.action(adjoint(f_a_od[f_dep], adjoint_arguments = (a_test, a_trial)), a_dep)
             if la_L_forms[a_key] is None:
               la_L_forms[a_key] = a_form
             else:
@@ -328,7 +328,7 @@ class PAAdjointSolvers(object):
               a = a_a)
             a_solver.set_operator(a_a)            
           else:
-            a_a = PABilinearForm(self.__a_a_forms[i], pre_assembly_parameters = self.__a_pre_assembly_parameters[i]["bilinear_forms"])
+            a_a = PAForm(self.__a_a_forms[i], pre_assembly_parameters = self.__a_pre_assembly_parameters[i]["bilinear_forms"])
             a_solver = linear_solver_cache.linear_solver(self.__a_a_forms[i],
               self.__a_solver_parameters[i], self.__a_pre_assembly_parameters[i]["bilinear_forms"],
               static = a_a.is_static() and static_bcs,
@@ -336,14 +336,14 @@ class PAAdjointSolvers(object):
         else:
           assert(a_a_rank == 1)
           assert(self.__a_solver_parameters[i] is None)
-          a_a = PALinearForm(self.__a_a_forms[i], pre_assembly_parameters = self.__a_pre_assembly_parameters[i]["linear_forms"])
+          a_a = PAForm(self.__a_a_forms[i], pre_assembly_parameters = self.__a_pre_assembly_parameters[i]["linear_forms"])
           a_solver = None
       return a_a, a_solver
     def assemble_rhs(i):
       if self.__a_L_forms[i] is None:
         return None
       else:
-        return PALinearForm(self.__a_L_forms[i], pre_assembly_parameters = self.__a_pre_assembly_parameters[i]["linear_forms"])
+        return PAForm(self.__a_L_forms[i], pre_assembly_parameters = self.__a_pre_assembly_parameters[i]["linear_forms"])
     
     if len(args) == 0:
       la_a, la_solvers = [], []
@@ -518,7 +518,7 @@ class PAAdjointSolvers(object):
       self.__a_L_rhs = [None for i in xrange(len(self.__a_x))]
       for i, a_x in enumerate(a_rhs):
         if a_x in self.__a_keys:
-          self.__a_L_rhs[self.__a_keys[a_x]] = PALinearForm(a_rhs[a_x], pre_assembly_parameters = self.__a_pre_assembly_parameters[i]["linear_forms"])
+          self.__a_L_rhs[self.__a_keys[a_x]] = PAForm(a_rhs[a_x], pre_assembly_parameters = self.__a_pre_assembly_parameters[i]["linear_forms"])
       self.__functional = functional
     elif isinstance(functional, TimeFunctional):
       self.__a_L_rhs = [None for i in xrange(len(self.__a_x))]

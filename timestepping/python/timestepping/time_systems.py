@@ -1434,10 +1434,10 @@ class ManagedModel(object):
             if not is_empty_form(f_der):
               rank = form_rank(f_der)
               if rank == 1:
-                f_der = PALinearForm(f_der)
+                f_der = PAForm(f_der)
               else:
                 assert(rank == 2)
-                f_der = PABilinearForm(adjoint(f_der, \
+                f_der = PAForm(adjoint(f_der, \
                   adjoint_arguments = (dolfin.TestFunction(parameter.function_space()), dolfin.TrialFunction(f_x.function_space()))))
               dFdm[j][i][f_x] = f_der
 

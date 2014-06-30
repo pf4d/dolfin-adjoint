@@ -37,7 +37,6 @@ from versions import *
   
 __all__ = \
   [
-    "QForm",
     "apply_bcs",
     "differentiate_expr",
     "enforce_bcs",
@@ -57,85 +56,15 @@ __all__ = \
     "lumped_mass"
   ]
 
-class QForm(ufl.form.Form):
-  """
-  A quadrature degree aware Form. A QForm records the quadrature degree with
-  which the Form is to be assembled, and the quadrature degree is considered
-  in all rich comparison. Hence two QForm s, which as Form s which would be
-  deemed equal, are non-equal if their quadrature degrees differ. Constructor
-  arguments are identical to the Form constructor, with the addition of a
-  required quadrature_degree keyword argument, equal to the requested quadrature
-  degree.
-  """
-
-  def __init__(self, arg, quadrature_degree):
-    if isinstance(arg, ufl.form.Form):
-      arg = arg.integrals()
-    if not isinstance(quadrature_degree, int) or quadrature_degree < 0:
-      raise InvalidArgumentException("quadrature_degree must be a non-negative integer")
-
-    ufl.form.Form.__init__(self, arg)
-    self.__quadrature_degree = quadrature_degree
-
-    return
-
-  def __cmp__(self, other):
-    if not isinstance(other, ufl.form.Form):
-      raise InvalidArgumentException("other must be a Form")
-    comp = self.__quadrature_degree.__cmp__(form_quadrature_degree(other))
-    if comp == 0:
-      return ufl.form.Form.__cmp__(self, other)
-    else:
-      return comp
-    
-  def __hash__(self):
-    return hash((self.__quadrature_degree, ufl.form.Form.__hash__(self)))
-
-  def __add__(self, other):
-    if not isinstance(other, ufl.form.Form):
-      raise InvalidArgumentException("other must be a Form")
-    if not self.__quadrature_degree == form_quadrature_degree(other):
-      raise InvalidArgumentException("Unable to add Forms: Quadrature degrees differ")
-    return QForm(ufl.form.Form.__add__(self, other), quadrature_degree = self.__quadrature_degree)
-
-  def __sub__(self, other):
-    return self.__add__(-other)
-
-  def __mul__(self, other):
-    raise NotImplementedException("__mul__ method not implemented")
-
-  def __rmul__(self, other):
-    raise NotImplementedException("__rmul__ method not implemented")
-
-  def __neg__(self):
-    return QForm(ufl.form.Form.__neg__(self), quadrature_degree = self.__quadrature_degree)
-
-  def quadrature_degree(self):
-    """
-    Return the quadrature degree.
-    """
-
-    return self.__quadrature_degree
-
-  def form_compiler_parameters(self):
-    """
-    Return a dictionary of form compiler parameters.
-    """
-
-    return {"quadrature_degree":self.__quadrature_degree}
-
 def form_quadrature_degree(form):
   """
   Determine the quadrature degree with which the supplied Form is to be
-  assembled. If form is a QForm, return the quadrature degree of the QForm.
-  Otherwise, return the default quadrature degree if one is set, or return
-  the quadrature degree that would be selected by FFC. The final case
-  duplicates the internal behaviour of FFC.
+  assembled. Return the default quadrature degree if one is set, or return the
+  quadrature degree that would be selected by FFC. The final case duplicates the
+  internal behaviour of FFC.
   """
 
-  if isinstance(form, QForm):
-    return form.quadrature_degree()
-  elif isinstance(form, ufl.form.Form):
+  if isinstance(form, ufl.form.Form):
     if dolfin.parameters["form_compiler"]["quadrature_degree"] > 0:
       quadrature_degree = dolfin.parameters["form_compiler"]["quadrature_degree"]
     else:
@@ -394,10 +323,7 @@ def expand(form, dim = None):
     raise InvalidArgumentException("form must be an Expr or Form")
 
   nform = ufl.algorithms.expand_indices(ufl.algorithms.expand_compounds(ufl.algorithms.expand_derivatives(form, dim = dim)))
-  if isinstance(form, QForm):
-    return QForm(nform, quadrature_degree = form_quadrature_degree(form))
-  else:
-    return nform
+  return nform
 
 if dolfin_version() < (1, 4, 0):
   def extract_test_and_trial(form):
