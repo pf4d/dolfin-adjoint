@@ -241,7 +241,7 @@ class PAFilter(object):
             result should not be modified.
     """
     
-    return None
+    raise StateException("Cannot assemble empty Form")
   
 class PAStaticFilter(PAFilter):
   """
@@ -337,7 +337,7 @@ class PAStaticFilter(PAFilter):
     
     if self.__pre_assembled is None:
       if self._n == 0:
-        return None
+        raise StateException("Cannot assemble empty Form")
       else:
         raise StateException("Cannot call assemble method when not pre-assembled")
     
@@ -425,7 +425,7 @@ class PAMatrixFilter(PAFilter):
     
     if self.__pre_assembled is None:
       if self._n == 0:
-        return None
+        raise StateException("Cannot assemble empty Form")
       else:
         raise StateException("Cannot call assemble method when not pre-assembled")
     
