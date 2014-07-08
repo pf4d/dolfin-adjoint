@@ -28,6 +28,7 @@ from fenics_overrides import *
 from fenics_utils import *
 from statics import *
 from versions import *
+import fenics_utils
 
 __all__ = \
   [
@@ -596,37 +597,50 @@ class PAForm(object):
     
     for filter in pa_filters:
       form, n_added = filter.add(form)
+
+    if self.pre_assembly_parameters["expand_form"]:
+      expand_expr = fenics_utils.expand_expr
+    else:
+      expand_expr = lambda expr : [expr]
+    def expand_sum(expr):
+      if isinstance(expr, ufl.algebra.Sum):
+        ops = []
+        for op in expr.operands():
+          ops += expand_sum(op)
+        return ops
+      else:
+        return [expr]
+      
     if not is_empty_form(form):
       if self.pre_assembly_parameters["term_optimisation"]:
+        terms = []
         for integral in form.integrals():
           integrand, iargs = preprocess_integral(integral)
-          if self.pre_assembly_parameters["expand_form"]:
-            if isinstance(integrand, ufl.algebra.Sum):
-              terms = [(term, expand_expr(term)) for term in integrand.operands()]
-            else:
-              terms = [(integrand, expand_expr(integrand))]
+          def integrand_to_form(expr):
+            return ufl.form.Form([ufl.Integral(expr, *iargs)])
+          if isinstance(integrand, ufl.algebra.Product) and len(integrand.operands()) == 2:
+            arg, e = integrand.operands()
+            if isinstance(e, ufl.argument.Argument):
+              arg, e = e, arg
+            integrand_terms = [arg * term for term in expand_sum(e)]
           else:
-            if isinstance(integrand, ufl.algebra.Sum):
-              terms = [(term, [term]) for term in integrand.operands()]
-            else:
-              terms = [(integrand, [integrand])]
-          for term in terms:
-            term_n_pa = 0
-            non_pa_terms = []
-            for sterm in term[1]:
-              sterm = ufl.form.Form([ufl.Integral(sterm, *iargs)])
-              for filter in pa_filters:
-                sterm, n_added = filter.add(sterm)
-                term_n_pa += n_added
-              non_pa_terms.append(sterm)
-            if term_n_pa == 0:
-              term = ufl.form.Form([ufl.Integral(term[0], *iargs)])
-              term, n_added = non_pa_filter.add(term)
-            else:
-              for sterm in non_pa_terms:
-                non_pa_filter.add(sterm)
+            integrand_terms = [integrand]
+          terms += [(integrand_to_form(term), [integrand_to_form(e) for e in expand_expr(term)]) for term in integrand_terms]
       else:
-        form, n_added = non_pa_filter.add(form)
+        terms = [(form, form)]
+      for term in terms:
+        term_n_pa = 0
+        non_pa_terms = []
+        for sterm in term[1]:
+          for filter in pa_filters:
+            sterm, n_added = filter.add(sterm)
+            term_n_pa += n_added
+          non_pa_terms.append(sterm)
+        if term_n_pa == 0:
+          non_pa_filter.add(term[0])
+        else:
+          for sterm in non_pa_terms:
+            non_pa_filter.add(sterm)
         
     n = {}
     n_pa = 0
