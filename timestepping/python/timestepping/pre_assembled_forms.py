@@ -473,7 +473,7 @@ class NonPAFilter(PAFilter):
     self.__tensor = None
     return ufl.form.Form([]), 1
   
-  def match_tensor(self, tensor):
+  def match_tensor(self, tensor = None):
     """
     Addition of GenericMatrix s can be more efficient if the sparsity patterns
     match. Extend the sparsity pattern of the input GenericMatrix and any
@@ -501,8 +501,11 @@ class NonPAFilter(PAFilter):
     elif self._rank == 2:
       if self.__tensor is None:
         self.__tensor = self._assemble(form)
-      self.__tensor.axpy(0.0, tensor, False)
-      tensor.axpy(0.0, self.__tensor, False)
+      if tensor is None:
+        tensor = self.__tensor.copy()
+      else:
+        self.__tensor.axpy(0.0, tensor, False)
+        tensor.axpy(0.0, self.__tensor, False)
     else:
       raise StateException("Unexpected form rank: %i" % self._rank)
     
