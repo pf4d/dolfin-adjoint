@@ -602,14 +602,6 @@ class PAForm(object):
       expand_expr = fenics_utils.expand_expr
     else:
       expand_expr = lambda expr : [expr]
-    def expand_sum(expr):
-      if isinstance(expr, ufl.algebra.Sum):
-        ops = []
-        for op in expr.operands():
-          ops += expand_sum(op)
-        return ops
-      else:
-        return [expr]
       
     if not is_empty_form(form):
       if self.pre_assembly_parameters["term_optimisation"]:
@@ -618,16 +610,9 @@ class PAForm(object):
           integrand, iargs = preprocess_integral(integral)
           def integrand_to_form(expr):
             return ufl.form.Form([ufl.Integral(expr, *iargs)])
-          if isinstance(integrand, ufl.algebra.Product) and len(integrand.operands()) == 2:
-            arg, e = integrand.operands()
-            if isinstance(e, ufl.argument.Argument):
-              arg, e = e, arg
-            integrand_terms = [arg * term for term in expand_sum(e)]
-          else:
-            integrand_terms = [integrand]
-          terms += [(integrand_to_form(term), [integrand_to_form(e) for e in expand_expr(term)]) for term in integrand_terms]
+          terms.append((integrand_to_form(integrand), [integrand_to_form(e) for e in expand_expr(integrand)]))
       else:
-        terms = [(form, form)]
+        terms = [(form, [form])]
       for term in terms:
         term_n_pa = 0
         non_pa_terms = []
