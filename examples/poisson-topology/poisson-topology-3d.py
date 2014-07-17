@@ -10,7 +10,7 @@
 #
 # .. sectionauthor:: Patrick E. Farrell <patrick.farrell@maths.ox.ac.uk>
 #
-# This demo solves example 1 of :cite:`gersborg2006`.
+# This demo solves a 3D generalisation of example 1 of :cite:`gersborg2006`.
 #
 # Problem definition
 # ******************
@@ -34,7 +34,7 @@
 #          0 \le a(x) &\le 1  \qquad \forall x \in \Omega \\
 #          \int_{\Omega} a &\le V
 #
-# where :math:`\Omega` is the unit square, :math:`T` is the temperature,
+# where :math:`\Omega` is the unit cube, :math:`T` is the temperature,
 # :math:`a` is the control (:math:`a(x) = 1` means material, :math:`a(x)
 # = 0` means no material), :math:`f` is a prescribed source term (here
 # the constant :math:`10^{-2}`), :math:`k(a)` is the Solid Isotropic
@@ -60,6 +60,12 @@
 from dolfin import *
 from dolfin_adjoint import *
 
+# Next, we set some PETSc options to govern how the linear systems
+# are to be solved: this sets the number of smoother interations
+# in the smoothed aggregation multigrid.
+
+PETScOptions.set("pc_gamg_agg_nsmooths", 1)
+
 # Next we import the Python interface to IPOPT. If IPOPT is
 # unavailable on your system, we strongly :doc:`suggest you install it
 # <../../download/index>`; IPOPT is a well-established open-source
@@ -73,8 +79,10 @@ When compiling IPOPT, make sure to link against HSL, as it \
 is a necessity for practical problems.""")
   raise
 
-# turn off redundant output in parallel
-parameters["std_out_all_processes"] = False
+# Form compiler options
+parameters["form_compiler"]["optimize"]     = True
+parameters["form_compiler"]["cpp_optimize"] = True
+parameters["form_compiler"]["cpp_optimize_flags"] = "-O3 -ffast-math -march=native"
 
 # Next we define some constants, and the Solid Isotropic Material with
 # Penalisation (SIMP) rule.
@@ -95,21 +103,25 @@ rule, equation (11)."""
 # Next we define the mesh (a unit square) and the function spaces to be
 # used for the control :math:`a` and forward solution :math:`T`.
 
-n = 100
-mesh = UnitSquareMesh(n, n)
+n = 50
+mesh = UnitCubeMesh(n, n, n)
 A = FunctionSpace(mesh, "CG", 1)  # function space for control
 P = FunctionSpace(mesh, "CG", 1)  # function space for solution
 
 # Next we define the forward boundary condition and source term.
 
-class WestNorth(SubDomain):
-  """The top and left boundary of the unitsquare, used to enforce the Dirichlet boundary condition."""
+class DirichletBoundary(SubDomain):
+  """
+  The left, top and far boundaries of the unit cube, used to enforce the
+  Dirichlet boundary condition.
+  """
   def inside(self, x, on_boundary):
-    return (x[0] == 0.0 or x[1] == 1.0) and on_boundary
+    return (x[0] == 0.0 or x[1] == 1.0 or x[2] == 1.0) and on_boundary
 
-# the Dirichlet BC; the Neumann BC will be implemented implicitly by
+# Define the Dirichlet BC; the Neumann BC will be implemented implicitly by
 # dropping the surface integral after integration by parts
-bc = [DirichletBC(P, 0.0, WestNorth())]                 
+
+bc = [DirichletBC(P, 0.0, DirichletBoundary())]
 f = interpolate(Constant(1.0e-2), P, name="SourceTerm") # the volume source term for the PDE
 
 # Next we define a function that given a control :math:`a` solves the
@@ -118,7 +130,6 @@ f = interpolate(Constant(1.0e-2), P, name="SourceTerm") # the volume source term
 # :doc:`Taylor remainder convergence tests
 # <../../documentation/verification>`.)
 
-
 def forward(a):
   """Solve the forward problem for a given material distribution a(x)."""
   T = Function(P, name="Temperature")
@@ -126,7 +137,9 @@ def forward(a):
 
   F = inner(grad(v), k(a)*grad(T))*dx - f*v*dx
   solve(F == 0, T, bc, solver_parameters={"newton_solver": {"absolute_tolerance": 1.0e-7,
-                                                            "maximum_iterations": 20}})
+                                                            "maximum_iterations": 20,
+                                                            "linear_solver": "cg",
+                                                            "preconditioner": "petsc_amg"}})
 
   return T
 
@@ -158,7 +171,7 @@ if __name__ == "__main__":
 # executed on every functional derivative calculation
 # <../../documentation/optimisation>`.
 
-  controls = File("output/control_iterations.pvd")
+  controls = File("output-3d/control_iterations.pvd")
   a_viz = Function(A, name="ControlVisualisation")
   def eval_cb(j, a):
     a_viz.assign(a)
@@ -242,48 +255,42 @@ if __name__ == "__main__":
   nlp = rfn.pyipopt_problem(bounds=(lb, ub), constraints=VolumeConstraint(V))
   a_opt = nlp.solve(full=False)
 
-  File("output/control_solution.xml.gz") << a_opt
+  File("output-3d/control_solution.xml.gz") << a_opt
 
 # The example code can be found in ``examples/poisson-topology/`` in the
-# ``dolfin-adjoint`` source tree, and executed as follows:
+# ``dolfin-adjoint`` source tree. Running it takes approximately 5 minutes
+# on my laptop. The code is executed as follows:
 
 # .. code-block:: bash
 
 #   $ mpiexec -n 4 python poisson-topology.py
 #   ...
-#   Number of Iterations....: 28
 
-#                                      (scaled)                 (unscaled)
-#   Objective...............:   8.5918769312525156e-05    8.5918769312525156e-05
-#   Dual infeasibility......:   6.2885905846597543e-08    6.2885905846597543e-08
+#   Number of Iterations....: 17
+#
+#   (scaled)                 (unscaled)
+#   Objective...............:   1.0060497104608291e-04    1.0060497104608291e-04
+#   Dual infeasibility......:   1.3469311941544299e-08    1.3469311941544299e-08
 #   Constraint violation....:   0.0000000000000000e+00    0.0000000000000000e+00
-#   Complementarity.........:   3.1475629953894822e-09    3.1475629953894822e-09
-#   Overall NLP error.......:   6.2885905846597543e-08    6.2885905846597543e-08
-
-
-#   Number of objective function evaluations             = 29
-#   Number of objective gradient evaluations             = 29
+#   Complementarity.........:   1.3512182623547745e-09    1.3512182623547745e-09
+#   Overall NLP error.......:   1.3469311941544299e-08    1.3469311941544299e-08
+#
+#
+#   Number of objective function evaluations             = 18
+#   Number of objective gradient evaluations             = 18
 #   Number of equality constraint evaluations            = 0
-#   Number of inequality constraint evaluations          = 29
+#   Number of inequality constraint evaluations          = 18
 #   Number of equality constraint Jacobian evaluations   = 0
-#   Number of inequality constraint Jacobian evaluations = 29
+#   Number of inequality constraint Jacobian evaluations = 18
 #   Number of Lagrangian Hessian evaluations             = 0
-#   Total CPU secs in IPOPT (w/o function evaluations)   =      2.628
-#   Total CPU secs in NLP function evaluations           =     27.790
-
+#   Total CPU secs in IPOPT (w/o function evaluations)   =     30.014
+#   Total CPU secs in NLP function evaluations           =    253.252
+#
 #   EXIT: Solved To Acceptable Level.
 
 # The optimisation iterations can be visualised by opening
 # ``output/control_iterations.pvd`` in paraview. The resulting solution
-# exhibits fascinating dendritic structures, similar to the reference
-# solution found in :cite:`gersborg2006`.
-
-# .. image:: poisson-topology.png
-#     :scale: 40
-#     :align: center
-
-# See also ``examples/poisson-topology/poisson-topology-3d.py`` for a 3-dimensional
-# generalisation of this example, with the following solution:
+# exhibits fascinating structures.
 
 # .. image:: poisson-topology-3d.png
 #     :scale: 90
