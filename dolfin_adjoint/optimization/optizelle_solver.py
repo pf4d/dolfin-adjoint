@@ -27,6 +27,7 @@ def safe_log(x):
 
 class BoundConstraint(constraints.InequalityConstraint):
     """A class that enforces the bound constraint l <= m or m >= u."""
+
     def __init__(self, m, bound, type):
         assert type is 'lower' or type is 'upper'
         assert isinstance(m, (Function, Constant))
@@ -77,7 +78,7 @@ class BoundConstraint(constraints.InequalityConstraint):
         elif isinstance(self.m, Function):
             result.assign(self.scale*dp)
 
-    def hessia_action(self, m, dm, dp, result):
+    def hessian_action(self, m, dm, dp, result):
         if isinstance(self.m, Constant):
             result[0] = 0.0
         elif isinstance(self.m, Function):
@@ -383,6 +384,7 @@ try:
 
     # May not have optizelle installed.
     class OptizelleObjective(Optizelle.ScalarValuedFunction):
+
         def __init__(self, rf, scale=1):
             self.rf = rf
             self.last_x = None
@@ -569,6 +571,8 @@ class OptizelleSolver(OptimizationSolver):
             self.fns = Optizelle.Unconstrained.Functions.t()
             self.fns.f = OptizelleObjective(self.problem.reduced_functional, scale=scale)
 
+            log(INFO, "Found no constraints.")
+
         # Equality constraints only
         elif num_equality_constraints > 0 and num_inequality_constraints == 0:
 
@@ -581,6 +585,8 @@ class OptizelleSolver(OptimizationSolver):
 
             self.fns.f = OptizelleObjective(self.problem.reduced_functional, scale=scale)
             self.fns.g = OptizelleConstraints(self.problem, equality_constraints)
+
+            log(INFO, "Found no equality and %i inequality constraints." % len(equality_constraints))
 
         # Inequality constraints only
         elif num_equality_constraints == 0 and num_inequality_constraints > 0:
@@ -598,6 +604,8 @@ class OptizelleSolver(OptimizationSolver):
 
             self.fns.f = OptizelleObjective(self.problem.reduced_functional, scale=scale)
             self.fns.h = OptizelleConstraints(self.problem, all_inequality_constraints)
+
+            log(INFO, "Found %i equality and 0 inequality constraints." % len(all_inequality_constraints))
 
         # Inequality and equality constraints
         else:
@@ -620,6 +628,9 @@ class OptizelleSolver(OptimizationSolver):
             self.fns.f = OptizelleObjective(self.problem.reduced_functional, scale=scale)
             self.fns.g = OptizelleConstraints(self.problem, equality_constraints)
             self.fns.h = OptizelleConstraints(self.problem, all_inequality_constraints)
+
+            log(INFO, "Found %i equality and %i inequality constraints." % (len(equality_constraints), len(all_inequality_constraints)))
+
 
         # Set solver parameters
         self.__set_optizelle_parameters()
