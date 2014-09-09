@@ -44,15 +44,16 @@ lu_solvers = KeyedDict(keyfunc=lu_canonicalisation)
 ### Stuff for preassembly caching
 
 def form_constants(form):
-  constants = tuple([float(x) for x in ufl.algorithms.extract_coefficients(form) if isinstance(x, Constant)])
+  constants = tuple([float(x) for x in ufl.algorithms.extract_coefficients(form)
+      if isinstance(x, Constant)])
   return constants
 
 def form_key(form):
   constants = form_constants(form)
-  try:
-    return (ufl.algorithms.expand_indices(form), constants)
-  except:
-    return (form, constants)
+  functionids = tuple(x.count() for itg in form.integrals()
+            for x in ufl.corealg.traversal.traverse_terminals(itg.integrand())
+            if isinstance(x, ufl.Coefficient))
+  return (form.signature(), functionids, constants)
 
 assembled_fwd_forms = set()
 assembled_adj_forms = KeyedDict(keyfunc=form_key)
