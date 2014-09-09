@@ -107,7 +107,7 @@ class Functional(libadjoint.Functional):
     return Functional(- self.timeform, self.verbose, self.name)
 
   def __call__(self, adjointer, timestep, dependencies, values):
-    
+
     functional_value = self._substitute_form(adjointer, timestep, dependencies, values)
 
     if functional_value is not None:
@@ -121,7 +121,7 @@ class Functional(libadjoint.Functional):
       return 0.0
 
   def derivative(self, adjointer, variable, dependencies, values):
-    
+
     functional_value = None
     for timestep in self._derivative_timesteps(adjointer, variable):
       functional_value = _add(functional_value,
@@ -151,7 +151,7 @@ class Functional(libadjoint.Functional):
     return adjlinalg.Vector(d)
 
   def _derivative_timesteps(self, adjointer, variable):
-    
+
     timestep = variable.timestep
     iteration = variable.iteration
     if timestep == 0 and iteration == 0:
@@ -193,7 +193,7 @@ class Functional(libadjoint.Functional):
           this_interval=_slice_intersect(interval, term.time)
           if this_interval:
             # Get adj_variables for dependencies. Time level is not yet specified.
-            
+
             # Dependency replacement dictionary.
             replace={}
 
@@ -206,7 +206,7 @@ class Functional(libadjoint.Functional):
 
             # Trapezoidal rule over given interval.
             quad_weight = 0.5*(this_interval.stop-this_interval.start)
-            
+
             return backend.replace(quad_weight*term.form, replace)
 
         # Calculate the integral contribution from the previous time level.
@@ -261,7 +261,7 @@ class Functional(libadjoint.Functional):
             replace[term_dep] = deps[str(end)]
 
           functional_value = _add(functional_value, backend.replace(term.form, replace))
-    
+
     return functional_value
 
   def get_vars(self, adjointer, timestep, model):
@@ -311,7 +311,7 @@ class Functional(libadjoint.Functional):
 
         if _slice_intersect(integral_interval, term.time):
           integral_deps.update(_vars(adjointer, term.form))
-        
+
       else:
         # Point evaluation.
 
@@ -326,37 +326,37 @@ class Functional(libadjoint.Functional):
         # Another special case for evaluation at the START_TIME, or the start of the timestep.
         elif (isinstance(term.time, StartTimeConstant) and timestep == 0) or point_interval.start == term.time:
           start_deps.update(_vars(adjointer, term.form))
-        
+
     integral_deps = list(integral_deps)
     point_deps = list(point_deps)
     final_deps = list(final_deps)
     start_deps = list(start_deps)
 
     # Set the time level of the dependencies:
-    
+
     # Point deps always need the current and previous timestep values.
     point_deps *= 2
     for i in range(len(point_deps)/2):
       point_deps[i]= point_deps[i].copy()
       if timestep !=0:
         point_deps[i].var.timestep = timestep-1
-        point_deps[i].var.iteration = point_deps[i].iteration_count(adjointer) - 1 
+        point_deps[i].var.iteration = point_deps[i].iteration_count(adjointer) - 1
       else:
         point_deps[i].var.timestep = timestep
         point_deps[i].var.iteration = 0
     for i in range(len(point_deps)/2, len(point_deps)):
       point_deps[i].var.timestep = timestep
-      point_deps[i].var.iteration = point_deps[i].iteration_count(adjointer) - 1 
+      point_deps[i].var.iteration = point_deps[i].iteration_count(adjointer) - 1
 
     # Integral deps depend on the previous time level.
     for i in range(len(integral_deps)):
       if timestep !=0:
         integral_deps[i].var.timestep = timestep - 1
-        integral_deps[i].var.iteration = integral_deps[i].iteration_count(adjointer) - 1 
+        integral_deps[i].var.iteration = integral_deps[i].iteration_count(adjointer) - 1
       else:
         integral_deps[i].var.timestep = timestep
         integral_deps[i].var.iteration = 0
-      
+
     # Except at the final timestep, integrals only depend on the previous
     # value.
     if  timestep==adjointer.timestep_count-1 and adjointer.time.finished:
@@ -364,7 +364,7 @@ class Functional(libadjoint.Functional):
       for i in range(len(integral_deps)/2, len(integral_deps)):
         integral_deps[i]= integral_deps[i].copy()
         integral_deps[i].var.timestep = timestep
-        integral_deps[i].var.iteration = integral_deps[i].iteration_count(adjointer) - 1 
+        integral_deps[i].var.iteration = integral_deps[i].iteration_count(adjointer) - 1
 
     # Final deps depend only at the very last value.
     for i in range(len(final_deps)):
@@ -373,7 +373,7 @@ class Functional(libadjoint.Functional):
     # Start deps depend only at the very first value.
     for i in range(len(start_deps)):
       start_deps[i] = self.get_vars(adjointer, timestep, start_deps[i])[0]
-    
+
     deps=set(point_deps).union(set(integral_deps)).union(set(final_deps)).union(set(start_deps))
 
     return list(deps)
@@ -396,16 +396,16 @@ def _slice_intersect(slice1, slice2):
       return intersect
   else:
     return None
-  
+
 def _vars(adjointer, form):
   # Return the libadjoint variables corresponding to the coeffs in form.
-  return [adjglobals.adj_variables[coeff].copy() 
-          for coeff in ufl.algorithms.extract_coefficients(form) 
+  return [adjglobals.adj_variables[coeff].copy()
+          for coeff in ufl.algorithms.extract_coefficients(form)
           if (hasattr(coeff, "function_space")) and adjointer.variable_known(adjglobals.adj_variables[coeff])]
 
 def _coeffs(adjointer, form):
-  return [coeff 
-          for coeff in ufl.algorithms.extract_coefficients(form) 
+  return [coeff
+          for coeff in ufl.algorithms.extract_coefficients(form)
           if (hasattr(coeff, "function_space")) and adjointer.variable_known(adjglobals.adj_variables[coeff])]
 
 def _add(value, increment):
@@ -418,7 +418,7 @@ def _add(value, increment):
     return value+increment
 
 def _time_levels(adjointer, timestep):
-  
+
   try:
     return adjointer.get_times(timestep)
   except Exception as exc:
