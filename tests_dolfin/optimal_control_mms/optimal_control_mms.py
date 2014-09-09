@@ -11,11 +11,9 @@ parameters['std_out_all_processes'] = False
 parameters["adjoint"]["cache_factorizations"] = True
 parameters["adjoint"]["debug_cache"] = True
 
-x = triangle.x
-
 def solve_pde(u, V, m):
     v = TestFunction(V)
-    F = (inner(grad(u), grad(v)) - m*v)*dx 
+    F = (inner(grad(u), grad(v)) - m*v)*dx
     bc = DirichletBC(V, 0.0, "on_boundary")
     solve(F == 0, u, bc)
 
@@ -28,14 +26,15 @@ def solve_optimal_control(n):
     W = FunctionSpace(mesh, "DG", 0)
     m = Function(W, name='Control')
 
-    u_d = 1/(2*pi**2)*sin(pi*x[0])*sin(pi*x[1]) 
+    x =  SpatialCoordinate(mesh)
+    u_d = 1/(2*pi**2)*sin(pi*x[0])*sin(pi*x[1])
 
     J = Functional((inner(u-u_d, u-u_d))*dx*dt[FINISH_TIME])
 
     # Run the forward model once to create the annotation
     solve_pde(u, V, m)
 
-    # Run the optimisation 
+    # Run the optimisation
     rf = ReducedFunctional(J, InitialConditionParameter(m, value=m))
 
     minimize(rf, method = 'Newton-CG', tol = 1e-16, options = {'disp': True})
@@ -69,12 +68,12 @@ try:
     info_green("State convergence: " + str(convergence_order(state_errors, base = 2)))
 
     if min(convergence_order(control_errors)) < 0.9:
-        info_red("Convergence order below tolerance") 
+        info_red("Convergence order below tolerance")
         sys.exit(1)
     if min(convergence_order(state_errors)) < 1.9:
-        info_red("Convergence order below tolerance") 
+        info_red("Convergence order below tolerance")
         sys.exit(1)
-    info_green("Test passed")    
+    info_green("Test passed")
 except ImportError:
   info_red("No suitable scipy version found. Aborting test.")
 
