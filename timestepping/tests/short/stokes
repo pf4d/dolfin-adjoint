@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
+# Copyright (C) 2014 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -175,7 +176,7 @@ dolfin_adjoint_solution = numpy.array(map(float, """0.22997968  0.23028553  0.23
   0.          0.          0.          0.          0.          0.          0.
   0.          0.          0.          0.          0.        """.split()))
 err = abs(T[N].vector().array() - dolfin_adjoint_solution).max()
-print err
+print(err)
 assert(err < 5.0e-9)
 
 system.set_functional(T[N] * T[N] * dx)
@@ -254,8 +255,8 @@ dolfin_adjoint_grad = numpy.array(map(float, """2.86666005e-06   4.17839553e-06 
    2.16133179e-06   2.13225319e-06   1.87020244e-06   1.30294009e-06
    4.73464636e-07""".split()))
 err = abs(dJdm.array() - dolfin_adjoint_grad).max()
-print err
+print(err)
 assert(err < 5.0e-14)
 
-orders = system.taylor_test(ic, grad = dJdm, fact = 1.0e-3)
-assert((orders > 1.98).all())
+orders = system.taylor_test(ic, grad = dJdm, fact = 3.0e-3)
+assert((orders > 1.97).all())

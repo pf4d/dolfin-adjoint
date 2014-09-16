@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
+# Copyright (C) 2014 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -25,7 +26,6 @@ from caches import *
 from exceptions import *
 from fenics_overrides import *
 from fenics_utils import *
-from quadrature import *
 from statics import *
 from versions import *
 
@@ -36,41 +36,8 @@ __all__ = \
     "PALinearForm"
   ]
 
-if ufl_version() < (1, 2, 0):
-  def form_integrals(form):
-    """
-    Return Integral s associated with the given Form.
-    """
-    
-    form_data = extract_form_data(form)
-    integrals = []
-    for integral_data in form_data.integral_data:
-      integrals += integral_data[2]
-    return integrals
-  
-  def preprocess_integral(form, integral):
-    """
-    Given an Integral associated with the given Form, return the integrand and
-    a list of arguments which can be used to construct an Integral from the
-    integrand.
-    """
-    
-    form_data = extract_form_data(form)
-    integrand, measure = integral.integrand(), integral.measure()
-    repl = {}
-    for old, new in zip(form_data.arguments + form_data.coefficients, form_data.original_arguments + form_data.original_coefficients):
-      repl[old] = new
-    integrand = replace(integrand, repl)
-    return integrand, [measure]
-else:
-  def form_integrals(form):
-    """
-    Return Integral s associated with the given Form.
-    """
-    
-    return form.integrals()
-  
-  def preprocess_integral(form, integral):
+if dolfin_version() < (1, 4, 0):
+  def preprocess_integral(integral):
     """
     Given an Integral associated with the given Form, return the integrand and
     a list of arguments which can be used to construct an Integral from the
@@ -82,7 +49,72 @@ else:
       integral.domain_type(), integral.domain_description(), integral.compiler_data(), integral.domain_data()
     return integrand, [domain_type, domain_description, compiler_data, domain_data]
 
-class PAForm:
+  def _assemble_tensor(form, tensor):
+    return assemble(form, tensor = tensor, reset_sparsity = False)
+else:
+  def preprocess_integral(integral):
+    """
+    Given an Integral associated with the given Form, return the integrand and
+    a list of arguments which can be used to construct an Integral from the
+    integrand.
+    """
+    
+    integrand = integral.integrand()
+    integral_type, domain, subdomain_id, metadata, subdomain_data = \
+      integral.integral_type(), integral.domain(), integral.subdomain_id(), integral.metadata(), integral.subdomain_data()
+    return integrand, [integral_type, domain, subdomain_id, metadata, subdomain_data]
+  
+  def _assemble_tensor(form, tensor):
+    return assemble(form, tensor = tensor)
+
+def matrix_optimisation(form):
+  """
+  Attempt to convert a linear form into the action of a bi-linear form.
+  Return a (bi-linear Form, Function) pair on success, and None on failure.
+  """
+
+  if not isinstance(form, ufl.form.Form):
+    raise InvalidArgumentException("form must be a Form")
+
+  # Find the test function
+  args = ufl.algorithms.extract_arguments(form)
+  if not len(args) == 1:
+    # This is not a linear form
+    return None
+
+  # Look for a single non-static Function dependency
+  tcs = extract_non_static_coefficients(form)
+  if not len(tcs) == 1:
+    # Found too many non-static coefficients
+    return None
+  elif not isinstance(tcs[0], dolfin.Function):
+    # The only non-static coefficient is not a Function
+    return None
+  # Found a single non-static Function dependency
+  fn = tcs[0]
+
+  # Look for a static bi-linear form whose action can be used to construct
+  # the linear form
+  mat_form = derivative(form, fn,
+    # Hack to work around an obscure FEniCS bug
+    expand = dolfin.MPI.num_processes() == 1 or
+      (not is_r0_function_space(args[0].function_space()) and not is_r0_function(fn)))
+  if n_non_static_coefficients(mat_form) > 0:
+    # The form is non-linear
+    return None
+  try:
+    rhs_form = rhs(replace(form, {fn:dolfin.TrialFunction(fn.function_space())}))
+  except ufl.log.UFLException:
+    # The form might be inhomogeneous
+    return None
+  if not is_empty_form(rhs_form):
+    # The form might be inhomogeneous
+    return None
+
+  # Success
+  return mat_form, fn
+
+class PAForm(object):
   """
   A pre-assembled form. Given a form of arbitrary rank, this finds and
   pre-assembles static terms.
@@ -112,7 +144,7 @@ class PAForm:
 
     self._set_optimise(form)
 
-    self.__rank = extract_form_data(form).rank
+    self.__rank = form_rank(form)
     self.__deps = ufl.algorithms.extract_coefficients(form)
 
     return
@@ -126,8 +158,8 @@ class PAForm:
       pre_assembled_L = []
       non_pre_assembled_L = []
       
-      for integral in form_integrals(form):
-        integrand, iargs = preprocess_integral(form, integral)
+      for integral in form.integrals():
+        integrand, iargs = preprocess_integral(integral)
         if self.pre_assembly_parameters["expand_form"]:
           if isinstance(integrand, ufl.algebra.Sum):
             terms = [(term, expand_expr(term)) for term in integrand.operands()]
@@ -135,9 +167,9 @@ class PAForm:
             terms = [(integrand, expand_expr(integrand))]
         else:
           if isinstance(integrand, ufl.algebra.Sum):
-            terms = [[(term, term)] for term in integrand.operands()]
+            terms = [(term, [term]) for term in integrand.operands()]
           else:
-            terms = [[(term, term)]]        
+            terms = [(integrand, [integrand])]    
         for term in terms:
           pterm = [], []
           for sterm in term[1]:
@@ -244,19 +276,6 @@ class PAForm:
     
     return self.__deps
   
-  def replace(self, mapping):
-    """
-    Replace coefficients.
-    """
-    
-    for i, dep in enumerate(self.__deps):
-      if dep in mapping:
-        self.__deps[i] = mapping[dep]
-    if not self._non_pre_assembled_L is None:
-      self._non_pre_assembled_L = replace(self._non_pre_assembled_L, mapping)
-    
-    return
-  
 _assemble_classes.append(PAForm)
     
 class PABilinearForm(PAForm):
@@ -267,7 +286,7 @@ class PABilinearForm(PAForm):
   """
   
   def __init__(self, form, pre_assembly_parameters = {}):
-    if not extract_form_data(form).rank == 2:
+    if not form_rank(form) == 2:
       raise InvalidArgumentException("form must be a rank 2 form")
     
     PAForm.__init__(self, form,
@@ -276,9 +295,8 @@ class PABilinearForm(PAForm):
     
     if not self._non_pre_assembled_L is None and not self._pre_assembled_L is None:
       # Work around a (rare) reproducibility issue:
-      # assemble(form, tensor = tensor, reset_sparsity = False) can give (very
-      # slightly) different results if given matrices with different sparsity
-      # patterns.
+      # _assemble_tensor(form, tensor = tensor) can give (very slightly)
+      # different results if given matrices with different sparsity patterns.
       
       # The coefficients may contain invalid data, or be non-wrapping
       # WrappedFunction s. Replace the coefficients with Constant(1.0).
@@ -313,12 +331,15 @@ class PABilinearForm(PAForm):
     else:
       if hasattr(self, "_PABilinearForm__non_pre_assembled_L_tensor"):
         L = self.__non_pre_assembled_L_tensor
-        assemble(self._non_pre_assembled_L, tensor = L, reset_sparsity = False)
+        _assemble_tensor(self._non_pre_assembled_L, tensor = L)
         if not self._pre_assembled_L is None:
           # The pre-assembled matrix and the non-pre-assembled matrix have
           # previously been configured so as to have the same sparsity pattern
           # (below)
           L.axpy(1.0, self._pre_assembled_L, True)
+        # A copy is not really required here
+        #if copy:
+        #  L = L.copy()
       else:
         L = self.__non_pre_assembled_L_tensor = assemble(self._non_pre_assembled_L)
         assert(self._pre_assembled_L is None)
@@ -332,7 +353,7 @@ class PALinearForm(PAForm):
   """
   
   def __init__(self, form, pre_assembly_parameters = {}):
-    if not extract_form_data(form).rank == 1:
+    if not form_rank(form) == 1:
       raise InvalidArgumentException("form must be a rank 1 form")
     
     PAForm.__init__(self, form,
@@ -346,31 +367,13 @@ class PALinearForm(PAForm):
     mult_assembled_L = OrderedDict()
     non_pre_assembled_L = []
     
-    def matrix_optimisation(tform):
-      args = ufl.algorithms.extract_arguments(tform)
-      if not len(args) == 1:
-        return None
-      tcs = extract_non_static_coefficients(tform)
-      if not len(tcs) == 1 or not isinstance(tcs[0], dolfin.Function):
-        return None
-      fn = tcs[0]
-        
-      expand = dolfin.MPI.num_processes() == 1 or \
-        (not is_r0_function_space(args[0].function_space()) and not is_r0_function(fn))
-      mat_form = derivative(tform, fn, expand = expand)
-      
-      if n_non_static_coefficients(mat_form) > 0:
-        return None
-      else:
-        return fn, mat_form
-    
     if is_static_form(form):
       pre_assembled_L.append(form)
     elif self.pre_assembly_parameters["term_optimisation"]:
       quadrature_degree = form_quadrature_degree(form)
     
-      for integral in form_integrals(form):
-        integrand, iargs = preprocess_integral(form, integral)
+      for integral in form.integrals():
+        integrand, iargs = preprocess_integral(integral)
         if self.pre_assembly_parameters["expand_form"]:
           if isinstance(integrand, ufl.algebra.Sum):
             terms = [(term, expand_expr(term)) for term in integrand.operands()]
@@ -401,17 +404,17 @@ class PALinearForm(PAForm):
           else:
             pre_assembled_L += pterm[0]
             for mform in pterm[1]:
-              if mform[0] in mult_assembled_L:
-                mult_assembled_L[mform[0]].append(mform[1])
+              if mform[1] in mult_assembled_L:
+                mult_assembled_L[mform[1]].append(mform[0])
               else:
-                mult_assembled_L[mform[0]] = [mform[1]]
+                mult_assembled_L[mform[1]] = [mform[0]]
             non_pre_assembled_L += pterm[2]
     elif self.pre_assembly_parameters["matrix_optimisation"]:
       mform = matrix_optimisation(form)
       if mform is None:
         non_pre_assembled_L.append(form)
       else:
-        mult_assembled_L[mform[0]] = [mform[1]]
+        mult_assembled_L[mform[1]] = [mform[0]]
     else:
       non_pre_assembled_L.append(form)
 
@@ -472,18 +475,14 @@ class PALinearForm(PAForm):
             L = self._pre_assembled_L
       else:
         L = self._mult_assembled_L[0][0] * self._mult_assembled_L[0][1].vector()
-        for i in range(1, len(self._mult_assembled_L)):
+        for i in xrange(1, len(self._mult_assembled_L)):
           L += self._mult_assembled_L[i][0] * self._mult_assembled_L[i][1].vector()
         if not self._pre_assembled_L is None:
           L += self._pre_assembled_L
     else:
-      if hasattr(self, "_PALinearForm__non_pre_assembled_L_tensor"):
-        L = self.__non_pre_assembled_L_tensor
-        assemble(self._non_pre_assembled_L, tensor = L, reset_sparsity = False)
-      else:
-        L = self.__non_pre_assembled_L_tensor = assemble(self._non_pre_assembled_L)
+      L = assemble(self._non_pre_assembled_L)
       if not self._mult_assembled_L is None:
-        for i in range(len(self._mult_assembled_L)):
+        for i in xrange(len(self._mult_assembled_L)):
           L += self._mult_assembled_L[i][0] * self._mult_assembled_L[i][1].vector()
       if not self._pre_assembled_L is None:
         L += self._pre_assembled_L
@@ -496,17 +495,3 @@ class PALinearForm(PAForm):
     """
     
     return self.__static
-  
-  def replace(self, mapping):
-    """
-    Replace coefficients.
-    """
-    
-    PAForm.replace(self, mapping)
-    if not self._mult_assembled_L is None:
-      for i in range(len(self._mult_assembled_L)):
-        mat, fn = self._mult_assembled_L[i]
-        if fn in mapping:
-          self._mult_assembled_L[i] = mat, mapping[fn]
-    
-    return

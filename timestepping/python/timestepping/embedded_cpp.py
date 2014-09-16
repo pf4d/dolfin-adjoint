@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
+# Copyright (C) 2014 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -37,7 +38,7 @@ __all__ = \
 
 int_arr, long_arr, double_arr = 2, 3, 4
 
-class EmbeddedCpp:
+class EmbeddedCpp(object):
   """
   A wrapper for short sections of embedded C++ code.
 
@@ -60,11 +61,7 @@ class EmbeddedCpp:
                      dolfin.GenericVector:"GenericVector",
                      dolfin.Mesh:"Mesh"}
 
-  if dolfin_version() < (1, 1, 0):
-    __default_includes = """#include "dolfin.h"
-#define la_index uint"""
-  else:
-    __default_includes = """#include "dolfin.h" """
+  __default_includes = """#include "dolfin.h" """
 
   def __init__(self, code, includes = "", include_dirs = [], **kwargs):
     if not isinstance(code, str):
@@ -91,8 +88,26 @@ class EmbeddedCpp:
           cls = self.__boost_classes[cls]
         args[arg] = cls
 
+    if dolfin_version() < (1, 4, 0):
+      includes = \
+"""
+namespace boost {
+}
+using namespace boost;
+
+%s""" % includes
+    else:
+      includes = \
+"""
+#include <memory>
+using namespace std;
+
+%s""" % includes
+
     self.__code = code
-    self.__includes = """%s
+    self.__includes = \
+"""
+%s
 
 %s""" % (includes, self.__default_includes)
     self.__include_dirs = copy.copy(include_dirs)
@@ -127,11 +142,12 @@ class EmbeddedCpp:
         while name_mangle in self.__args.keys():
           name_mangle = "%s_" % name_mangle
         args += "void* %s" % name_mangle
-        cast_code += "    boost::shared_ptr<%s> %s = (*((boost::shared_ptr<%s>*)%s));\n" % \
+        cast_code += "    shared_ptr<%s> %s = (*((shared_ptr<%s>*)%s));\n" % \
           (self.__boost_classes[arg], name, self.__boost_classes[arg], name_mangle)
 
     code = \
-"""%s
+"""
+%s
 
 // Keep SWIG happy
 namespace dolfin {
@@ -139,7 +155,7 @@ namespace dolfin {
 using namespace dolfin;
 
 extern "C" {
-  int code(%s){
+  int code(%s) {
 %s
 
 %s
@@ -147,15 +163,10 @@ extern "C" {
   }
 }""" % (self.__includes, args, cast_code, self.__code)
 
-    if instant_version() < (1, 2, 0):
-      mod = instant.build_module(code = code,
-        cppargs = dolfin.parameters["form_compiler"]["cpp_optimize_flags"],
-        lddargs = "-ldolfin", include_dirs = self.__include_dirs)
-    else:
-      mod = instant.build_module(code = code,
-        cppargs = dolfin.parameters["form_compiler"]["cpp_optimize_flags"],
-        lddargs = "-ldolfin", include_dirs = self.__include_dirs,
-        cmake_packages = ["DOLFIN"])
+    mod = instant.build_module(code = code,
+      cppargs = dolfin.parameters["form_compiler"]["cpp_optimize_flags"],
+      lddargs = "-ldolfin", include_dirs = self.__include_dirs,
+      cmake_packages = ["DOLFIN"])
     path = os.path.dirname(mod.__file__)
     name = os.path.split(path)[-1]
     self.__lib = ctypes.cdll.LoadLibrary(os.path.join(path, "_%s.so" % name))
@@ -204,7 +215,13 @@ extern "C" {
       elif isinstance(arg, float):
         largs.append(ctypes.c_double(arg))
       elif isinstance(arg, numpy.ndarray):
-        largs.append(arg.ctypes.data)
+        if arg.dtype == "int32":
+          largs.append(arg.ctypes.data_as(ctypes.POINTER(ctypes.c_int)))
+        elif arg.dtype == "int64":
+          largs.append(arg.ctypes.data_as(ctypes.POINTER(ctypes.c_long)))
+        else:
+          assert(arg.dtype == "float64")
+          largs.append(arg.ctypes.data_as(ctypes.POINTER(ctypes.c_double)))
       else:
         assert(isinstance(arg, tuple(self.__boost_classes.keys())))
         largs.append(ctypes.c_void_p(int(arg.this)))
@@ -243,8 +260,9 @@ class CellKernel(EmbeddedCpp):
       raise InvalidArgumentException("finalisation_code must be a string")
 
     code = \
-"""%s
-    for(size_t cell = 0;cell < %i;cell++){
+"""
+%s
+    for(size_t cell = 0;cell < %i;cell++) {
 %s
     }
 %s""" % (initialisation_code, mesh.num_cells(), kernel_code, finalisation_code)

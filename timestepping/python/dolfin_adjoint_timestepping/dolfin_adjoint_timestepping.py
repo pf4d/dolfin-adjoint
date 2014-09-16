@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
+# Copyright (C) 2014 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -46,6 +47,7 @@ def system_info():
   
   return
 
+dolfin.parameters["adjoint"]["cache_factorizations"] = True
 dolfin.parameters["timestepping"]["pre_assembly"]["linear_forms"]["matrix_optimisation"] = False
 dolfin.parameters["timestepping"]["pre_assembly"]["linear_forms"]["term_optimisation"] = False
 
@@ -61,6 +63,7 @@ del(Constant__getattr__)
     
 # Modified version of code from dolfin-adjoint bzr trunk 717
 def get_constant(a):
+  import dolfin
   if isinstance(a, dolfin.Constant):
     return a
   else:
@@ -144,9 +147,7 @@ def AssignmentSolver__init__(self, *args, **kwargs):
     ret = solve_orig(self, *args, **kwargs)
     dolfin.parameters["adjoint"]["stop_annotating"] = not annotate
     if record:
-      x = self.x()
-      if isinstance(x, WrappedFunction):
-        x = x.fn()
+      x = unwrap_fns(self.x())
       adjglobals.adjointer.record_variable(adjglobals.adj_variables[x], libadjoint.MemoryStorage(adjlinalg.Vector(x)))
     return ret
   solve.__doc__ = solve_orig.__doc__
@@ -171,13 +172,11 @@ def EquationSolver__init__(self, *args, **kwargs):
     # ... and then restore the previous annotation status.
     dolfin.parameters["adjoint"]["stop_annotating"] = not annotate
     if record:
-      x = self.x()
       # We still want to wrap functions with WrappedFunction so that we can for
       # example write separate equations for u[0] and u[n]. However
       # dolfin-adjoint needs to treat these as the same Function, so
       # strategically unwrap WrappedFunction s.
-      if isinstance(x, WrappedFunction):
-        x = x.fn()
+      x = unwrap_fns(self.x())
       adjglobals.adjointer.record_variable(adjglobals.adj_variables[x], libadjoint.MemoryStorage(adjlinalg.Vector(x)))
     return ret
   solve.__doc__ = solve_orig.__doc__
@@ -211,13 +210,6 @@ class Functional(functional.Functional):
     
     return
   
-# Based on the ReducedFunctional class in reduced_functional.py
-class ReducedFunctional(reduced_functional.ReducedFunctional):
-  def eval_array(self, m_array):
-    # Clear caches
-    clear_caches()
-    return reduced_functional.ReducedFunctional.eval_array(self, m_array)
-
 # Based on dolfin_adjoint_assign in function.py.
 def da_annotate_assign(y, x):
   """
@@ -229,10 +221,8 @@ def da_annotate_assign(y, x):
     # Annotation disabled
     return False
   
-  if isinstance(x, WrappedFunction):
-    x = x.fn()
-  if isinstance(y, WrappedFunction):
-    y = y.fn()
+  x = unwrap_fns(x)
+  y = unwrap_fns(y)
   if not x == y:
     # ?? What does this do ??
     if not adjglobals.adjointer.variable_known(adjglobals.adj_variables[x]):
@@ -251,8 +241,22 @@ def clear_caches(*args):
   
   timestepping.clear_caches(*args)
   da_matrix_cache.clear()
+  dolfin_adjoint.adjglobals.adj_reset_cache()
   
   return
+
+def adj_reset_cache():
+  clear_caches()
+  
+  return
+
+__ReducedFunctionalNumPy__call__ = ReducedFunctionalNumPy.__call__
+def ReducedFunctionalNumPy__call__(self, *args, **kwargs):
+  timestepping.clear_caches()
+  da_matrix_cache.clear()
+  return __ReducedFunctionalNumPy__call__(self, *args, **kwargs)
+ReducedFunctionalNumPy.__call__ = ReducedFunctionalNumPy__call__
+del(ReducedFunctionalNumPy__call__)
 
 # Based on annotate in solving.py
 def da_annotate_equation_solve(solve):
@@ -284,7 +288,7 @@ def da_annotate_equation_solve(solve):
       for term in rhs[1:]:
         nrhs += term[0] * term[1]
       rhs = nrhs;  del(nrhs)
-    if isinstance(rhs, (float, int, ufl.constantvalue.FloatValue, ufl.constantvalue.IntValue, ufl.constantvalue.Zero)):
+    if isinstance(rhs, (float, int, ufl.constantvalue.ConstantValue)):
       # This is a direct assignment, so register an assignment
       return da_annotate_assign(dolfin.Constant(rhs), x_fn)
     elif isinstance(rhs, (dolfin.Constant, dolfin.Function)):
@@ -296,7 +300,8 @@ def da_annotate_equation_solve(solve):
       dolfin.inner(dolfin.TestFunction(x.function_space()), rhs) * dolfin.dx
     bcs = []
     solver_parameters = {"linear_solver":"default"}
-    adjoint_solver_parameters = solver_parameters
+    linear_solver_parameters = solver_parameters
+    adjoint_solver_parameters = linear_solver_parameters
   else:
     # Equation solve case
     assert(isinstance(solve, EquationSolver))
@@ -304,13 +309,14 @@ def da_annotate_equation_solve(solve):
     eq = solve.eq()
     bcs = solve.bcs()
     solver_parameters = solve.solver_parameters()
+    linear_solver_parameters = solve.linear_solver_parameters()
     adjoint_solver_parameters = solve.adjoint_solver_parameters()
   
   # Unwrap WrappedFunction s in the equation
   eq.lhs = unwrap_fns(eq.lhs)
   if not is_zero_rhs(eq.rhs):
     eq.rhs = unwrap_fns(eq.rhs)
-  if solve.is_linear() and extract_form_data(eq.lhs).rank == 1:
+  if solve.is_linear() and form_rank(eq.lhs) == 1:
     raise NotImplementedException("Annotation for linear variational problem with rank 1 LHS not implemented")
   
   if hasattr(x, "_time_level_data"):
@@ -324,7 +330,7 @@ def da_annotate_equation_solve(solve):
         self.__x_fn = x_fn
         self.__eq = eq
         self.__bcs = bcs
-        self.__solver_parameters = solver_parameters
+        self.__linear_solver_parameters = linear_solver_parameters
         self.__adjoint_solver_parameters = adjoint_solver_parameters
         self.parameters = dolfin.Parameters(**dolfin.parameters["timestepping"]["pre_assembly"])
         
@@ -361,7 +367,7 @@ def da_annotate_equation_solve(solve):
             if apply_a_bcs:
               a = a.copy()
         else:
-          if extract_form_data(self.__eq.lhs).rank == 2:
+          if form_rank(self.__eq.lhs) == 2:
             assert(not self.__x_fn in ufl.algorithms.extract_coefficients(self.__eq.lhs))
             if not is_zero_rhs(self.__eq.rhs):
               assert(not self.__x_fn in ufl.algorithms.extract_coefficients(self.__eq.rhs))
@@ -397,28 +403,28 @@ def da_annotate_equation_solve(solve):
             a = assemble(self.data)
             apply_a_bcs = len(bcs) > 0
 
-        if ("solver", var.type) in cache:
+        if ("linear_solver", var.type) in cache:
           # Extract a linear solver from the cache
-          solver = cache[("solver", var.type)]
+          linear_solver = cache[("linear_solver", var.type)]
         else:
           # Create a new linear solver and cache it
           if var.type in ["ADJ_ADJOINT", "ADJ_SOA"]:
-            solver_parameters = self.__adjoint_solver_parameters
+            linear_solver_parameters = self.__adjoint_solver_parameters
           else:
-            solver_parameters = self.__solver_parameters
+            linear_solver_parameters = self.__linear_solver_parameters
           if static_a:
             if apply_a_bcs:
-              solver = cache[("solver", var.type)] = solver_cache.solver(self.data,
-                solver_parameters,
+              linear_solver = cache[("linear_solver", var.type)] = linear_solver_cache.linear_solver(self.data,
+                linear_solver_parameters,
                 bcs = bcs, symmetric_bcs = self.parameters["equations"]["symmetric_boundary_conditions"])
             else:
-              solver = cache[("solver", var.type)] = solver_cache.solver(self.data,
-                solver_parameters,
+              linear_solver = cache[("linear_solver", var.type)] = linear_solver_cache.linear_solver(self.data,
+                linear_solver_parameters,
                 bcs = bcs, symmetric_bcs = self.parameters["equations"]["symmetric_boundary_conditions"],
                 a = a)
           else:
-            solver = cache[("solver", var.type)] = solver_cache.solver(self.data,
-              solver_parameters,
+            linear_solver = cache[("linear_solver", var.type)] = linear_solver_cache.linear_solver(self.data,
+              linear_solver_parameters,
               bcs = bcs, symmetric_bcs = self.parameters["equations"]["symmetric_boundary_conditions"])
         
         # Assemble the RHS
@@ -437,13 +443,32 @@ def da_annotate_equation_solve(solve):
         x = adjlinalg.Vector(dolfin.Function(self.__x.function_space()))
 
         # Solve and return
-        solver.set_operator(a)
-        solver.solve(x.data.vector(), b, annotate = False)
+        linear_solver.set_operator(a)
+        linear_solver.solve(x.data.vector(), b, annotate = False)
         return x
   else:
     # This is not a time level solve. Use the default Matrix type.
     DAMatrix = adjlinalg.Matrix
   
   # Annotate the equation
+  if dolfin_version() < (1, 3, 0):
+    if not solve.is_linear():
+      solver_parameters = copy.deepcopy(solver_parameters)      
+      nl_solver = solver_parameters.get("nonlinear_solver", "newton")
+      if nl_solver == "newton":
+        nl_solver_parameters = solver_parameters.get("newton_solver", {})
+      elif nl_solver == "snes":
+        nl_solver_parameters = solver_parameters.get("snes_solver", {})
+      else:
+        raise ParameterException("Invalid non-linear solver: %s" % nl_solver)
+      for key, default in [("linear_solver", "default"),
+                           ("preconditioner", "default"),
+                           ("lu_solver", {}),
+                           ("krylov_solver", {})]:
+        if key in nl_solver_parameters:
+          solver_parameters[key] = nl_solver_parameters[key]
+          del(nl_solver_parameters[key])
+        else:
+          solver_parameters[key] = default
   solving.annotate(eq, x_fn, bcs, solver_parameters = solver_parameters, matrix_class = DAMatrix)
   return True

@@ -1,5 +1,5 @@
 import numpy as np
-from dolfin import cpp, info, info_red, Constant, Function, TestFunction, TrialFunction, assemble, inner, dx, as_backend_type, info_red, MPI
+from backend import cpp, info, info_red, Constant, Function, TestFunction, TrialFunction, assemble, inner, dx, as_backend_type, info_red, MPI
 from dolfin_adjoint import constant, utils 
 from dolfin_adjoint.adjglobals import adjointer, adj_reset_cache
 from reduced_functional import ReducedFunctional
@@ -170,6 +170,9 @@ class ReducedFunctionalNumPy(ReducedFunctional):
         ''' An implementation of the reduced functional hessian action evaluation 
             that accepts the parameter as an array of scalars. If m_array is None,
             the Hessian action at the latest forward run is returned. ''' 
+
+        if not hasattr(self, "H"):
+            raise NotImplementedError, "Hessian computation not supported."
 
         m = [p.data() for p in self.parameter]
         if m_array is not None:
@@ -430,6 +433,8 @@ def copy_data(m):
         return Function(m.function_space())
     elif hasattr(m, "value_size"): 
         return Constant(m(()))
+    elif hasattr(m, "copy"): 
+        return m.copy()
     else:
         raise TypeError, 'Unknown parameter type %s.' % str(type(m)) 
 

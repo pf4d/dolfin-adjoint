@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
+# Copyright (C) 2014 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -35,15 +36,11 @@ This version of the library integrates with dolfin-adjoint.
 
 __license__ = "LGPL-3"
 
-__version__ = "1.2.0+"
+__version__ = "1.4.0+"
 
 __all__ = \
   dolfin_adjoint_timestepping.__all__ + \
   [
-    "__doc__",
-    "__license__",
-    "__name__",
-    "__version__",
     "dolfin_adjoint",
     "dolfin_adjoint_timestepping",
     "timestepping"

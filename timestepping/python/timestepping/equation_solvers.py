@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
+# Copyright (C) 2014 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -31,7 +32,7 @@ __all__ = \
     "LinearCombination"
   ]
 
-class LinearCombination:
+class LinearCombination(object):
   """
   A linear combination.
 
@@ -127,9 +128,11 @@ class LinearCombination:
       lalpha = float(self.__alpha[0])
     else:
       lalpha = evaluate_expr(self.__alpha[0], copy = False)
-    if isinstance(lalpha, float) and lalpha == 1.0:
-      x[:] = self.__y[0].vector()[:]
+    if isinstance(lalpha, float):
+      x.zero()
+      x.axpy(lalpha, self.__y[0].vector())
     else:
+      assert(isinstance(lalpha, dolfin.GenericVector))
       x[:] = lalpha * self.__y[0].vector()[:]
     for alpha, y in zip(self.__alpha[1:], self.__y[1:]):
       if isinstance(alpha, (ufl.constantvalue.FloatValue, dolfin.Constant)):
@@ -144,7 +147,7 @@ class LinearCombination:
 
     return
 
-class AssignmentSolver:
+class AssignmentSolver(object):
   """
   A "solver" defining a direct assignment.
 
@@ -165,7 +168,7 @@ class AssignmentSolver:
     if not isinstance(x, dolfin.Function):
       raise InvalidArgumentException("x must be a Function")
 
-    if isinstance(y, (int, float)):
+    if isinstance(y, (int, float, ufl.constantvalue.IntValue)):
       y = ufl.constantvalue.FloatValue(y)
     elif isinstance(y, dolfin.Function):
       if y is x:
@@ -276,11 +279,11 @@ class AssignmentSolver:
     """
     Solve for x.
     """
-    
-    if isinstance(self.__y, (ufl.constantvalue.FloatValue, dolfin.Constant)):
-      self.__x.vector()[:] = float(self.__y)
-    elif isinstance(self.__y, dolfin.Function):
-      self.__x.vector()[:] = self.__y.vector()
+
+    if isinstance(self.__y, ufl.constantvalue.FloatValue):
+      self.__x.assign(dolfin.Constant(self.__y))
+    elif isinstance(self.__y, (dolfin.Constant, dolfin.Function)):
+      self.__x.assign(self.__y)
     elif is_general_constant(self.__y):
       self.__x.assign(dolfin.Constant([y_c for y_c in self.__y]))
     elif isinstance(self.__y, LinearCombination):
@@ -291,7 +294,7 @@ class AssignmentSolver:
 
     return
   
-class EquationSolver:
+class EquationSolver(object):
   """
   A generic linear or non-linear equation solver.
 
@@ -300,8 +303,8 @@ class EquationSolver:
     x: The Function being solved for.
     bcs: A list of DirichletBC s.
     solver_parameters: A dictionary of solver parameters.
-    adjoint_solver_parameters: A dictionary of solver parameters for an adjoint
-      solve.
+    adjoint_solver_parameters: A dictionary of linear solver parameters for an
+      adjoint solve.
     pre_assembly_parameters: A dictionary of pre-assembly parameters.
   """
   
@@ -322,19 +325,42 @@ class EquationSolver:
     if not adjoint_solver_parameters is None and not isinstance(adjoint_solver_parameters, dict):
       raise InvalidArgumentException("adjoint_solver_parameters must be a dictionary")
 
-    solver_parameters = copy.deepcopy(solver_parameters)
-    if adjoint_solver_parameters is None:
-      adjoint_solver_parameters = solver_parameters
-    adjoint_solver_parameters = copy.deepcopy(adjoint_solver_parameters)
-    npre_assembly_parameters = dolfin.parameters["timestepping"]["pre_assembly"].copy()
-    npre_assembly_parameters.update(pre_assembly_parameters)
-    pre_assembly_parameters = npre_assembly_parameters;  del(npre_assembly_parameters)
-
     x_deps = ufl.algorithms.extract_coefficients(eq.lhs)
     if not is_zero_rhs(eq.rhs):
       x_deps += ufl.algorithms.extract_coefficients(eq.rhs)
 
     is_linear = not x in x_deps
+
+    solver_parameters = copy.deepcopy(solver_parameters)
+    if is_linear:
+      linear_solver_parameters = solver_parameters
+    else:
+      for key in ["linear_solver", "preconditioner", "lu_solver", "krylov_solver"]:
+        if key in solver_parameters:
+          raise ParameterException("Unexpected linear solver parameters")
+      nl_solver = solver_parameters.get("nonlinear_solver", "newton")
+      if nl_solver == "newton":
+        if "snes_solver" in solver_parameters:
+          raise ParameterException("Unexpected SNES solver parameters")
+        linear_solver_parameters = solver_parameters.get("newton_solver", {})
+      elif nl_solver == "snes":
+        if "newton_solver" in solver_parameters:
+          raise ParameterException("Unexpected Newton solver parameters")
+        linear_solver_parameters = solver_parameters.get("snes_solver", {})
+      else:
+        raise ParameterException("Invalid non-linear solver: %s" % nl_solver)
+      nlinear_solver_parameters = {}
+      for key in linear_solver_parameters:
+        if key in ["linear_solver", "preconditioner", "lu_solver", "krylov_solver"]:
+          nlinear_solver_parameters[key] = linear_solver_parameters[key]
+      linear_solver_parameters = nlinear_solver_parameters;  del(nlinear_solver_parameters)
+    linear_solver_parameters = copy.deepcopy(linear_solver_parameters)
+    if adjoint_solver_parameters is None:
+      adjoint_solver_parameters = linear_solver_parameters
+    adjoint_solver_parameters = copy.deepcopy(adjoint_solver_parameters)
+    npre_assembly_parameters = dolfin.parameters["timestepping"]["pre_assembly"].copy()
+    npre_assembly_parameters.update(pre_assembly_parameters)
+    pre_assembly_parameters = npre_assembly_parameters;  del(npre_assembly_parameters)
       
     self.__eq = eq
     self.__x = x
@@ -342,6 +368,7 @@ class EquationSolver:
     self.__J = None
     self.__hbcs = None
     self.__solver_parameters = solver_parameters
+    self.__linear_solver_parameters = linear_solver_parameters
     self.__adjoint_solver_parameters = adjoint_solver_parameters
     self.__pre_assembly_parameters = pre_assembly_parameters
     self.__x_deps = x_deps
@@ -451,6 +478,13 @@ class EquationSolver:
     
     return self.__solver_parameters
 
+  def linear_solver_parameters(self):
+    """
+    Return linear solver parameters.
+    """
+    
+    return self.__linear_solver_parameters
+
   def adjoint_solver_parameters(self):
     """
     Return adjoint solver parameters.
@@ -544,7 +578,7 @@ class EquationSolver:
       raise InvalidArgumentException("parameter must be a Constant or Function")
 
     if self.is_linear():
-      if extract_form_data(self.__eq.lhs).rank == 1:
+      if form_rank(self.__eq.lhs) == 1:
         if parameter is self.__x:
           form = self.__eq.lhs
         elif parameter in ufl.algorithms.extract_coefficients(self.__eq.lhs):
@@ -565,7 +599,7 @@ class EquationSolver:
     Solve the equation. This calls the DOLFIN solve function.
     """
 
-    if self.is_linear() and extract_form_data(self.__eq.lhs).rank == 1:
+    if self.is_linear() and form_rank(self.__eq.lhs) == 1:
       raise NotImplementedException("Solve for linear variational problem with rank 1 LHS not implemented")
     
     if self.__J is None:

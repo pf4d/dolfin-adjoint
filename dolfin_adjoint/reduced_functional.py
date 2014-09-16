@@ -1,5 +1,5 @@
 import libadjoint
-from dolfin import Function, Constant, info_red, info_green, File
+from backend import Function, Constant, info_red, info_green, File
 from dolfin_adjoint import adjlinalg, adjrhs, constant, drivers
 from dolfin_adjoint.adjglobals import adjointer, mem_checkpoints, disk_checkpoints
 import cPickle as pickle
@@ -42,9 +42,11 @@ class ReducedFunctional(object):
         self.ignore = ignore
         self.cache = cache
 
-        # TODO: implement a drivers.hessian function that supports a list of parameters
-        if len(parameter) == 1:
-            self.H = drivers.hessian(functional, parameter[0], warn=False)
+        try:
+            self.H = drivers.hessian(functional, unlist(parameter), warn=False)
+        except libadjoint.exceptions.LibadjointErrorNotImplemented:
+            # Might fail as Hessian support is currently limited to a single parameter
+            pass
 
         if cache is not None:
             try:
@@ -55,7 +57,7 @@ class ReducedFunctional(object):
                                 "hessian_cache": {}}
 
     def __del__(self):
-        if self.cache is not None:
+        if hasattr(self, 'cache') and self.cache is not None:
             pickle.dump(self._cache, open(self.cache, "w"))
 
     def __call__(self, value):
@@ -165,7 +167,12 @@ class ReducedFunctional(object):
 
     def hessian(self, m_dot):
         ''' Evaluates the Hessian action in direction m_dot. '''
+
+        # TODO: Add support for more than one parameter
         assert(len(self.parameter) == 1)
+
+        if not hasattr(self, "H"):
+            raise NotImplementedError, "Hessian computation not supported."
 
         if self.cache is not None:
             hash = value_hash([x.data() for x in self.parameter] + [m_dot])
