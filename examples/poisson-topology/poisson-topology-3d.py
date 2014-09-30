@@ -61,10 +61,16 @@ from dolfin import *
 from dolfin_adjoint import *
 
 # Next, we set some PETSc options to govern how the linear systems
-# are to be solved: this sets the number of smoother interations
-# in the smoothed aggregation multigrid.
+# are to be solved.
 
-PETScOptions.set("pc_gamg_agg_nsmooths", 1)
+import sys
+args = [sys.argv[0]] + """
+                       --petsc.pc_type gamg
+                       --petsc.pc_gamg_verbose 1
+                       --petsc.pc_gamg_agg_nsmooths 1
+                       --petsc.ksp_monitor_true_residual
+                       """.split()
+parameters.parse(args)
 
 # Next we import the Python interface to IPOPT. If IPOPT is
 # unavailable on your system, we strongly :doc:`suggest you install it
