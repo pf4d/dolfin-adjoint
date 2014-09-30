@@ -28,6 +28,8 @@ if __name__ == "__main__":
     m = Function(W, name='Control')
     x = SpatialCoordinate(mesh)
 
+    x = SpatialCoordinate(mesh)
+
     u_d = 1/(2*pi**2)*sin(pi*x[0])*sin(pi*x[1]) 
 
     J = Functional((inner(u-u_d, u-u_d))*dx*dt[FINISH_TIME])

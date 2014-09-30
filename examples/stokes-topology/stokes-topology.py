@@ -238,10 +238,6 @@ if __name__ == "__main__":
     def output_workspace(self):
       return [0.0]
 
-    def length(self):
-      """Return the number of components in the constraint vector (here, one)."""
-      return 1
-
 # Now that all the ingredients are in place, we can perform the initial
 # optimisation. We set the maximum number of iterations for this initial
 # optimisation problem to 30; there's no need to solve this to
@@ -249,7 +245,7 @@ if __name__ == "__main__":
 
   # Solve the optimisation problem with q = 0.01
   problem = MinimizationProblem(Jhat, bounds=(lb, ub), constraints=VolumeConstraint(V))
-  parameters = { 'maximum_iterations': 20 }
+  parameters = {'maximum_iterations': 20}
 
   solver = IPOPTSolver(problem, parameters=parameters)
   rho_opt = solver.solve()
@@ -293,7 +289,7 @@ if __name__ == "__main__":
 # from the solution of :math:`q=0.01`:
 
   problem = MinimizationProblem(Jhat, bounds=(lb, ub), constraints=VolumeConstraint(V))
-  parameters = { 'maximum_iterations': 200 }
+  parameters = {'maximum_iterations': 100}
 
   solver = IPOPTSolver(problem, parameters=parameters)
   rho_opt = solver.solve()
