@@ -11,7 +11,6 @@ parameters['std_out_all_processes'] = False
 parameters["adjoint"]["cache_factorizations"] = True
 parameters["adjoint"]["debug_cache"] = True
 
-x = triangle.x
 
 def solve_pde(u, V, m):
     v = TestFunction(V)
@@ -28,6 +27,8 @@ def solve_optimal_control(n):
     W = FunctionSpace(mesh, "DG", 0)
     m = Function(W, name='Control')
 
+    x = SpatialCoordinate(mesh)
+
     u_d = 1/(2*pi**2)*sin(pi*x[0])*sin(pi*x[1]) 
 
     J = Functional((inner(u-u_d, u-u_d))*dx*dt[FINISH_TIME])
@@ -36,7 +37,7 @@ def solve_optimal_control(n):
     solve_pde(u, V, m)
 
     # Run the optimisation 
-    rf = ReducedFunctional(J, InitialConditionParameter(m, value=m))
+    rf = ReducedFunctional(J, Control(m, value=m))
 
     minimize(rf, method = 'Newton-CG', tol = 1e-16, options = {'disp': True})
     solve_pde(u, V, m)
