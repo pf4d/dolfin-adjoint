@@ -11,7 +11,13 @@
 """
 from dolfin import *
 from dolfin_adjoint import *
-import Optizelle
+
+try:
+    import Optizelle
+except ImportError:
+    info_red("Optizelle unavailable, skipping test")
+    import sys; sys.exit(0)
+
 set_log_level(ERROR)
 
 parameters["adjoint"]["cache_factorizations"] = True
@@ -39,7 +45,7 @@ d = 1/(2*pi**2)*sin(pi*x[0])
 
 alpha = Constant(1e-10)
 J = Functional((0.5*inner(u-d, u-d))*dx + alpha/2*f**2*dx)
-control = SteadyParameter(f)
+control = Control(f)
 rf = ReducedFunctional(J, control)
 
 # Volume constraints

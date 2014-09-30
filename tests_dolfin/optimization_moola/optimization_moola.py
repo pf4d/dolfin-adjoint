@@ -14,7 +14,7 @@ parameters['std_out_all_processes'] = False
 
 def solve_pde(u, V, m):
     v = TestFunction(V)
-    F = (inner(grad(u), grad(v)) - m*v)*dx
+    F = (inner(grad(u), grad(v)) - m*v)*dx 
     bc = DirichletBC(V, 0.0, "on_boundary")
     solve(F == 0, u, bc)
 
@@ -26,20 +26,22 @@ if __name__ == "__main__":
     u = Function(V, name='State')
     W = FunctionSpace(mesh, "DG", 0)
     m = Function(W, name='Control')
+    x = SpatialCoordinate(mesh)
 
     x = SpatialCoordinate(mesh)
-    u_d = 1/(2*pi**2)*sin(pi*x[0])*sin(pi*x[1])
+
+    u_d = 1/(2*pi**2)*sin(pi*x[0])*sin(pi*x[1]) 
 
     J = Functional((inner(u-u_d, u-u_d))*dx*dt[FINISH_TIME])
 
     # Run the forward model once to create the annotation
     solve_pde(u, V, m)
 
-    # Run the optimisation
-    rf = ReducedFunctional(J, InitialConditionParameter(m, value=m))
+    # Run the optimisation 
+    rf = ReducedFunctional(J, Control(m, value=m))
     problem = rf.moola_problem()
     m_moola = moola.DolfinPrimalVector(m)
-
+    
     solver = moola.SteepestDescent(problem, m_moola, options={'jtol': 0, 'gtol': 1e-10, 'maxiter': 1})
 
     sol = solver.solve()
