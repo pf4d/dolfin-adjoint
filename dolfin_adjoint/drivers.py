@@ -7,6 +7,7 @@ import backend
 import constant
 import adjresidual
 import ufl.algorithms
+from enlisting import enlist, delist
 from numpy import ndarray
 
 def replay_dolfin(forget=False, tol=0.0, stop=False):
@@ -58,7 +59,7 @@ def compute_adjoint(functional, forget=True, ignore=[]):
         if backend.__name__ == "dolfin":
           output.data.rename(str(adj_var) , "a Function from dolfin-adjoint")
         else:
-          output.data.name = str(adj_var) 
+          output.data.name = str(adj_var)
 
       storage = libadjoint.MemoryStorage(output)
       storage.set_overwrite(True)
@@ -106,10 +107,9 @@ def compute_tlm(parameter, forget=False):
 def compute_gradient(J, param, forget=True, ignore=[], callback=lambda var, output: None, project=False):
   backend.parameters["adjoint"]["stop_annotating"] = True
 
-  if isinstance(param, (list, tuple)):
-    param = ListParameter(param)
-
-  dJdparam = None
+  enlisted_controls = enlist(param)
+  param = ListParameter(enlisted_controls)
+  dJdparam = enlisted_controls.__class__([None] * len(enlisted_controls))
 
   last_timestep = adjglobals.adjointer.timestep_count
 
@@ -159,7 +159,7 @@ def compute_gradient(J, param, forget=True, ignore=[], callback=lambda var, outp
 
   rename(J, dJdparam, param)
 
-  return postprocess(dJdparam, project)
+  return postprocess(dJdparam, project, list_type=enlisted_controls)
 
 def rename(J, dJdparam, param):
   if isinstance(dJdparam, list):
@@ -182,9 +182,9 @@ def project_test(func):
   else:
     return func
 
-def postprocess(dJdparam, project):
+def postprocess(dJdparam, project, list_type):
   if isinstance(dJdparam, list):
-    return [postprocess(x, project) for x in dJdparam]
+    return delist([postprocess(x, project, list_type) for x in dJdparam], list_type=list_type)
   else:
     if project:
       dJdparam = project_test(dJdparam)
@@ -217,7 +217,7 @@ class BasicHessian(libadjoint.Matrix):
   def update(self, m):
     pass
 
-  def __call__(self, m_dot):
+  def __call__(self, m_dot, project=False):
 
     hess_action_timer = backend.Timer("Hessian action")
 
@@ -253,7 +253,7 @@ class BasicHessian(libadjoint.Matrix):
         adjglobals.adjointer.record_variable(adj_var, storage)
 
       adj = adj.data
-      
+
       soa_timer = backend.Timer("Hessian action (SOA)")
       (soa_var, soa_vec) = adjglobals.adjointer.get_soa_solution(i, self.J, m_p)
       soa_timer.stop()
@@ -294,7 +294,7 @@ class BasicHessian(libadjoint.Matrix):
     if isinstance(Hm, backend.Function):
       Hm.rename("d^2(%s)/d(%s)^2" % (str(self.J), str(self.m)), "a Function from dolfin-adjoint")
 
-    return Hm
+    return postprocess(Hm, project, list_type=[])
 
   def action(self, x, y):
     assert isinstance(x.data, backend.Function)
@@ -354,7 +354,7 @@ def _add(value, increment):
   else:
     if isinstance(value, list) or isinstance(increment, list):
       assert isinstance(value, list) and isinstance(increment, list)
-      return [_add(val, inc) for (val, inc) in zip(value, increment)]
+      return value.__class__([_add(val, inc) for (val, inc) in zip(value, increment)])
 
     else:
       return value+increment
@@ -419,7 +419,7 @@ class compute_gradient_tlm(object):
       return mdot
 
     mdot = make_mdot(vec)
-    
+
     grad = 0.0
     last_timestep = -1
 
