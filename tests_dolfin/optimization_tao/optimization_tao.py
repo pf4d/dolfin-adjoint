@@ -22,8 +22,6 @@ tao_args = """--petsc.tao_monitor
 print "Tao arguments:", tao_args           
 parameters.parse(tao_args)
 
-x = triangle.x
-
 def solve_pde(u, V, m):
     v = TestFunction(V)
     F = (inner(grad(u), grad(v)) - m*v)*dx 
@@ -38,6 +36,8 @@ if __name__ == "__main__":
     u = Function(V, name='State')
     W = FunctionSpace(mesh, "DG", 0)
     m = Function(W, name='Control')
+
+    x = SpatialCoordinate(mesh)
 
     u_d = 1/(2*pi**2)*sin(pi*x[0])*sin(pi*x[1]) 
 
