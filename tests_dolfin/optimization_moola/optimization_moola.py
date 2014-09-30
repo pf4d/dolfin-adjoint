@@ -26,6 +26,9 @@ if __name__ == "__main__":
     u = Function(V, name='State')
     W = FunctionSpace(mesh, "DG", 0)
     m = Function(W, name='Control')
+    x = SpatialCoordinate(mesh)
+
+    x = SpatialCoordinate(mesh)
 
     x = SpatialCoordinate(mesh)
     u_d = 1/(2*pi**2)*sin(pi*x[0])*sin(pi*x[1])
