@@ -47,7 +47,7 @@ if __name__ == "__main__":
     solve_pde(u, V, m)
 
     # Run the optimisation 
-    rf = ReducedFunctional(J, InitialConditionParameter(m, value=m))
+    rf = ReducedFunctional(J, FunctionControl(m, value=m))
     problem = rf.tao_problem(method="nls")
     problem.tao.setFunctionTolerances(fatol=1e-100, frtol=1e-1000)
     
