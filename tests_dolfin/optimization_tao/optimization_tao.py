@@ -48,10 +48,17 @@ if __name__ == "__main__":
 
     # Run the optimisation 
     rf = ReducedFunctional(J, FunctionControl(m, value=m))
-    problem = rf.tao_problem(method="nls")
-    problem.tao.setFunctionTolerances(fatol=1e-100, frtol=1e-1000)
+    #problem = rf.tao_problem(method="nls")
+    #problem.tao.setFunctionTolerances(fatol=1e-100, frtol=1e-1000)
     
-    m_opt = problem.solve()
+    #m_opt = problem.solve()
+
+    problem = MinimizationProblem(rf)
+    fatol=1e-100; frtol=1e-1000
+    parameters = { 'method': 'nls', 'tolerances':(fatol, frtol) }
+
+    solver = TAOSolver(problem, parameters=parameters)
+    m_opt = solver.solve()
 
     #assert max(abs(sol["Optimizer"].data + 1./2*np.pi)) < 1e-9
     #assert sol["Number of iterations"] < 50

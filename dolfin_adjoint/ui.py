@@ -30,6 +30,7 @@ from optimization.optimization_problem import *
 from optimization.optimization_solver import *
 from optimization.ipopt_solver import *
 from optimization.optizelle_solver import OptizelleSolver
+from optimization.tao_solver import TAOSolver
 
 if backend.__name__ == "dolfin":
   from newton_solver import NewtonSolver
