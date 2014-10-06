@@ -54,8 +54,7 @@ if __name__ == "__main__":
     #m_opt = problem.solve()
 
     problem = MinimizationProblem(rf)
-    fatol=1e-100; frtol=1e-1000
-    parameters = { 'method': 'nls', 'tolerances':(fatol, frtol) }
+    parameters = { 'type': 'nls', 'fatol':1e-100, 'frtol':1e-1000 }
 
     solver = TAOSolver(problem, parameters=parameters)
     m_opt = solver.solve()

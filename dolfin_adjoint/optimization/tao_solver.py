@@ -9,7 +9,6 @@ class TAOSolver(OptimizationSolver):
     def __init__(self, problem, parameters=None):
         
         try:
-            import petsc4py
             from petsc4py import PETSc
         except:
             raise Exception, "Could not find petsc4py. Please install it."
@@ -19,13 +18,15 @@ class TAOSolver(OptimizationSolver):
             raise Exception, "Your petsc4py version does not support TAO. Please upgrade to petsc4py >= 3.5."
 
         OptimizationSolver.__init__(self, problem, parameters)
+
+        self.tao_problem = PETSc.TAO().create(PETSc.COMM_SELF)
         
         self.__build_app_context()
         self.__set_parameters()
 
     def __build_app_context(self):
         from petsc4py import PETSc
-        
+                
         rf = self.problem.reduced_functional
 
         if len(rf.parameter) > 1:
@@ -56,9 +57,9 @@ class TAOSolver(OptimizationSolver):
                 self.x = param_vec.duplicate()
                 
                 # create Hessian matrix
-                self.H = PETSc.Mat().create(PETSc.COMM_SELF)
+                self.H = PETSc.Mat().create(comm=PETSc.COMM_WORLD)
                 N = self.x.size
-                self.H.createPython([N,N], comm=PETSc.COMM_SELF)
+                self.H.createPython([N,N], comm=PETSc.COMM_WORLD)
                 hessian_context = MatrixFreeHessian()
                 self.H.setPythonContext(hessian_context)
                 self.H.setOption(PETSc.Mat.Option.SYMMETRIC, True)
@@ -71,7 +72,6 @@ class TAOSolver(OptimizationSolver):
                 tmp_ctrl_vec.axpy(1, x)
 
                 return rf(tmp_ctrl)
-
 
             def gradient(self, tao, x, G):
                 ''' Evaluates the gradient for the parameter choice x. '''
@@ -97,25 +97,30 @@ class TAOSolver(OptimizationSolver):
 
         # create user application context
         self.__user = AppCtx()
-        self.tao_problem = PETSc.TAO().create(PETSc.COMM_SELF)
 
     def __set_parameters(self):
         """Set some basic parameters from the parameters dictionary that the user
         passed in, if any."""
 
+        from petsc4py import PETSc
+
+        OptDB = PETSc.Options(prefix="tao_")
+
         if self.parameters is not None:
             for param in self.parameters:
 
+                # Support alternate parameter names
                 if param == "method":
-                    method = self.parameters['method']
-                    self.tao_problem.setType(method)
+                    self.parameters["type"] = self.parameters.pop(param)
+                    param = "type"
 
-                elif param == "tolerances":
-                    fatol, frtol = self.parameters['tolerances']
-                    self.tao_problem.setFunctionTolerances(fatol=fatol, frtol=frtol)
-
-                else:
-                    raise ValueError("Don't know how to deal with parameter %s (a %s)" % (param, self.parameters[param].__class__))
+                elif param == "maximum_iterations" or param == "max_iter":
+                    self.parameters["max_it"] = self.parameters.pop(param)
+                    param = "max_it"
+                    
+                # Unlike IPOPT and Optizelle solver, this doesn't raise ValueError on unknown option.
+                # Presented as a "WARNING!" message following solve attempt.
+                OptDB.setValue(param,self.parameters[param])
 
         self.tao_problem.setFromOptions()
         

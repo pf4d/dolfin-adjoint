@@ -16,7 +16,7 @@ class ReducedFunctional(object):
         to compute derivatives of that map. '''
 
     def __init__(self, functional, parameter, scale=1.0, eval_cb=None, derivative_cb=None, replay_cb=None, hessian_cb=None, cache=None):
-        ''' Creates a reduced functional object that mpas parameter values to functional values. '''
+        ''' Creates a reduced functional object that maps parameter values to functional values. '''
 
         # Check the types of the inputs 
         self.__check_input_types(functional, parameter, scale, cache)
