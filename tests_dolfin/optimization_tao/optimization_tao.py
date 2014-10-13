@@ -54,7 +54,7 @@ if __name__ == "__main__":
     #m_opt = problem.solve()
 
     problem = MinimizationProblem(rf)
-    parameters = { 'type': 'nls', 'fatol':1e-100, 'frtol':1e-1000 }
+    parameters = { 'method': 'nls', 'fatol':1e-100, 'frtol':1e-1000 }
 
     solver = TAOSolver(problem, parameters=parameters)
     m_opt = solver.solve()
@@ -65,7 +65,6 @@ if __name__ == "__main__":
     plot(m_opt, interactive=True)
 
     solve_pde(u, V, m_opt)
-
 
     # Define the analytical expressions
     m_analytic = Expression("sin(pi*x[0])*sin(pi*x[1])")

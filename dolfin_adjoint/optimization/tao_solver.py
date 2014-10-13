@@ -1,5 +1,7 @@
 from dolfin import as_backend_type
+from dolfin_adjoint.parameter import FunctionControl
 from optimization_solver import OptimizationSolver
+import numpy as np
 
 from backend import *
 
@@ -19,7 +21,7 @@ class TAOSolver(OptimizationSolver):
 
         OptimizationSolver.__init__(self, problem, parameters)
 
-        self.tao_problem = PETSc.TAO().create(PETSc.COMM_SELF)
+        self.tao_problem = PETSc.TAO().create(PETSc.COMM_WORLD)
         
         self.__build_app_context()
         self.__set_parameters()
@@ -29,16 +31,46 @@ class TAOSolver(OptimizationSolver):
                 
         rf = self.problem.reduced_functional
 
-        if len(rf.parameter) > 1:
-            raise ValueError, "TAO support is currently limited to 1 parameter"
+        # Map each control to a PETSc Vec...
+        ctrl_vecs = []
+        for control in rf.parameter:
+            if isinstance(control, Function):
+                tmp_vec = as_backend_type(control.vector()).vec()
+                
+            elif isinstance(control, FunctionControl):
+                tmp_fn = Function(control.data())
+                tmp_vec = as_backend_type(tmp_fn.vector()).vec()
+                
+            elif isinstance(control, Constant):
+                tmp_vec = self.__constant_as_vec()
+                
+            ctrl_vecs.append(tmp_vec)
+
+        # ...then concatenate
+        # Make a Vec with appropriate local/global sizes and copy in each rank's local entries
+        lsizes = [ctrl_vec.sizes for ctrl_vec in ctrl_vecs]
+        nlocal, nglobal = map(sum, zip(*lsizes))
+
+        tmp_ctrl_vec = PETSc.Vec().create(PETSc.COMM_WORLD)
+        tmp_ctrl_vec.setSizes((nlocal,nglobal))
+        tmp_ctrl_vec.setFromOptions()
         
+        for ctrl_vec in ctrl_vecs:
+            starti, endi = ctrl_vec.owner_range
+            for i in range(starti, endi):
+                tmp_ctrl_vec.setValue(i,ctrl_vec[i])
+
+        self.ctrl_vec = tmp_ctrl_vec
+        self.work = tmp_ctrl_vec.duplicate()
+
+        # TODO: Remove below.
         tmp_ctrl = Function(rf.parameter[0].data())
-        tmp_ctrl_vec = as_backend_type(tmp_ctrl.vector()).vec()
+        #tmp_ctrl_vec = as_backend_type(tmp_ctrl.vector()).vec()
 
         self.tmp_ctrl = tmp_ctrl
         self.tmp_ctrl_vec = tmp_ctrl_vec
         
-        class MatrixFreeHessian():
+        class MatrixFreeHessian(): 
             def mult(self, mat, X, Y):
                 tmp_ctrl_vec.set(0)
                 tmp_ctrl_vec.axpy(1, X)
@@ -54,7 +86,7 @@ class TAOSolver(OptimizationSolver):
                 # create solution vector
                 param_vec = as_backend_type(rf.parameter[0].data().vector()).vec()
                 # Use value of parameter object as initial guess for the optimisation
-                self.x = param_vec.duplicate()
+                self.x = param_vec.copy()
                 
                 # create Hessian matrix
                 self.H = PETSc.Mat().create(comm=PETSc.COMM_WORLD)
@@ -67,7 +99,7 @@ class TAOSolver(OptimizationSolver):
 
             def objective(self, tao, x):
                 ''' Evaluates the functional for the parameter value x. '''
-
+                
                 tmp_ctrl_vec.set(0)
                 tmp_ctrl_vec.axpy(1, x)
 
@@ -75,7 +107,7 @@ class TAOSolver(OptimizationSolver):
 
             def gradient(self, tao, x, G):
                 ''' Evaluates the gradient for the parameter choice x. '''
-
+                
                 self.objective(tao, x)
                 gradient = rf.derivative(forget=False)[0]
                 gradient_vec = as_backend_type(gradient.vector()).vec()
@@ -84,16 +116,21 @@ class TAOSolver(OptimizationSolver):
                 G.axpy(1, gradient_vec)
 
             def objective_and_gradient(self, tao, x, G):
-                ''' Evaluates the gradient for the parameter choice x. '''
-
+                ''' Evaluates the functional and gradient for the parameter choice x. '''
+                
                 j = self.objective(tao, x)
                 self.gradient(tao, x, G)
                 return j
 
             def hessian(self, tao, x, H, HP):
-                ''' Evaluates the gradient for the parameter choice x. '''
+                ''' Updates the Hessian. '''
+                
                 print "In hessian user action routine"
+                print "Updating Hessian: %s" % self.stats(x)
                 self.objective(tao, x)
+
+            def stats(self, x):
+                return "(min, max): (%s, %s)" % (x.min()[-1], x.max()[-1])
 
         # create user application context
         self.__user = AppCtx()
@@ -129,6 +166,36 @@ class TAOSolver(OptimizationSolver):
         self.tao_problem.setGradient(self.__user.gradient)
         self.tao_problem.setHessian(self.__user.hessian, self.__user.H)
         self.tao_problem.setInitial(self.__user.x)
+
+    def __constant_as_vec(self, cons):
+        """Return a PETSc Vec representing the supplied Constant"""
+        
+        cvec = PETSc.Vec().create(PETSc.COMM_WORLD)
+        
+        # Scalar case e.g. Constant(0.1)
+        if cons.shape() == ():
+            cvec.setSizes((PETSc.DECIDE,1))
+            cvec.setFromOptions()
+            cvec.set(float(cons))
+
+        # Vector case e.g. Constant((0.1,0.1))
+        else:
+            vec_length = cons.shape()[0]
+            cvec.setSizes((PETSc.DECIDE,vec_length))
+            cvec.setFromOptions()
+
+            # Can't iterate over vector calling float on each entry
+            # Instead evaluate with Numpy arrays of appropriate length
+            # See FEniCS Q&A #592
+            vals = np.zeros(vec_length)
+            cons.eval(vals, np.zeros(vec_length))
+
+            ostarti, oendi = cvec.owner_range
+            for i in range(ostarti, oendi):
+                cvec.setValue(i,vals[i])
+            
+        cvec.assemble()
+        return cvec
 
     def solve(self):
         self.tao_problem.solve(self.__user.x)
