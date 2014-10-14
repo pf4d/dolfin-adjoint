@@ -34,16 +34,14 @@ class TAOSolver(OptimizationSolver):
         # Map each control to a PETSc Vec...
         ctrl_vecs = []
         for control in rf.parameter:
-            if isinstance(control, Function):
-                tmp_vec = as_backend_type(control.vector()).vec()
-                
-            elif isinstance(control, FunctionControl):
-                tmp_fn = Function(control.data())
-                tmp_vec = as_backend_type(tmp_fn.vector()).vec()
+
+            tmp_data = control.data()
+            
+            if isinstance(control, FunctionControl):
+                tmp_vec = as_backend_type(Function(tmp_data).vector()).vec()
                 
             elif isinstance(control, ConstantControl):
-                tmp_fn = Constant(control.data())
-                tmp_vec = self.__constant_as_vec()
+                tmp_vec = self.__constant_as_vec(Constant(tmp_data))
                 
             ctrl_vecs.append(tmp_vec)
 
