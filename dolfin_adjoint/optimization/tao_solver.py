@@ -41,7 +41,8 @@ class TAOSolver(OptimizationSolver):
                 tmp_fn = Function(control.data())
                 tmp_vec = as_backend_type(tmp_fn.vector()).vec()
                 
-            elif isinstance(control, Constant):
+            elif isinstance(control, ConstantControl):
+                tmp_fn = Constant(control.data())
                 tmp_vec = self.__constant_as_vec()
                 
             ctrl_vecs.append(tmp_vec)
@@ -51,29 +52,39 @@ class TAOSolver(OptimizationSolver):
         lsizes = [ctrl_vec.sizes for ctrl_vec in ctrl_vecs]
         nlocal, nglobal = map(sum, zip(*lsizes))
 
-        tmp_ctrl_vec = PETSc.Vec().create(PETSc.COMM_WORLD)
-        tmp_ctrl_vec.setSizes((nlocal,nglobal))
-        tmp_ctrl_vec.setFromOptions()
-        
+        param_vec = PETSc.Vec().create(PETSc.COMM_WORLD)
+        param_vec.setSizes((nlocal,nglobal))
+        param_vec.setFromOptions()
+        nvec = 0
         for ctrl_vec in ctrl_vecs:
-            starti, endi = ctrl_vec.owner_range
-            for i in range(starti, endi):
-                tmp_ctrl_vec.setValue(i,ctrl_vec[i])
 
-        self.ctrl_vec = tmp_ctrl_vec
-        self.work = tmp_ctrl_vec.duplicate()
+            # Local range indices
+            ostarti, oendi = ctrl_vec.owner_range
+            rstarti = ostarti + nvec
+            rendi = rstarti + ctrl_vec.local_size
+                        
+            param_vec.setValues(range(rstarti,rendi), ctrl_vec[ostarti:oendi])
+            param_vec.assemble()
+            nvec += ctrl_vec.size
+
+        work_vec = param_vec.duplicate()
+
+        self.param_vec = param_vec
+        self.work_vec = work_vec
+
+        tmp_ctrl = Function(rf.parameter[0].data())
+        self.tmp_ctrl = Function(rf.parameter[0].data())
 
         # TODO: Remove below.
         tmp_ctrl = Function(rf.parameter[0].data())
-        #tmp_ctrl_vec = as_backend_type(tmp_ctrl.vector()).vec()
-
+        work_vec = as_backend_type(tmp_ctrl.vector()).vec()
         self.tmp_ctrl = tmp_ctrl
-        self.tmp_ctrl_vec = tmp_ctrl_vec
+        self.work_vec = work_vec
         
         class MatrixFreeHessian(): 
             def mult(self, mat, X, Y):
-                tmp_ctrl_vec.set(0)
-                tmp_ctrl_vec.axpy(1, X)
+                work_vec.set(0)
+                work_vec.axpy(1, X)
                 hes = rf.hessian(tmp_ctrl)[0]
                 hes_vec = as_backend_type(hes.vector()).vec()
                 Y.set(0)
@@ -84,7 +95,6 @@ class TAOSolver(OptimizationSolver):
 
             def __init__(self):
                 # create solution vector
-                param_vec = as_backend_type(rf.parameter[0].data().vector()).vec()
                 # Use value of parameter object as initial guess for the optimisation
                 self.x = param_vec.copy()
                 
@@ -99,16 +109,17 @@ class TAOSolver(OptimizationSolver):
 
             def objective(self, tao, x):
                 ''' Evaluates the functional for the parameter value x. '''
-                
-                tmp_ctrl_vec.set(0)
-                tmp_ctrl_vec.axpy(1, x)
+
+                work_vec.set(0)
+                work_vec.axpy(1, x)
 
                 return rf(tmp_ctrl)
 
             def gradient(self, tao, x, G):
                 ''' Evaluates the gradient for the parameter choice x. '''
-                
+
                 self.objective(tao, x)
+                # TODO: Concatenated gradient vector
                 gradient = rf.derivative(forget=False)[0]
                 gradient_vec = as_backend_type(gradient.vector()).vec()
 
@@ -117,9 +128,10 @@ class TAOSolver(OptimizationSolver):
 
             def objective_and_gradient(self, tao, x, G):
                 ''' Evaluates the functional and gradient for the parameter choice x. '''
-                
+
                 j = self.objective(tao, x)
                 self.gradient(tao, x, G)
+
                 return j
 
             def hessian(self, tao, x, H, HP):
@@ -193,13 +205,13 @@ class TAOSolver(OptimizationSolver):
             ostarti, oendi = cvec.owner_range
             for i in range(ostarti, oendi):
                 cvec.setValue(i,vals[i])
-            
-        cvec.assemble()
+
+        cvec.assemble()    
         return cvec
 
     def solve(self):
         self.tao_problem.solve(self.__user.x)
         sol_vec = self.tao_problem.getSolution()
-        self.tmp_ctrl_vec.set(0)
-        self.tmp_ctrl_vec.axpy(1, sol_vec)
+        self.work_vec.set(0)
+        self.work_vec.axpy(1, sol_vec)
         return self.tmp_ctrl
