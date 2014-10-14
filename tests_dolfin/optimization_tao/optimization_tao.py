@@ -12,6 +12,7 @@ except Exception:
 
 # Set options
 dolfin.set_log_level(ERROR)
+#dolfin.set_log_level(DBG)
 parameters['std_out_all_processes'] = False
 tao_args = """--petsc.tao_monitor
             --petsc.tao_view
@@ -48,6 +49,7 @@ if __name__ == "__main__":
 
     # Run the optimisation 
     rf = ReducedFunctional(J, FunctionControl(m, value=m))
+    #rf = ReducedFunctional(J, [FunctionControl(m, value=m),ConstantControl(Constant(0.1))])
     #problem = rf.tao_problem(method="nls")
     #problem.tao.setFunctionTolerances(fatol=1e-100, frtol=1e-1000)
     

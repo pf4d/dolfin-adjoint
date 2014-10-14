@@ -344,8 +344,8 @@ class ReducedFunctional(object):
       except:
           raise Exception, "Your petsc4py version does not support TAO. Please upgrade to petsc4py >= 3.5."
 
-      if len(self.parameter) > 1:
-          raise ValueError, "TAO support is currently limited to 1 parameter"
+      #if len(self.parameter) > 1:
+      #    raise ValueError, "TAO support is currently limited to 1 parameter"
 
       rf = self
       tmp_ctrl = Function(rf.parameter[0].data())

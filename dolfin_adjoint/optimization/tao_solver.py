@@ -100,8 +100,8 @@ class TAOSolver(OptimizationSolver):
                 
                 # create Hessian matrix
                 self.H = PETSc.Mat().create(comm=PETSc.COMM_WORLD)
-                N = self.x.size
-                self.H.createPython([N,N], comm=PETSc.COMM_WORLD)
+                dims = (self.x.local_size, self.x.size)
+                self.H.createPython((dims,dims), comm=PETSc.COMM_WORLD)
                 hessian_context = MatrixFreeHessian()
                 self.H.setPythonContext(hessian_context)
                 self.H.setOption(PETSc.Mat.Option.SYMMETRIC, True)
@@ -109,7 +109,6 @@ class TAOSolver(OptimizationSolver):
 
             def objective(self, tao, x):
                 ''' Evaluates the functional for the parameter value x. '''
-
                 work_vec.set(0)
                 work_vec.axpy(1, x)
 
