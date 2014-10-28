@@ -63,15 +63,13 @@ class TAOSolver(OptimizationSolver):
                         
             param_vec.setValues(range(rstarti,rendi), ctrl_vec[ostarti:oendi])
             param_vec.assemble()
+            # TODO: Ghost update required?
             nvec += ctrl_vec.size
 
         work_vec = param_vec.duplicate()
 
         self.param_vec = param_vec
         self.work_vec = work_vec
-
-        tmp_ctrl = Function(rf.parameter[0].data())
-        self.tmp_ctrl = Function(rf.parameter[0].data())
 
         # TODO: Remove below.
         tmp_ctrl = Function(rf.parameter[0].data())
@@ -136,7 +134,18 @@ class TAOSolver(OptimizationSolver):
                 
                 print "In hessian user action routine"
                 print "Updating Hessian: %s" % self.stats(x)
-                self.objective(tao, x)
+
+                diff = x.copy()
+                diff.axpy(-1.0, work_vec)
+                diffnorm = diff.norm()
+
+                if diffnorm > 0.0:
+                    print "x: "; x.view()
+                    print "m: ", work_vec.view()
+                    print "diff: ", diff.view()
+                    print "diffnorm: ", diffnorm
+                    info_red("Warning: rerunning rf")
+                    self.objective(tao, x)
 
             def stats(self, x):
                 return "(min, max): (%s, %s)" % (x.min()[-1], x.max()[-1])
@@ -187,9 +196,16 @@ class TAOSolver(OptimizationSolver):
             cvec.setFromOptions()
             cvec.set(float(cons))
 
-        # Vector case e.g. Constant((0.1,0.1))
         else:
-            vec_length = cons.shape()[0]
+
+            # Vector case e.g. Constant((0.1,0.1))
+            if len(cons.shape()) == 1:
+                vec_length = cons.shape()[0]
+                
+            # Matrix case e.g. Constant(((1,2),(3,4)))
+            else:
+                vec_length = cons.shape()[0] * cons.shape()[1]
+                
             cvec.setSizes((PETSc.DECIDE,vec_length))
             cvec.setFromOptions()
 
