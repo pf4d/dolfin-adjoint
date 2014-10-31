@@ -6,10 +6,25 @@ import numpy as np
 from backend import *
 
 class TAOSolver(OptimizationSolver):
-    """Use PETSc TAO to solve the given optimization problem."""
+    """Uses PETSc TAO to solve the given optimization problem.
+       http://www.mcs.anl.gov/research/projects/tao/
+
+       Valid methods: 
+         ------ Unconstrained optimisation --------
+         nm:    Nelder-Mead method
+         lmvm:  Limited memory, variable metric method
+         nls:   Newton line-search method
+         cg:    Nonlinear conjugate gradient mehtod
+
+         ------ Bound constrained optimisation --------
+         ntr:   Newton trust-region method (supports bound constraints)
+         bqpib: Interior point Newton algorithm
+         blmvm: Limited memory, variable metric method with bound constraints
+
+    """
 
     def __init__(self, problem, parameters=None):
-        
+       
         try:
             from petsc4py import PETSc
         except:
@@ -19,16 +34,18 @@ class TAOSolver(OptimizationSolver):
         except:
             raise Exception, "Your petsc4py version does not support TAO. Please upgrade to petsc4py >= 3.5."
 
+        self.PETSc = PETSc
+
         OptimizationSolver.__init__(self, problem, parameters)
 
         self.tao_problem = PETSc.TAO().create(PETSc.COMM_WORLD)
         
         self.__build_app_context()
         self.__set_parameters()
+        self.__build_tao_problem()
 
     def __build_app_context(self):
-        from petsc4py import PETSc
-                
+        PETSc = self.PETSc
         rf = self.problem.reduced_functional
 
         # Map each control to a PETSc Vec...
@@ -46,26 +63,7 @@ class TAOSolver(OptimizationSolver):
             ctrl_vecs.append(tmp_vec)
 
         # ...then concatenate
-        # Make a Vec with appropriate local/global sizes and copy in each rank's local entries
-        lsizes = [ctrl_vec.sizes for ctrl_vec in ctrl_vecs]
-        nlocal, nglobal = map(sum, zip(*lsizes))
-
-        param_vec = PETSc.Vec().create(PETSc.COMM_WORLD)
-        param_vec.setSizes((nlocal,nglobal))
-        param_vec.setFromOptions()
-        nvec = 0
-        for ctrl_vec in ctrl_vecs:
-
-            # Local range indices
-            ostarti, oendi = ctrl_vec.owner_range
-            rstarti = ostarti + nvec
-            rendi = rstarti + ctrl_vec.local_size
-                        
-            param_vec.setValues(range(rstarti,rendi), ctrl_vec[ostarti:oendi])
-            param_vec.assemble()
-            # TODO: Ghost update required?
-            nvec += ctrl_vec.size
-
+        param_vec = self.__petsc_vec_concatenate(ctrl_vecs)
         work_vec = param_vec.duplicate()
 
         self.param_vec = param_vec
@@ -103,17 +101,16 @@ class TAOSolver(OptimizationSolver):
                 self.H.setOption(PETSc.Mat.Option.SYMMETRIC, True)
                 self.H.setUp()
 
-            def objective(self, tao, x):
-                ''' Evaluates the functional for the parameter value x. '''
+            def objective(self, x):
+                ''' Evaluates the functional. '''
                 work_vec.set(0)
                 work_vec.axpy(1, x)
-
                 return rf(tmp_ctrl)
 
-            def gradient(self, tao, x, G):
-                ''' Evaluates the gradient for the parameter choice x. '''
-
-                self.objective(tao, x)
+            def objective_and_gradient(self, tao, x, G):
+                ''' Evaluates the functional and gradient for the parameter choice x. '''
+                j = self.objective(x)
+                
                 # TODO: Concatenated gradient vector
                 gradient = rf.derivative(forget=False)[0]
                 gradient_vec = as_backend_type(gradient.vector()).vec()
@@ -121,17 +118,10 @@ class TAOSolver(OptimizationSolver):
                 G.set(0)
                 G.axpy(1, gradient_vec)
 
-            def objective_and_gradient(self, tao, x, G):
-                ''' Evaluates the functional and gradient for the parameter choice x. '''
-
-                j = self.objective(tao, x)
-                self.gradient(tao, x, G)
-
                 return j
 
             def hessian(self, tao, x, H, HP):
                 ''' Updates the Hessian. '''
-                
                 print "In hessian user action routine"
                 print "Updating Hessian: %s" % self.stats(x)
 
@@ -157,9 +147,7 @@ class TAOSolver(OptimizationSolver):
         """Set some basic parameters from the parameters dictionary that the user
         passed in, if any."""
 
-        from petsc4py import PETSc
-
-        OptDB = PETSc.Options(prefix="tao_")
+        OptDB = self.PETSc.Options(prefix="tao_")
 
         if self.parameters is not None:
             for param in self.parameters:
@@ -177,17 +165,73 @@ class TAOSolver(OptimizationSolver):
                 # Presented as a "WARNING!" message following solve attempt.
                 OptDB.setValue(param,self.parameters[param])
 
+    def __build_tao_problem(self):
         self.tao_problem.setFromOptions()
         
         self.tao_problem.setObjectiveGradient(self.__user.objective_and_gradient)
-        self.tao_problem.setObjective(self.__user.objective)
-        self.tao_problem.setGradient(self.__user.gradient)
         self.tao_problem.setHessian(self.__user.hessian, self.__user.H)
         self.tao_problem.setInitial(self.__user.x)
 
+        # Set bounds if we have any
+        if self.problem.bounds is not None:
+            (lb, ub) = self.__get_bounds()
+            self.tao_problem.setVariableBounds(lb, ub)
+
+    def __get_bounds(self):
+        """Convert bounds to PETSc vectors - TAO's accepted format"""
+        bounds = self.problem.bounds
+
+        lbvecs = []
+        ubvecs = []
+
+        for (lb,ub) in bounds:
+
+            if isinstance(lb, Function):
+                lbvec = as_backend_type(lb.vector()).vec()
+            else:
+                raise TypeError("Unknown lower bound type %s" % lb.__class__)
+
+            if isinstance(ub, Function):
+                ubvec = as_backend_type(ub.vector()).vec()
+            else:
+                raise TypeError("Unknown upper bound type %s" % ub.__class__)
+
+            lbvecs.append(lbvec)
+            ubvecs.append(ubvec)
+
+        lbvec = self.__petsc_vec_concatenate(lbvecs)
+        ubvec = self.__petsc_vec_concatenate(ubvecs)
+        return (lbvec, ubvec)
+
+    def __petsc_vec_concatenate(self, vecs):
+        """Concatenates the supply list of PETSc Vecs."""
+        PETSc = self.PETSc
+        
+        # Make a Vec with appropriate local/global sizes and copy in each rank's local entries
+        lsizes = [vec.sizes for vec in vecs]
+        nlocal, nglobal = map(sum, zip(*lsizes))
+
+        concat_vec = PETSc.Vec().create(PETSc.COMM_WORLD)
+        concat_vec.setSizes((nlocal,nglobal))
+        concat_vec.setFromOptions()
+        nvec = 0
+        for vec in vecs:
+
+            # Local range indices
+            ostarti, oendi = vec.owner_range
+            rstarti = ostarti + nvec
+            rendi = rstarti + vec.local_size
+                        
+            concat_vec.setValues(range(rstarti,rendi), vec[ostarti:oendi])
+            concat_vec.assemble()
+            # TODO: Ghost update required?
+            nvec += vec.size
+
+        return concat_vec        
+
     def __constant_as_vec(self, cons):
         """Return a PETSc Vec representing the supplied Constant"""
-        
+        PETSc = self.PETSc
         cvec = PETSc.Vec().create(PETSc.COMM_WORLD)
         
         # Scalar case e.g. Constant(0.1)
