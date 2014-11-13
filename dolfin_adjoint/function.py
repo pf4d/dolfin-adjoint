@@ -164,6 +164,8 @@ class Function(backend.Function):
 
         if known or (annotate is True):
           assignment.register_assign(self, args[0])
+        else:
+          adjglobals.adj_variables.forget(args[0])
 
   def assign(self, other, annotate=None, *args, **kwargs):
     '''To disable the annotation, just pass :py:data:`annotate=False` to this routine, and it acts exactly like the
@@ -283,7 +285,7 @@ def _check_mul_and_division(e, linear_comb, scalar_weight=1.0, multi_index=None)
     if isinstance(e, Product):
         for i, op in enumerate(e.operands()):
             if isinstance(op, ScalarValue) or \
-                   (isinstance(op, Constant) and op.value_size()==1):
+                   (isinstance(op, backend.Constant) and op.value_size()==1):
                 scalar = op
                 expr = e.operands()[1-i]
                 break
@@ -294,7 +296,7 @@ def _check_mul_and_division(e, linear_comb, scalar_weight=1.0, multi_index=None)
     elif isinstance(e, Division):
         expr, scalar = e.operands()
         if not (isinstance(scalar, ScalarValue) or \
-                isinstance(scalar, Constant) and scalar.value_rank()==1):
+                isinstance(scalar, backend.Constant) and scalar.value_rank()==1):
             _assign_error()
         scalar_weight /= float(scalar)
     else:

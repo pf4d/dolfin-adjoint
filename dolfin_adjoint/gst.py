@@ -2,10 +2,10 @@ import adjglobals
 import adjlinalg
 import libadjoint
 import backend
-import parameter as parameter_module
+import controls
 import math
 
-def compute_gst(ic, final, nsv, ic_norm="mass", final_norm="mass"):
+def compute_gst(ic, final, nsv, ic_norm="mass", final_norm="mass", which=1):
   '''This function computes the generalised stability analysis of a simulation.
   Generalised stability theory computes the perturbations to a field (such as an
   initial condition, forcing term, etc.) that /grow the most/ over the finite
@@ -17,6 +17,7 @@ def compute_gst(ic, final, nsv, ic_norm="mass", final_norm="mass"):
   - :py:data:`nsv` -- the number of optimal perturbations to compute
   - :py:data:`ic_norm` -- a symmetric positive-definite bilinear form that defines the norm on the input space
   - :py:data:`final_norm` -- a symmetric positive-definite bilinear form that defines the norm on the output space
+  - :py:data:`which` -- which singular vectors to compute. Use e.g. slepc4py.SLEPc.EPS.Which.LARGEST_REAL
 
   You can supply :py:data:`"mass"` for :py:data:`ic_norm` and :py:data:`final_norm` to use the (default) mass matrices associated
   with these spaces.
@@ -53,7 +54,7 @@ def compute_gst(ic, final, nsv, ic_norm="mass", final_norm="mass"):
   elif ic_norm is not None:
     ic_norm = adjlinalg.Matrix(ic_norm)
 
-  return adjglobals.adjointer.compute_gst(ic_var, ic_norm, final_var, final_norm, nsv)
+  return adjglobals.adjointer.compute_gst(ic_var, ic_norm, final_var, final_norm, nsv, which)
 
 orig_get_gst = libadjoint.GSTHandle.get_gst
 def new_get_gst(self, *args, **kwargs):
@@ -100,7 +101,7 @@ def perturbed_replay(parameter, perturbation, perturbation_scale, observation, p
   .. math::
 
     \frac{
-    \left|\left| \delta \mathrm{observation} \right|\right| 
+    \left|\left| \delta \mathrm{observation} \right|\right|
     }{
     \left|\left| \delta \mathrm{input} \right| \right|
     }
@@ -120,7 +121,7 @@ def perturbed_replay(parameter, perturbation, perturbation_scale, observation, p
   if not backend.parameters["adjoint"]["record_all"]:
     info_red("Warning: your replay test will be much more effective with backend.parameters['adjoint']['record_all'] = True.")
 
-  assert isinstance(parameter, parameter_module.FunctionControl)
+  assert isinstance(parameter, controls.FunctionControl)
 
   if perturbation_norm == "mass":
     p_fnsp = perturbation.function_space()

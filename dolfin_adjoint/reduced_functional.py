@@ -1,63 +1,65 @@
 import libadjoint
 from backend import Function, Constant, info_red, info_green, File
 from dolfin_adjoint import adjlinalg, adjrhs, constant, drivers
-from dolfin_adjoint.adjglobals import adjointer, mem_checkpoints, disk_checkpoints
+from dolfin_adjoint.adjglobals import adjointer, mem_checkpoints, disk_checkpoints, adj_reset_cache
 from functional import Functional
 from enlisting import enlist, delist
+from controls import DolfinAdjointControl
 import cPickle as pickle
 import hashlib
 
 global_eqn_list = {}
 
 class ReducedFunctional(object):
-    ''' This class provides access to the reduced functional for a given functional/parameter pair. The 
-        reduced functional maps a parameter value to the associated functional value by implicitly
-        solving the PDE that is annotated by dolfin-adjoint. The ReducedFunctional object may also be used
-        to compute derivatives of that map. '''
+    ''' This class provides access to the reduced functional for given
+    functional and controls. The reduced functional maps a point in control
+    space to the associated functional value by implicitly solving the PDE that
+    is annotated by dolfin-adjoint. The ReducedFunctional object can also
+    compute functional derivatives with respect to the controls using the
+    adjoint method. '''
 
-    def __init__(self, functional, parameter, scale=1.0, eval_cb=None, derivative_cb=None, replay_cb=None, hessian_cb=None, cache=None):
-        ''' Creates a reduced functional object that maps parameter values to functional values. '''
-
-        # Check the types of the inputs 
-        self.__check_input_types(functional, parameter, scale, cache)
+    def __init__(self, functional, controls, scale=1.0, eval_cb=None, derivative_cb=None, replay_cb=None, hessian_cb=None, cache=None):
 
         #: The objective functional.
         self.functional = functional
 
-        #: One, or a list of parameters.
-        self.parameter = enlist(parameter)
+        #: One, or a list of controls.
+        self.controls = enlist(controls)
+
+        # Check the types of the inputs
+        self.__check_input_types(functional, self.controls, scale, cache)
 
         #: An optional scaling factor for the functional
         self.scale = scale
 
-        #: An optional callback function that is executed after each functional 
-        #: evaluation. 
-        #: The interace must be eval_cb(j, m) where j is the functional value and 
-        #: m is the parameter value at which the functional is evaluated.
+        #: An optional callback function that is executed after each functional
+        #: evaluation.
+        #: The interace must be eval_cb(j, m) where j is the functional value and
+        #: m is the control value at which the functional is evaluated.
         self.eval_cb = eval_cb
 
-        #: An optional callback function that is executed after each functional 
-        #: gradient evaluation. 
-        #: The interface must be eval_cb(j, dj, m) where j and dj are the 
-        #: functional and functional gradient values, and m is the parameter 
+        #: An optional callback function that is executed after each functional
+        #: gradient evaluation.
+        #: The interface must be eval_cb(j, dj, m) where j and dj are the
+        #: functional and functional gradient values, and m is the control
         #: value at which the gradient is evaluated.
         self.derivative_cb = derivative_cb
 
-        #: An optional callback function that is executed after each hessian 
-        #: action evaluation. The interface must be hessian_cb(j, m, mdot, h) 
-        #: where mdot is the direction in which the hessian action is evaluated 
+        #: An optional callback function that is executed after each hessian
+        #: action evaluation. The interface must be hessian_cb(j, m, mdot, h)
+        #: where mdot is the direction in which the hessian action is evaluated
         #: and h the value of the hessian action.
         self.hessian_cb = hessian_cb
 
-        #: An optional callback function that is executed after for each forward 
-        #: equation during a (forward) solve. The interface must be 
-        #: replay_cb(var, value, m) where var is the libadjoint variable 
+        #: An optional callback function that is executed after for each forward
+        #: equation during a (forward) solve. The interface must be
+        #: replay_cb(var, value, m) where var is the libadjoint variable
         #: containing information about the variable, value is the associated
-        #: dolfin object and m is the parameter at which the functional is 
+        #: dolfin object and m is the control at which the functional is
         #: evaluated.
         self.replay_cb = replay_cb
 
-        #: If not None, caching (memoization) will be activated. The parameter->ouput pairs
+        #: If not None, caching (memoization) will be activated. The control->ouput pairs
         #: are stored on disk in the filename given by cache.
         self.cache = cache
         if cache is not None:
@@ -68,9 +70,9 @@ class ReducedFunctional(object):
                                 "derivative_cache": {},
                                 "hessian_cache": {}}
 
-        #: Indicator if the user has overloaded the functional evaluation and 
+        #: Indicator if the user has overloaded the functional evaluation and
         #: hence re-annotates the forward model at every evaluation.
-        #: By default the ReducedFunctional replays the tape for the 
+        #: By default the ReducedFunctional replays the tape for the
         #: evaluation.
         self.replays_annotation = True
 
@@ -78,21 +80,25 @@ class ReducedFunctional(object):
         self.current_func_value = None
 
         # Set up the Hessian driver
-        # Note: drivers.hessian currently only supports one parameter
+        # Note: drivers.hessian currently only supports one control
         try:
-            self.H = drivers.hessian(functional, delist(parameter,
-                list_type=parameter), warn=False)
+            self.H = drivers.hessian(functional, delist(controls,
+                list_type=controls), warn=False)
         except libadjoint.exceptions.LibadjointErrorNotImplemented:
-            # Might fail as Hessian support is currently limited 
-            # to a single parameter
+            # Might fail as Hessian support is currently limited
+            # to a single control
             pass
 
-    def __check_input_types(self, functional, parameter, scale, cache):
+    def __check_input_types(self, functional, controls, scale, cache):
 
         if not isinstance(functional, Functional):
             raise TypeError("functional should be a Functional")
 
-        # TODO: Check that parameter is a dolfin-adjoint.Parameter.
+        for control in controls:
+            if not isinstance(control, DolfinAdjointControl):
+                print control.__class__
+                raise TypeError("control should be a Control")
+
 
         if not isinstance(scale, float):
             raise TypeError("scale should be a float")
@@ -107,16 +113,18 @@ class ReducedFunctional(object):
             pickle.dump(self._cache, open(self.cache, "w"))
 
     def __call__(self, value):
-        ''' Evaluates the reduced functional for the given parameter value. '''
+        ''' Evaluates the reduced functional for the given control value. '''
 
-        #: The parameter value at which the reduced functional is to be evaluated.
+        adj_reset_cache()
+
+        #: The control values at which the reduced functional is to be evaluated.
         value = enlist(value)
 
-        if len(value) != len(self.parameter):
-            raise ValueError, "The number of parameters must equal the number of parameter values."
+        if len(value) != len(self.controls):
+            raise ValueError, "The number of controls must equal the number of controls values."
 
-        # Update the parameter values on the tape
-        replace_parameter_value(self.parameter, value)
+        # Update the control values on the tape
+        replace_control_value(self.controls, value)
 
         # Check if the result is already cached
         if self.cache:
@@ -134,11 +142,11 @@ class ReducedFunctional(object):
               output.data.rename(str(fwd_var), "a Function from dolfin-adjoint")
 
             if self.replay_cb is not None:
-              self.replay_cb(fwd_var, output.data, delist(value, list_type=self.parameter))
+              self.replay_cb(fwd_var, output.data, delist(value, list_type=self.controls))
 
             # Check if we checkpointing is active and if yes
-            # record the exact same checkpoint variables as 
-            # in the initial forward run 
+            # record the exact same checkpoint variables as
+            # in the initial forward run
             if adjointer.get_checkpoint_strategy() != None:
                 if str(fwd_var) in mem_checkpoints:
                     storage = libadjoint.MemoryStorage(output, cs = True)
@@ -166,9 +174,10 @@ class ReducedFunctional(object):
                 if adjointer.get_checkpoint_strategy() != None:
                     adjointer.forget_forward_equation(i)
 
-        self.current_func_value = func_value 
+        self.current_func_value = func_value
         if self.eval_cb:
-            self.eval_cb(self.scale * func_value, delist(value, list_type=self.parameter))
+            self.eval_cb(self.scale * func_value, delist(value,
+                list_type=self.controls))
 
         if self.cache:
             # Add result to cache
@@ -178,17 +187,19 @@ class ReducedFunctional(object):
         return self.scale*func_value
 
     def derivative(self, forget=True, project=False):
-        ''' Evaluates the derivative of the reduced functional for the most recently evaluated parameter value. ''' 
+        ''' Evaluates the derivative of the reduced functional for the most
+        recently evaluated control value. '''
 
         if self.cache is not None:
-            hash = value_hash([x.data() for x in self.parameter])
-            fnspaces = [p.data().function_space() if isinstance(p.data(), Function) else None for p in self.parameter]
+            hash = value_hash([x.data() for x in self.controls])
+            fnspaces = [p.data().function_space() if isinstance(p.data(),
+                Function) else None for p in self.controls]
 
             if hash in self._cache["derivative_cache"]:
                 info_green("Got a derivative cache hit.")
                 return cache_load(self._cache["derivative_cache"][hash], fnspaces)
 
-        dfunc_value = drivers.compute_gradient(self.functional, self.parameter, forget=forget, project=project)
+        dfunc_value = drivers.compute_gradient(self.functional, self.controls, forget=forget, project=project)
         dfunc_value = enlist(dfunc_value)
 
         adjointer.reset_revolve()
@@ -201,8 +212,10 @@ class ReducedFunctional(object):
 
         if self.derivative_cb:
             if self.current_func_value is not None:
-              values = [p.data() for p in self.parameter]
-              self.derivative_cb(self.scale * self.current_func_value, delist(scaled_dfunc_value, list_type=self.parameter), delist(values, list_type=self.parameter))
+              values = [p.data() for p in self.controls]
+              self.derivative_cb(self.scale * self.current_func_value,
+                      delist(scaled_dfunc_value, list_type=self.controls),
+                      delist(values, list_type=self.controls))
             else:
               info_red("Gradient evaluated without functional evaluation, not calling derivative callback function")
 
@@ -214,11 +227,12 @@ class ReducedFunctional(object):
 
     def hessian(self, m_dot, project=False):
         ''' Evaluates the Hessian action in direction m_dot. '''
-        assert(len(self.parameter) == 1)
+        assert(len(self.controls) == 1)
 
         if self.cache is not None:
-            hash = value_hash([x.data() for x in self.parameter] + [m_dot])
-            fnspaces = [p.data().function_space() if isinstance(p.data(), Function) else None for p in self.parameter]
+            hash = value_hash([x.data() for x in self.controls] + [m_dot])
+            fnspaces = [p.data().function_space() if isinstance(p.data(),
+                Function) else None for p in self.controls]
 
             if hash in self._cache["hessian_cache"]:
                 info_green("Got a Hessian cache hit.")
@@ -232,7 +246,8 @@ class ReducedFunctional(object):
 
         if self.hessian_cb:
             self.hessian_cb(self.scale * self.current_func_value,
-                            delist([p.data() for p in self.parameter], list_type=self.parameter),
+                            delist([p.data() for p in self.controls],
+                                list_type=self.controls),
                             m_dot,
                             Hm.vector() * self.scale)
 
@@ -257,47 +272,55 @@ class ReducedFunctional(object):
 
       class Functional(moola.Functional):
           latest_eval_hash = None
-          latest_eval_val = None
+          latest_eval_eval = None
           latest_eval_deriv = None
 
           def __call__(self, x):
-              ''' Evaluates the functional for the parameter choice x. '''
+              ''' Evaluates the functional for the given control value. '''
 
-              hashx = hash(x)
+              if memoize:
+                  hashx = hash(x)
 
-              if self.latest_eval_hash != hashx or not memoize:
-                  self.latest_eval_hash = hashx
-                  self.latest_eval_val = rf(x.data)
-                  self.latest_eval_deriv = None
-                  moola.events.increment("Functional evaluation")
+                  if self.latest_eval_hash != hashx:
+                      self.latest_eval_hash = hashx
+                      self.latest_eval_eval = rf(x.data)
+                      self.latest_eval_deriv = None
+                      moola.events.increment("Functional evaluation")
+                  else:
+                      #print  "Using memoised functional evaluation"
+                      pass
+
+                  return self.latest_eval_eval
+
               else:
-                  #print  "Using memoised functional evaluation" 
-                  pass
-
-              return self.latest_eval_val
+                  moola.events.increment("Functional evaluation")
+                  return rf(x.data)
 
 
           def derivative(self, x):
-              ''' Evaluates the gradient for the parameter choice x. '''
+              ''' Evaluates the gradient for the control values. '''
 
-              self(x)
+              if memoize:
 
-              if self.latest_eval_deriv is None or not memoize:
-                  #print "Using memoised forward solution for gradient evaluation"
-                  moola.events.increment("Derivative evaluation")
-                  deriv = rf.derivative(forget=False)[0]
-                  moola_deriv = moola.DolfinDualVector(deriv, riesz_map=x.riesz_map)
+                  self(x)
 
-                  self.latest_eval_deriv = moola_deriv
+                  if self.latest_eval_deriv is None:
+                      #print "Using memoised forward solution for gradient evaluation"
+                      moola.events.increment("Derivative evaluation")
+                      self.latest_eval_deriv = moola.DolfinDualVector(rf.derivative(forget=False)[0])
+
+                  else:
+                      #print "Using memoised gradient"
+                      pass
+
+                  return self.latest_eval_deriv
 
               else:
-                  #print "Using memoised gradient"
-                  pass
-
-              return self.latest_eval_deriv
+                  moola.events.increment("Derivative evaluation")
+                  return moola.DolfinDualVector(rf.derivative(forget=False)[0])
 
           def hessian(self, x):
-              ''' Evaluates the gradient for the parameter choice x. '''
+              ''' Evaluates the gradient for the control values. '''
 
               self(x)
 
@@ -305,7 +328,7 @@ class ReducedFunctional(object):
                   assert isinstance(direction, moola.DolfinPrimalVector)
                   moola.events.increment("Hessian evaluation")
                   hes = rf.hessian(direction.data)[0]
-                  return moola.DolfinDualVector(hes, riesz_map=x.riesz_map)
+                  return moola.DolfinDualVector(hes)
 
               return moola_hessian
 
@@ -314,151 +337,18 @@ class ReducedFunctional(object):
 
       return problem
 
-    def tao_problem(self, method="lmvm", tao_args=None):
-      '''Returns a TAO problem class that can be used with the TAO package,
-      http://www.mcs.anl.gov/research/projects/tao/
-
-      Valid methods: 
-        ------ Unconstrained optimisation --------
-        nm:    Nelder-Mead method
-        lmvm:  Limited memory, variable metric method
-        nls:   Newton line-search method
-        cg:    Nonlinear conjugate gradient mehtod
-
-        ------ Bound constrained optimisation --------
-        ntr:   Newton trust-region method (supports bound constraints)
-        bqpib: Interior point Newton algorithm
-        blmvm: Limited memory, variable metric method with bound constraints
-
-      '''
-      from dolfin import as_backend_type
-
-      # Check that the required packages are installed and that options are valid
-      try:
-          import petsc4py
-          from petsc4py import PETSc
-      except:
-          raise Exception, "Could not find petsc4py. Please install it."
-      try:
-          TAO = PETSc.TAO
-      except:
-          raise Exception, "Your petsc4py version does not support TAO. Please upgrade to petsc4py >= 3.5."
-
-      #if len(self.parameter) > 1:
-      #    raise ValueError, "TAO support is currently limited to 1 parameter"
-
-      rf = self
-      tmp_ctrl = Function(rf.parameter[0].data())
-      tmp_ctrl_vec = as_backend_type(tmp_ctrl.vector()).vec()
-
-      class AppCtx(object):
-          ''' Implements the application context for the TAO solver '''
-
-          def objective(self, tao, x):
-              ''' Evaluates the functional for the parameter value x. '''
-
-              tmp_ctrl_vec.set(0)
-              tmp_ctrl_vec.axpy(1, x)
-
-              return rf(tmp_ctrl)
-
-
-          def gradient(self, tao, x, G):
-              ''' Evaluates the gradient for the parameter choice x. '''
-
-              self.objective(tao, x)
-              gradient = rf.derivative(forget=False)[0]
-              gradient_vec = as_backend_type(gradient.vector()).vec()
-
-              G.set(0)
-              G.axpy(1, gradient_vec)
-
-          def objective_and_gradient(self, tao, x, G):
-              ''' Evaluates the gradient for the parameter choice x. '''
-
-              j = self.objective(tao, x)
-              self.gradient(tao, x, G)
-              return j
-
-          def hessian(self, tao, x, H, HP):
-              ''' Evaluates the gradient for the parameter choice x. '''
-              print "In hessian user action routine"
-              self.objective(tao, x)
-
-
-      class MatrixFreeHessian():
-          def mult(self, mat, X, Y):
-              tmp_ctrl_vec.set(0)
-              tmp_ctrl_vec.axpy(1, X)
-              hes = rf.hessian(tmp_ctrl)[0]
-              hes_vec = as_backend_type(hes.vector()).vec()
-              Y.set(0)
-              Y.axpy(1, hes_vec)
-
-
-      class TAOProblem(object):
-        def __init__(self, tao, x):
-          self.tao = tao
-          self.x = x
-
-
-        def solve(self):
-          self.tao.solve(self.x)
-          sol_vec = self.tao.getSolution()
-          tmp_ctrl_vec.set(0)
-          tmp_ctrl_vec.axpy(1, sol_vec)
-          return tmp_ctrl
-
-
-        def __del__(self):
-          self.tao.destroy()
-
-
-
-      # create user application context
-      # and configure user parameters
-      user = AppCtx()
-
-      # create solution vector
-      param_vec = as_backend_type(self.parameter[0].data().vector()).vec()
-      # Use value of parameter object as initial guess for the optimisation
-      x = param_vec.duplicate()
-
-      # create Hessian matrix
-      H = PETSc.Mat().create(PETSc.COMM_SELF)
-      N = x.size
-      H.createPython([N,N], comm=PETSc.COMM_SELF)
-      hessian_context = MatrixFreeHessian()
-      hessian_context.name = "mymat"
-      H.setPythonContext(hessian_context)
-      H.setOption(PETSc.Mat.Option.SYMMETRIC, True)
-      H.setUp()
-
-      tao = PETSc.TAO().create(PETSc.COMM_SELF)
-      tao.setType(method)
-      tao.setFromOptions()
-
-      tao.setObjectiveGradient(user.objective_and_gradient)
-      tao.setObjective(user.objective)
-      tao.setGradient(user.gradient)
-      tao.setHessian(user.hessian, H)
-      #app.getKSP().getPC().setFromOptions()
-      tao.setInitial(x)
-
-      return TAOProblem(tao, x)
-
-def replace_parameter_value(parameters, values):
-    ''' Replaces the parameter value with new values. '''
-    for parameter, value in zip(enlist(parameters), enlist(values)):
-        if hasattr(parameter, 'var'):
-            replace_tape_value(parameter.var, value)
+def replace_control_value(controls, values):
+    ''' Replaces the control value with new values. '''
+    for control, value in zip(enlist(controls), enlist(values)):
+        if hasattr(control, 'var'):
+            replace_tape_value(control.var, value)
 
 def replace_tape_value(variable, new_value):
     ''' Replaces the tape value of the given DolfinAdjointVariable with new_value. '''
 
-    # Case 1: The parameter value and new_value are Functions
+    # Case 1: The control value and new_value are Functions
     if hasattr(new_value, 'vector'):
-        # Functions are copied in da and occur as rhs in the annotation. 
+        # Functions are copied in da and occur as rhs in the annotation.
         # Hence we need to update the right hand side callbacks for
         # the equation that targets the associated variable.
 
@@ -478,11 +368,11 @@ def replace_tape_value(variable, new_value):
         # Keep a python reference of the equation in memory
         global_eqn_list[eqn_nb] = eqn
 
-    # Case 2: The parameter value and new_value are Constants
-    elif hasattr(new_value, "value_size"): 
+    # Case 2: The control value and new_value are Constants
+    elif hasattr(new_value, "value_size"):
         # Constants are not copied in the annotation. That is, changing a constant that occurs
         # in the forward model will also change the forward replay with libadjoint.
-        constant = parameter.data()
+        constant = control.data()
         constant.assign(new_value(()))
 
     else:
@@ -490,12 +380,12 @@ def replace_tape_value(variable, new_value):
 
 def copy_data(m):
     ''' Returns a deep copy of the given Function/Constant. '''
-    if hasattr(m, "vector"): 
+    if hasattr(m, "vector"):
         return Function(m.function_space())
-    elif hasattr(m, "value_size"): 
+    elif hasattr(m, "value_size"):
         return Constant(m(()))
     else:
-        raise TypeError, 'Unknown parameter type %s.' % str(type(m)) 
+        raise TypeError, 'Unknown control type %s.' % str(type(m))
 
 def value_hash(value):
     if isinstance(value, Constant):
