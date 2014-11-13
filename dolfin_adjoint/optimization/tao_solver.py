@@ -1,5 +1,5 @@
 from dolfin import as_backend_type
-from dolfin_adjoint.parameter import FunctionControl
+from dolfin_adjoint.controls import FunctionControl, ConstantControl
 from optimization_solver import OptimizationSolver
 import numpy as np
 
@@ -50,7 +50,7 @@ class TAOSolver(OptimizationSolver):
 
         # Map each control to a PETSc Vec...
         ctrl_vecs = []
-        for control in rf.parameter:
+        for control in rf.controls:
 
             tmp_data = control.data()
             
@@ -63,14 +63,14 @@ class TAOSolver(OptimizationSolver):
             ctrl_vecs.append(tmp_vec)
 
         # ...then concatenate
-        param_vec = self.__petsc_vec_concatenate(ctrl_vecs)
-        work_vec = param_vec.duplicate()
+        ctrl_vec = self.__petsc_vec_concatenate(ctrl_vecs)
+        work_vec = ctrl_vec.copy()
 
-        self.param_vec = param_vec
+        self.ctrl_vec = ctrl_vec
         self.work_vec = work_vec
 
-        # TODO: Remove below.
-        tmp_ctrl = Function(rf.parameter[0].data())
+        # TODO: Remove below. Limits support to a single control. 
+        tmp_ctrl = Function(rf.controls[0].data())
         work_vec = as_backend_type(tmp_ctrl.vector()).vec()
         self.tmp_ctrl = tmp_ctrl
         self.work_vec = work_vec
@@ -90,7 +90,7 @@ class TAOSolver(OptimizationSolver):
             def __init__(self):
                 # create solution vector
                 # Use value of parameter object as initial guess for the optimisation
-                self.x = param_vec.copy()
+                self.x = ctrl_vec.copy()
                 
                 # create Hessian matrix
                 self.H = PETSc.Mat().create(comm=PETSc.COMM_WORLD)
@@ -105,6 +105,7 @@ class TAOSolver(OptimizationSolver):
                 ''' Evaluates the functional. '''
                 work_vec.set(0)
                 work_vec.axpy(1, x)
+                
                 return rf(tmp_ctrl)
 
             def objective_and_gradient(self, tao, x, G):
@@ -188,11 +189,15 @@ class TAOSolver(OptimizationSolver):
 
             if isinstance(lb, Function):
                 lbvec = as_backend_type(lb.vector()).vec()
+            elif isinstance(lb, Constant):
+                lbvec = self.__constant_as_vec(lb)
             else:
                 raise TypeError("Unknown lower bound type %s" % lb.__class__)
 
             if isinstance(ub, Function):
                 ubvec = as_backend_type(ub.vector()).vec()
+            elif isinstance(ub, Constant):
+                ubvec = self.__constant_as_vec(ub)
             else:
                 raise TypeError("Unknown upper bound type %s" % ub.__class__)
 
@@ -203,14 +208,18 @@ class TAOSolver(OptimizationSolver):
         ubvec = self.__petsc_vec_concatenate(ubvecs)
         return (lbvec, ubvec)
 
+    def __get_constraints(self):
+        # TODO: Implement constraints handling
+        return None
+
     def __petsc_vec_concatenate(self, vecs):
-        """Concatenates the supply list of PETSc Vecs."""
+        """Concatenates the supplied list of PETSc Vecs."""
         PETSc = self.PETSc
         
         # Make a Vec with appropriate local/global sizes and copy in each rank's local entries
         lsizes = [vec.sizes for vec in vecs]
         nlocal, nglobal = map(sum, zip(*lsizes))
-
+        
         concat_vec = PETSc.Vec().create(PETSc.COMM_WORLD)
         concat_vec.setSizes((nlocal,nglobal))
         concat_vec.setFromOptions()
@@ -222,12 +231,12 @@ class TAOSolver(OptimizationSolver):
             rstarti = ostarti + nvec
             rendi = rstarti + vec.local_size
                         
-            concat_vec.setValues(range(rstarti,rendi), vec[ostarti:oendi])
+            concat_vec.setValues(range(rstarti,rendi), vec[ostarti:oendi])    
             concat_vec.assemble()
             # TODO: Ghost update required?
             nvec += vec.size
 
-        return concat_vec        
+        return concat_vec
 
     def __constant_as_vec(self, cons):
         """Return a PETSc Vec representing the supplied Constant"""
