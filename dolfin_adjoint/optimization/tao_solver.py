@@ -52,38 +52,23 @@ class TAOSolver(OptimizationSolver):
         ctrl_vecs = []
         for control in rf.controls:
 
-            tmp_data = control.data()
-            
             if isinstance(control, FunctionControl):
-                tmp_vec = as_backend_type(Function(tmp_data).vector()).vec()
+                tmp_vec = as_backend_type(Function(control.data()).vector()).vec()
                 
             elif isinstance(control, ConstantControl):
-                tmp_vec = self.__constant_as_vec(Constant(tmp_data))
+                tmp_vec = self.__constant_as_vec(Constant(control.data()))
                 
             ctrl_vecs.append(tmp_vec)
 
         # ...then concatenate
         ctrl_vec = self.__petsc_vec_concatenate(ctrl_vecs)
-        work_vec = ctrl_vec.copy()
-
-        self.ctrl_vec = ctrl_vec
-        self.work_vec = work_vec
 
         # TODO: Remove below. Limits support to a single control. 
-        tmp_ctrl = Function(rf.controls[0].data())
-        work_vec = as_backend_type(tmp_ctrl.vector()).vec()
-        self.tmp_ctrl = tmp_ctrl
-        self.work_vec = work_vec
+        #tmp_ctrl = Function(rf.controls[0].data())
+        #work_vec = as_backend_type(tmp_ctrl.vector()).vec()
+        #self.tmp_ctrl = tmp_ctrl
+        #self.work_vec = work_vec
         
-        class MatrixFreeHessian(): 
-            def mult(self, mat, X, Y):
-                work_vec.set(0)
-                work_vec.axpy(1, X)
-                hes = rf.hessian(tmp_ctrl)[0]
-                hes_vec = as_backend_type(hes.vector()).vec()
-                Y.set(0)
-                Y.axpy(1, hes_vec)
-
         class AppCtx(object):
             ''' Implements the application context for the TAO solver '''
 
@@ -96,17 +81,15 @@ class TAOSolver(OptimizationSolver):
                 self.H = PETSc.Mat().create(comm=PETSc.COMM_WORLD)
                 dims = (self.x.local_size, self.x.size)
                 self.H.createPython((dims,dims), comm=PETSc.COMM_WORLD)
-                hessian_context = MatrixFreeHessian()
-                self.H.setPythonContext(hessian_context)
+                self.H.setPythonContext(self)
                 self.H.setOption(PETSc.Mat.Option.SYMMETRIC, True)
                 self.H.setUp()
 
             def objective(self, x):
                 ''' Evaluates the functional. '''
-                work_vec.set(0)
-                work_vec.axpy(1, x)
-                
-                return rf(tmp_ctrl)
+                self.update(x)
+                # TODO: Multiple controls
+                return rf(rf.controls[0].data())
 
             def objective_and_gradient(self, tao, x, G):
                 ''' Evaluates the functional and gradient for the parameter choice x. '''
@@ -127,12 +110,12 @@ class TAOSolver(OptimizationSolver):
                 print "Updating Hessian: %s" % self.stats(x)
 
                 diff = x.copy()
-                diff.axpy(-1.0, work_vec)
+                diff.axpy(-1.0, ctrl_vec)
                 diffnorm = diff.norm()
 
                 if diffnorm > 0.0:
                     print "x: "; x.view()
-                    print "m: ", work_vec.view()
+                    print "m: ", ctrl_vec.view()
                     print "diff: ", diff.view()
                     print "diffnorm: ", diffnorm
                     info_red("Warning: rerunning rf")
@@ -140,6 +123,63 @@ class TAOSolver(OptimizationSolver):
 
             def stats(self, x):
                 return "(min, max): (%s, %s)" % (x.min()[-1], x.max()[-1])
+
+            def mult(self, mat, X, Y):
+                self.update(X)
+                
+                # TODO: Add multiple control support to Hessian stack
+                hes = rf.hessian(rf.controls[0].data())[0]
+                hes_vec = as_backend_type(hes.vector()).vec()
+                
+                Y.set(0)
+                Y.axpy(1, hes_vec)
+
+            def update(self, x):
+                ''' Split input vector and update all control values '''
+                nvec = 0
+                for i in range(0,len(rf.controls)):
+                    control = rf.controls[i]
+
+                    if isinstance(control, FunctionControl):
+                        data_vec = as_backend_type(Function(control.data()).vector()).vec()
+
+                        # Map appropriate range of input vector to control
+                        as_array = x[nvec:nvec+data_vec.size]
+                        starto, endo = data_vec.owner_range      
+                        data_vec.setValues(range(starto, endo), as_array[starto:endo])
+                        nvec += data_vec.size
+                
+                    elif isinstance(control, ConstantControl):
+                        # Scalar case
+                        if control.data().shape() == ():
+                            vsize = 1
+                            val = float(x[nvec])
+
+                        # Vector case
+                        elif len(control.data().shape()) == 1:
+                            vsize = control.data().shape()[0]
+                            val = x[nvec:nvec+vsize]
+
+                        # Matrix case
+                        else:
+                            vsizex, vsizey = control.data().shape()
+                            vsize = vsizex*vsizey
+                            as_array = x[nvec:nvec+vsize]
+                            
+                            # Sort into matrix restoring rows and columns
+                            val = []
+                            for row in range(0,vsizex):
+                                val_inner = []
+                                
+                                for column in range(0,vsizey):
+                                    val_inner.append(as_array[row*vsizey + column])
+                                    
+                                val.append(val_inner)
+                            
+                        # Replace control in rf
+                        cons = Constant(val) # Loss of information? No coeff in init
+                        rf.controls[i] = ConstantControl(cons)
+                        nvec += vsize
 
         # create user application context
         self.__user = AppCtx()
@@ -177,6 +217,7 @@ class TAOSolver(OptimizationSolver):
         if self.problem.bounds is not None:
             (lb, ub) = self.__get_bounds()
             self.tao_problem.setVariableBounds(lb, ub)
+        
 
     def __get_bounds(self):
         """Convert bounds to PETSc vectors - TAO's accepted format"""
@@ -278,6 +319,7 @@ class TAOSolver(OptimizationSolver):
     def solve(self):
         self.tao_problem.solve(self.__user.x)
         sol_vec = self.tao_problem.getSolution()
-        self.work_vec.set(0)
-        self.work_vec.axpy(1, sol_vec)
-        return self.tmp_ctrl
+        self.__user.update(sol_vec)
+
+        # TODO: Multiple controls support
+        return self.problem.reduced_functional.controls[0]
