@@ -106,7 +106,6 @@ class TAOSolver(OptimizationSolver):
 
             def hessian(self, tao, x, H, HP):
                 ''' Updates the Hessian. '''
-                print "In hessian user action routine"
                 print "Updating Hessian: %s" % self.stats(x)
 
                 diff = x.copy()
@@ -114,12 +113,8 @@ class TAOSolver(OptimizationSolver):
                 diffnorm = diff.norm()
 
                 if diffnorm > 0.0:
-                    print "x: "; x.view()
-                    print "m: ", ctrl_vec.view()
-                    print "diff: ", diff.view()
-                    print "diffnorm: ", diffnorm
                     info_red("Warning: rerunning rf")
-                    self.objective(tao, x)
+                    self.objective(x)
 
             def stats(self, x):
                 return "(min, max): (%s, %s)" % (x.min()[-1], x.max()[-1])
@@ -136,19 +131,23 @@ class TAOSolver(OptimizationSolver):
 
             def update(self, x):
                 ''' Split input vector and update all control values '''
+                x.copy(ctrl_vec) # Refresh concatenated control vector first
+                
                 nvec = 0
                 for i in range(0,len(rf.controls)):
                     control = rf.controls[i]
 
                     if isinstance(control, FunctionControl):
-                        data_vec = as_backend_type(Function(control.data()).vector()).vec()
+                        data_vec = as_backend_type(control.data().vector()).vec()
 
                         # Map appropriate range of input vector to control
-                        as_array = x[nvec:nvec+data_vec.size]
-                        starto, endo = data_vec.owner_range      
-                        data_vec.setValues(range(starto, endo), as_array[starto:endo])
+                        ostarti, oendi = data_vec.owner_range
+                        rstarti = ostarti + nvec
+                        rendi = rstarti + data_vec.local_size
+                        data_vec.setValues(range(ostarti, oendi), x[rstarti:rendi])
+                        data_vec.assemble()
                         nvec += data_vec.size
-                
+
                     elif isinstance(control, ConstantControl):
                         # Scalar case
                         if control.data().shape() == ():
@@ -230,15 +229,15 @@ class TAOSolver(OptimizationSolver):
 
             if isinstance(lb, Function):
                 lbvec = as_backend_type(lb.vector()).vec()
-            elif isinstance(lb, Constant):
-                lbvec = self.__constant_as_vec(lb)
+            elif isinstance(lb, (float, int, Constant)):
+                lbvec = self.__constant_as_vec(Constant(lb))
             else:
                 raise TypeError("Unknown lower bound type %s" % lb.__class__)
 
             if isinstance(ub, Function):
                 ubvec = as_backend_type(ub.vector()).vec()
-            elif isinstance(ub, Constant):
-                ubvec = self.__constant_as_vec(ub)
+            elif isinstance(ub, (float, int, Constant)):
+                ubvec = self.__constant_as_vec(Constant(ub))
             else:
                 raise TypeError("Unknown upper bound type %s" % ub.__class__)
 
@@ -322,4 +321,4 @@ class TAOSolver(OptimizationSolver):
         self.__user.update(sol_vec)
 
         # TODO: Multiple controls support
-        return self.problem.reduced_functional.controls[0]
+        return self.problem.reduced_functional.controls[0].data()
