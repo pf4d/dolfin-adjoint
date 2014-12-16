@@ -584,7 +584,7 @@ class PAForm(object):
     self.__form = form
     self.__rank = rank
     self.__quadrature_degree = form_quadrature_degree(form)
-    self.__deps = ufl.algorithms.extract_coefficients(form)
+    self.__deps = set(ufl.algorithms.extract_coefficients(form))
     self.__is_static = is_static_form(form)
     self.pre_assembly_parameters = pre_assembly_parameters
     self.__set_optimise(form, pa_filters)

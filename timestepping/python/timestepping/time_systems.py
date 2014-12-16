@@ -228,9 +228,9 @@ class TimeSystem(object):
         raise StateException("Solve for %s already registered" % x.name())
       eq = eargs[0]
       solve = copy.copy(args), copy.copy(kwargs)
-      x_deps = ufl.algorithms.extract_coefficients(eq.lhs)
+      x_deps = set(ufl.algorithms.extract_coefficients(eq.lhs))
       if not is_zero_rhs(eq.rhs):
-        x_deps += ufl.algorithms.extract_coefficients(eq.rhs)
+        x_deps.update(ufl.algorithms.extract_coefficients(eq.rhs))
       eq_lhs = eq.lhs
 
       if form_rank(eq_lhs) == 2:
@@ -238,7 +238,7 @@ class TimeSystem(object):
           if dep is x:
             raise DependencyException("Invalid non-linear solve")
       if not initial_guess is None:
-        x_deps.append(initial_guess)
+        x_deps.add(initial_guess)
     
     if not hasattr(x, "_time_level_data"):
       raise InvalidArgumentException("Missing time level data")

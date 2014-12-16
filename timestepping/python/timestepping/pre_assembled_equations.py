@@ -271,10 +271,10 @@ class PAEquationSolver(EquationSolver):
       else:
         a, linear_solver = self.__a, self.__linear_solver
         L = self.__L
-        lhs_cs = ufl.algorithms.extract_coefficients(J)
-        rhs_cs = ufl.algorithms.extract_coefficients(eq.lhs)
+        lhs_cs = set(ufl.algorithms.extract_coefficients(J))
+        rhs_cs = set(ufl.algorithms.extract_coefficients(eq.lhs))
         if not is_zero_rhs(eq.rhs):
-          rhs_cs += ufl.algorithms.extract_coefficients(eq.rhs)
+          rhs_cs.update(ufl.algorithms.extract_coefficients(eq.rhs))
         for dep in args:
           if dep in lhs_cs:
             a, linear_solver = assemble_lhs()
@@ -299,7 +299,9 @@ class PAEquationSolver(EquationSolver):
     if not non_symbolic:
       return EquationSolver.dependencies(self, non_symbolic = False)
     elif not self.__initial_guess is None:
-      return EquationSolver.dependencies(self, non_symbolic = True) + [self.__initial_guess]
+      deps = copy.copy(EquationSolver.dependencies(self, non_symbolic = True))
+      deps.add(self.__initial_guess)
+      return deps
     else:
       return EquationSolver.dependencies(self, non_symbolic = True)
 
