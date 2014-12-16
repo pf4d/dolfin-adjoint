@@ -7,6 +7,11 @@ import constant
 import adjresidual
 import adjlinalg
 import ufl.algorithms
+import projection
+import functional
+import drivers
+import math
+from controls import ListControl, Control
 if backend.__name__  == "dolfin":
   from backend import cpp
 
@@ -110,9 +115,9 @@ def test_initial_condition_adjoint(J, ic, final_adjoint, seed=0.01, perturbation
 
   return min(convergence_order(with_gradient))
 
-def tlm_dolfin(parameter, forget=False):
+def tlm_dolfin(control, forget=False):
   for i in range(adjglobals.adjointer.equation_count):
-      (tlm_var, output) = adjglobals.adjointer.get_tlm_solution(i, parameter)
+      (tlm_var, output) = adjglobals.adjointer.get_tlm_solution(i, control)
 
       storage = libadjoint.MemoryStorage(output)
       storage.set_overwrite(True)
@@ -147,7 +152,7 @@ def test_initial_condition_tlm(J, dJ, ic, seed=0.01, perturbation_direction=None
   # and check its correctness with the Taylor remainder convergence test.
   info_blue("Running Taylor remainder convergence analysis for the tangent linear model... ")
   import random
-  import parameter
+  import controls
 
   adj_var = adjglobals.adj_variables[ic]; adj_var.timestep = 0
   if not adjglobals.adjointer.variable_known(adj_var):
@@ -188,7 +193,7 @@ def test_initial_condition_tlm(J, dJ, ic, seed=0.01, perturbation_direction=None
 
   with_gradient = []
   for i in range(len(perturbations)):
-    param = parameter.InitialConditionParameter(ic, perturbations[i])
+    param = controls.FunctionControl(ic, perturbations[i])
     final_tlm = tlm_dolfin(param, forget=False).data
     remainder = abs(functional_values[i] - f_direct - final_tlm.vector().inner(dJ))
     with_gradient.append(remainder)
@@ -208,7 +213,7 @@ def test_initial_condition_adjoint_cdiff(J, ic, final_adjoint, seed=0.01, pertur
      (usually the last adjoint equation solved).
 
      This function returns the order of convergence of the Taylor
-     series remainder of central finite differencing, which should be 3 
+     series remainder of central finite differencing, which should be 3
      if the adjoint is working correctly.'''
 
   # We will compute the gradient of the functional with respect to the initial condition,
@@ -349,14 +354,14 @@ def test_scalar_parameters_adjoint(J, a, dJda, seed=0.1):
 def test_gradient_array(J, dJdx, x, seed = 0.01, perturbation_direction = None, random_seed = 118):
   '''Checks the correctness of the derivative dJ.
      x must be an array that specifies at which point in the parameter space
-     the gradient is to be checked, and dJdx must be an array containing the gradient. 
-     The function J(x) must return the functional value. 
+     the gradient is to be checked, and dJdx must be an array containing the gradient.
+     The function J(x) must return the functional value.
 
      This function returns the order of convergence of the Taylor
      series remainder, which should be 2 if the gradient is correct.'''
 
   import random
-  # Set the random seed to a constant. This is important for parallel environments to ensure that the 
+  # Set the random seed to a constant. This is important for parallel environments to ensure that the
   # perturbation direction is consistent between all processors.
   random.seed(random_seed)
 
@@ -381,7 +386,7 @@ def test_gradient_array(J, dJdx, x, seed = 0.01, perturbation_direction = None, 
     perturbation = perturbation_direction.copy() * perturbation_size
     perturbations.append(perturbation)
 
-    perturbed_x = x.copy() + perturbation 
+    perturbed_x = x.copy() + perturbation
     functional_values.append(J(perturbed_x))
 
   # First-order Taylor remainders (not using adjoint)
@@ -409,7 +414,7 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
 
        func = J(m)
 
-     Jm is the value of the function J at the parameter m. 
+     Jm is the value of the function J at the parameter m.
      dJdm is the gradient of J evaluated at m, to be tested for correctness.
 
      This function returns the order of convergence of the Taylor
@@ -425,9 +430,12 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
 
   info_blue("Running Taylor remainder convergence test ... ")
   import random
-  import parameter
+  import controls
 
-  if isinstance(m, parameter.ListParameter):
+  if isinstance(m, list):
+    m = ListControl(m)
+
+  if isinstance(m, controls.ListControl):
     if perturbation_direction is None:
       perturbation_direction = [None] * len(m.parameters)
 
@@ -455,13 +463,13 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
   # First, compute perturbation sizes.
   seed_default = 0.01
   if seed is None:
-    if isinstance(m, parameter.ScalarParameter):
+    if isinstance(m, controls.ConstantControl):
       seed = get_const(m.a) / 5.0
 
       if seed == 0.0: seed = 0.1
-    elif isinstance(m, parameter.InitialConditionParameter):
+    elif isinstance(m, controls.FunctionControl):
       ic = get_value(m, value)
-      if len(ic.vector()) == 1: # our parameter is in R
+      if len(ic.vector()) == 1: # our control is in R
         seed = float(ic) / 5.0
       else:
         seed = seed_default
@@ -472,11 +480,11 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
 
   # Next, compute the perturbation direction.
   if perturbation_direction is None:
-    if isinstance(m, parameter.ScalarParameter):
+    if isinstance(m, controls.ConstantControl):
       perturbation_direction = 1
-    elif isinstance(m, parameter.ScalarParameters):
+    elif isinstance(m, controls.ConstantControls):
       perturbation_direction = numpy.array([get_const(x)/5.0 for x in m.v])
-    elif isinstance(m, parameter.InitialConditionParameter):
+    elif isinstance(m, controls.FunctionControl):
       ic = get_value(m, value)
       perturbation_direction = backend.Function(ic)
       vec = perturbation_direction.vector()
@@ -485,7 +493,7 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
     else:
       raise libadjoint.exceptions.LibadjointErrorNotImplemented("Don't know how to compute a perturbation direction")
   else:
-    if isinstance(m, parameter.InitialConditionParameter):
+    if isinstance(m, controls.FunctionControl):
       ic = get_value(m, value)
 
   # So now compute the perturbations:
@@ -505,16 +513,16 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
       perturbations.append(perturbation)
 
   # And now the perturbed inputs:
-  if isinstance(m, parameter.ScalarParameter):
+  if isinstance(m, controls.ConstantControl):
     pinputs = [backend.Constant(get_const(m.a) + x) for x in perturbations]
-  elif isinstance(m, parameter.ScalarParameters):
+  elif isinstance(m, controls.ConstantControls):
     a = numpy.array([get_const(x) for x in m.v])
 
     def make_const(arr):
       return [backend.Constant(x) for x in arr]
 
     pinputs = [make_const(a + x) for x in perturbations]
-  elif isinstance(m, parameter.InitialConditionParameter):
+  elif isinstance(m, controls.FunctionControl):
     pinputs = []
     for x in perturbations:
       pinput = backend.Function(x)
@@ -524,6 +532,14 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
         pinput += ic
 
       pinputs.append(pinput)
+
+  # Issue 34: We must evaluate HJm before we evaluate the tape at the
+  # perturbed controls below.
+  if HJm is not None:
+    HJm_values = []
+    for perturbation in perturbations:
+      HJmp = HJm(perturbation)
+      HJm_values.append(HJmp)
 
   # At last: the common bit!
   functional_values = []
@@ -538,15 +554,15 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
   info("Convergence orders for Taylor remainder without gradient information (should all be 1): " + str(convergence_order(no_gradient)))
 
   with_gradient = []
-  if isinstance(m, parameter.ScalarParameter):
+  if isinstance(m, controls.ConstantControl):
     for i in range(len(perturbations)):
       remainder = abs(functional_values[i] - Jm - float(dJdm)*perturbations[i])
       with_gradient.append(remainder)
-  elif isinstance(m, parameter.ScalarParameters):
+  elif isinstance(m, controls.ConstantControls):
     for i in range(len(perturbations)):
       remainder = abs(functional_values[i] - Jm - numpy.dot(dJdm, perturbations[i]))
       with_gradient.append(remainder)
-  elif isinstance(m, parameter.InitialConditionParameter):
+  elif isinstance(m, controls.FunctionControl):
     for i in range(len(perturbations)):
       if backend.__name__  == "dolfin":
         remainder = abs(functional_values[i] - Jm - dJdm.vector().inner(perturbations[i].vector()))
@@ -562,17 +578,17 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
 
   if HJm is not None:
     with_hessian = []
-    if isinstance(m, parameter.ScalarParameter):
+    if isinstance(m, controls.ConstantControl):
       for i in range(len(perturbations)):
-        remainder = abs(functional_values[i] - Jm - float(dJdm)*perturbations[i] - 0.5*perturbations[i]*HJm(perturbations[i]))
+        remainder = abs(functional_values[i] - Jm - float(dJdm)*perturbations[i] - 0.5*perturbations[i]*HJm_values[i])
         with_hessian.append(remainder)
-    elif isinstance(m, parameter.ScalarParameters):
+    elif isinstance(m, controls.ConstantControls):
       for i in range(len(perturbations)):
-        remainder = abs(functional_values[i] - Jm - numpy.dot(dJdm, perturbations[i]) - 0.5*numpy.dot(perturbations[i], HJm(perturbations[i])))
+        remainder = abs(functional_values[i] - Jm - numpy.dot(dJdm, perturbations[i]) - 0.5*numpy.dot(perturbations[i], HJm_values[i]))
         with_hessian.append(remainder)
-    elif isinstance(m, parameter.InitialConditionParameter):
+    elif isinstance(m, controls.FunctionControl):
       for i in range(len(perturbations)):
-        remainder = abs(functional_values[i] - Jm - dJdm.vector().inner(perturbations[i].vector()) - 0.5*perturbations[i].vector().inner(HJm(perturbations[i]).vector()))
+        remainder = abs(functional_values[i] - Jm - dJdm.vector().inner(perturbations[i].vector()) - 0.5*perturbations[i].vector().inner(HJm_values[i].vector()))
         with_hessian.append(remainder)
 
     info("Taylor remainder with Hessian information: " + str(with_hessian))
@@ -580,6 +596,64 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
     return min(convergence_order(with_hessian))
   else:
     return min(convergence_order(with_gradient))
+
+
+def taylor_test_expression(exp, V):
+    """
+    Performs a Taylor test of an Expression with dependencies.
+
+    exp: The expression to test
+    V: A suitable function space on which the expression will be projected.
+
+    Warning: This function resets the adjoint tape! """
+
+    adjglobals.adj_reset()
+
+    # Annotate test model
+    s = projection.project(exp, V, annotate=True)
+    mesh = V.mesh()
+
+    Jform = s**2*backend.dx + exp*backend.dx(domain=mesh)
+
+    J = functional.Functional(Jform)
+    J0 = backend.assemble(Jform)
+
+    deps = exp.dependencies()
+    controls = [Control(c) for c in deps]
+    dJd0 = drivers.compute_gradient(J, controls, forget=False)
+
+    for i in range(len(controls)):
+        def Jfunc(new_val):
+            dep = exp.dependencies()[i]
+
+            # Remember the old dependency value for later
+            old_val = float(dep)
+
+            # Compute the functional value
+            dep.assign(new_val)
+            s = projection.project(exp, V, annotate=False)
+            out = backend.assemble(s**2*backend.dx + exp*backend.dx(domain=mesh))
+
+            # Restore the old dependency value
+            dep.assign(old_val)
+
+            return out
+
+        #HJ = hessian(J, controls[i], warn=False)
+        #minconv = taylor_test(Jfunc, controls[i], J0, dJd0[i], HJm=HJ)
+        minconv = taylor_test(Jfunc, controls[i], J0, dJd0[i])
+
+        if math.isnan(minconv):
+            warning("Convergence order is not a number. Assuming that you \
+have a linear or constant constraint dependency (e.g. check that the Taylor \
+remainder are all 0).")
+        else:
+            if not minconv > 1.9:
+                raise Exception, "The Taylor test failed when checking the \
+derivative with respect to the %i'th dependency." % (i+1)
+
+    adjglobals.adj_reset()
+
 
 def to_annotate(flag):
   '''Should dolfin-adjoint annotate this statement or not?'''
@@ -593,17 +667,17 @@ def to_annotate(flag):
   return flag
 
 class DolfinAdjointVariable(libadjoint.Variable):
-  ''' A wrapper class for Dolfin objects to store additional information such as 
+  ''' A wrapper class for Dolfin objects to store additional information such as
       a time step, a iteration counter and the type of the variable (adjoint, forward or tangent linear). '''
 
   def __init__(self, coefficient, timestep=None, iteration=None):
-    ''' Create a DolfinAdjointVariable associated with the provided coefficient. 
+    ''' Create a DolfinAdjointVariable associated with the provided coefficient.
 
-    If the coefficient is not known to dolfin_adjoint (i.e. if no equation for it was 
+    If the coefficient is not known to dolfin_adjoint (i.e. if no equation for it was
     annotated), an Exception is thrown.
 
     By default, the DolfinAdjointVariable references the latest timestep and iteration number,
-    but may be overwritten with the timestep and the iteration parameters. Negative values may 
+    but may be overwritten with the timestep and the iteration parameters. Negative values may
     be used to reference the backwards. '''
 
     super(DolfinAdjointVariable, self).__init__(var=adjglobals.adj_variables[coefficient].var)

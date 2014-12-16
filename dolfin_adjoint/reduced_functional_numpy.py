@@ -1,6 +1,6 @@
 import numpy as np
-from backend import cpp, info, info_red, Constant, Function, TestFunction, TrialFunction, assemble, inner, dx, as_backend_type, info_red, MPI
-from dolfin_adjoint import constant, utils 
+from backend import info, info_red, Constant, Function, TestFunction, TrialFunction, assemble, inner, dx, info_red
+from dolfin_adjoint import constant, utils
 from dolfin_adjoint.adjglobals import adjointer, adj_reset_cache
 from reduced_functional import ReducedFunctional
 from utils import gather
@@ -8,332 +8,128 @@ from functools import partial
 import misc
 
 class ReducedFunctionalNumPy(ReducedFunctional):
-    ''' This class implements the reduced functional for a given functional/parameter combination. The core idea 
-        of the reduced functional is to consider the problem as a pure function of the parameter value which 
-        implicitly solves the recorded PDE. '''
+    ''' This class implements the reduced functional for given functional and
+    controls based on numpy data structures.
 
-    def __init__(self, rf, in_euclidian_space=False):
-        ''' Creates a reduced functional object, that evaluates the functional value for a given parameter value.
-            This "NumPy version" of the reduced functional is created from an existing ReducedFunctional object:
-              rf_np = ReducedFunctionalNumPy(rf = rf)
+    This "NumPy version" of the dolfin_adjoint.ReducedFunctional is created from
+    an existing ReducedFunctional object:
+    rf_np = ReducedFunctionalNumPy(rf = rf)
 
-            If the optional parameter in_euclidian_space norm is True, the ReducedFunctionalNumPy will 
-            perform a transformation from the L2-inner product given by the discrete Functionspace to Euclidian space.
-            That is, the squared norm of the gradient can then for example be computed with:
+        '''
 
-               numpy.dot(dj, dj)
-
-            instead of 
-
-              assemble(inner(dj, dj)*dx).
-
-            This is useful for example, if the reduced functional is to be used with a third party library (such as 
-            optimisation libraries) that expect the Euclidian norm. 
-            '''
-        super(ReducedFunctionalNumPy, self).__init__(rf.functional, rf.parameter, scale = rf.scale, 
-                                                     eval_cb = rf.eval_cb, derivative_cb = rf.derivative_cb, 
-                                                     replay_cb = rf.replay_cb, hessian_cb = rf.hessian_cb, 
-                                                     ignore = rf.ignore, cache = rf.cache)
+    def __init__(self, rf):
+        super(ReducedFunctionalNumPy, self).__init__(rf.functional, rf.controls, scale=rf.scale,
+                                                     eval_cb=rf.eval_cb, derivative_cb=rf.derivative_cb,
+                                                     replay_cb=rf.replay_cb, hessian_cb=rf.hessian_cb,
+                                                     cache=rf.cache)
         self.current_func_value = rf.current_func_value
-        self.in_euclidian_space = in_euclidian_space
 
         self.__base_call__ = rf.__call__
         self.__base_derivative__ = rf.derivative
         self.__base_hessian__ = rf.hessian
 
-        # Variables for storing the Cholesky factorisation
-        self.L = None
-        self.LT = None
-        self.factor = None
-        self.has_cholmod = False
-
-        if self.in_euclidian_space:
-            # Build up the Cholesky factorisation
-            assert len(rf.parameter) == 1
-            V = rf.parameter[0].data().function_space()
-            r = TestFunction(V)
-            q = TrialFunction(V)
-            M = assemble(inner(r, q)*dx)
-
-            # Try using PETSc4py and Cholmod for the Cholesky factorisation
-            try:
-                from scipy.sparse import csr_matrix
-                from scikits.sparse.cholmod import cholesky 
-
-                M_petsc = as_backend_type(M).mat()
-                indptr, indices, data = M_petsc.getValuesCSR()
-                s = len(indptr) - 1
-
-                M_csr = csr_matrix( (data, indices, indptr), shape=(s, s) )
-                factor = cholesky(M_csr)
-
-                sqD = factor.L_D()[1]
-                sqD.data[:] = np.sqrt(sqD.data)
-                self.sqD = sqD
-
-                sqDinv = factor.L_D()[1]
-                sqDinv.data[:] = 1./np.sqrt(sqDinv.data)
-                self.sqDinv = sqDinv
-
-                self.factor = factor
-
-                self.has_cholmod = True
-
-            # Fallback to a dense Cholesky factorisation 
-            except:
-                info_red("Warning: Dolfin is not compiled with PETSc4Py support or scikits.sparse.cholmod is not installed.")
-                info_red("dolfin-adjoint.optimize will use a dense Cholesky factorisation instead")
-                info_red("which can be extremely slow.")
-
-                from numpy.linalg import cholesky
-                self.L = cholesky(M.array())
-                self.LT = self.L.T
+        self.rf = rf
 
 
     def __call__(self, m_array):
         ''' An implementation of the reduced functional evaluation
-            that accepts the parameter as an array of scalars '''
+            that accepts the control values as an array of scalars '''
 
         # In case the annotation is not reused, we need to reset any prior annotation of the adjointer before reruning the forward model.
         if not self.replays_annotation:
             solving.adj_reset()
 
-        # We move in parameter space, so we also need to reset the factorisation cache
+        # We move in control space, so we also need to reset the factorisation cache
         adj_reset_cache()
 
-        # Now its time to update the parameter values using the given array  
-        m = [p.data() for p in self.parameter]
+        # Now its time to update the control values using the given array
+        m = self.rf.controls.__class__([p.data() for p in self.controls])
         self.set_local(m, m_array)
 
         return self.__base_call__(m)
 
     def set_local(self, m, m_array):
-        if self.in_euclidian_space:
-            if self.has_cholmod:
-                set_local(m, m_array, True, True, None, self.factor, self.sqDinv)
-            else:
-                set_local(m, m_array, True, False, self.LT)
-        else:
-            set_local(m, m_array, False)
+        set_local(m, m_array)
 
     def get_global(self, m):
-        if self.in_euclidian_space:
-            if self.has_cholmod:
-                return get_global(m, True, True, None, self.factor, self.sqD)
-            else:
-                return get_global(m, True, False, self.LT)
-        else:
-            return get_global(m, False)
+        return get_global(m)
 
     def derivative(self, m_array=None, taylor_test=False, seed=0.001, forget=True, project=False):
-        ''' An implementation of the reduced functional derivative evaluation 
-            that accepts the parameter as an array of scalars. If no parameter values are given,
+        ''' An implementation of the reduced functional derivative evaluation
+            that accepts the controls as an array of scalars. If no control values are given,
             the result is derivative at the last forward run.
-            If taylor_test = True, the derivative is automatically verified 
-            by the Taylor remainder convergence test. The perturbation direction 
+            If taylor_test = True, the derivative is automatically verified
+            by the Taylor remainder convergence test. The perturbation direction
             is random and the perturbation size can be controlled with the seed argument.
             '''
 
-        # In the case that the parameter values have changed since the last forward run, 
-        # we first need to rerun the forward model with the new parameters to have the 
+        # In the case that the control values have changed since the last forward run,
+        # we first need to rerun the forward model with the new controls to have the
         # correct forward solutions
-        m = [p.data() for p in self.parameter]
+        m = [p.data() for p in self.controls]
         if m_array is not None and (m_array != self.get_global(m)).any():
             info_red("Rerunning forward model before computing derivative")
-            self(m_array) 
+            self(m_array)
 
-        dJdm = self.__base_derivative__(forget=forget, project=project) 
+        dJdm = self.__base_derivative__(forget=forget, project=project)
         if project:
             dJdm_global = self.get_global(dJdm)
         else:
-            dJdm_global = get_global(dJdm, False)
-            if self.in_euclidian_space:
-
-                if self.has_cholmod:
-                    dJdm_global = self.sqDinv*self.factor.solve_L(self.factor.apply_P(dJdm_global))
-                else:
-                    dJdm_global = np.linalg.solve(self.L, dJdm_global)
+            dJdm_global = get_global(dJdm)
 
         # Perform the gradient test
         if taylor_test:
-            minconv = utils.test_gradient_array(self.__call__, self.scale * dJdm_global, m_array, 
-                                                seed = seed) 
+            minconv = utils.test_gradient_array(self.__call__, self.scale * dJdm_global, m_array,
+                                                seed = seed)
             if minconv < 1.9:
                 raise RuntimeWarning, "A gradient test failed during execution."
             else:
                 info("Gradient test successful.")
-            self(m_array) 
+            self(m_array)
 
-        return dJdm_global 
+        return dJdm_global
 
     def hessian(self, m_array, m_dot_array):
-        ''' An implementation of the reduced functional hessian action evaluation 
-            that accepts the parameter as an array of scalars. If m_array is None,
-            the Hessian action at the latest forward run is returned. ''' 
+        ''' An implementation of the reduced functional hessian action evaluation
+            that accepts the controls as an array of scalars. If m_array is None,
+            the Hessian action at the latest forward run is returned. '''
 
-        m = [p.data() for p in self.parameter]
+        if not hasattr(self, "H"):
+            raise NotImplementedError, "Hessian computation not supported."
+
+        m = [p.data() for p in self.controls]
         if m_array is not None:
-            # In case the parameter values have changed since the last forward run, 
-            # we first need to rerun the forward model with the new parameters to have the 
+            # In case the control values have changed since the last forward run,
+            # we first need to rerun the forward model with the new controls to have the
             # correct forward solutions
             if (m_array != self.get_global(m)).any():
-                self(m_array) 
+                self(m_array)
 
-                # Clear the adjoint solution as we need to recompute them 
+                # Clear the adjoint solution as we need to recompute them
                 for i in range(adjointer.equation_count):
                     adjointer.forget_adjoint_values(i)
 
             self.set_local(m, m_array)
         self.H.update(m)
 
-        m_dot = [copy_data(p.data()) for p in self.parameter] 
+        m_dot = [copy_data(p.data()) for p in self.controls]
         self.set_local(m_dot, m_dot_array)
 
-        hess = self.__base_hessian__(m_dot) 
-        hess_array = get_global(hess, False)
-
-        if self.in_euclidian_space:
-
-            if self.has_cholmod:
-                hess_array = self.sqDinv*self.factor.solve_L(self.factor.apply_P(hess_array))
-            else:
-                hess_array = np.linalg.solve(self.L, hess_array)
+        hess = self.__base_hessian__(m_dot)
+        hess_array = get_global(hess)
 
         return hess_array
-    
+
     def obj_to_array(self, obj):
         return self.get_global(obj)
 
-    def get_parameters(self):
-        m = [p.data() for p in self.parameter]
+    def get_controls(self):
+        m = [p.data() for p in self.controls]
         return self.obj_to_array(m)
 
-    def set_parameters(self, array):
-        m = [p.data() for p in self.parameter]
+    def set_controls(self, array):
+        m = [p.data() for p in self.controls]
         return self.set_local(m, array)
-
-    def pyipopt_problem(self, constraints=None, bounds=None):
-      '''Return a pyipopt problem class that can be used with the pyipopt Python bindings,
-      https://github.com/xuy/pyipopt
-      '''
-
-      from optimization.constraints import canonicalise, InequalityConstraint, EqualityConstraint
-      constraints = canonicalise(constraints)
-
-      import pyipopt
-
-      m = self.get_parameters()
-      n = len(m)
-
-      if bounds is not None:
-        ulb, uub = bounds
-        if isinstance(ulb, float) or isinstance(ulb, Constant):
-          lb = np.array([float(ulb)]*n)
-        else:
-          lb = np.array([float(v) for v in ulb])
-
-        if isinstance(uub, float) or isinstance(uub, Constant):
-          ub = np.array([float(uub)]*n)
-        else:
-          ub = np.array([float(v) for v in uub])
-
-      else:
-        mx = np.finfo(np.double).max
-        ub = np.array([mx]*n)
-
-        mn = np.finfo(np.double).min
-        lb = np.array([mn]*n)
-
-      if constraints is None:
-        nconstraints = 0
-        empty = np.array([], dtype=float)
-        clb = empty
-        cub = empty
-
-        def fun_g(x, user_data=None):
-          return empty
-        def jac_g(x, flag, user_data=None):
-          if flag:
-            rows = np.array([], dtype=int)
-            cols = np.array([], dtype=int)
-            return (rows, cols)
-          else:
-            return empty
-      else:
-
-        nconstraints = len(constraints)
-
-        def fun_g(x, user_data=None):
-          return np.array(constraints.function(x))
-        def jac_g(x, flag, user_data=None):
-          if flag:
-            # Don't have any sparsity information on constraints, pass in a dense matrix (it usually is anyway).
-            rows = []
-            for i in range(len(constraints)):
-              rows += [i] * n
-            cols = range(n) * len(constraints)
-            return (np.array(rows), np.array(cols))
-          else:
-            return np.array(constraints.jacobian(x))
-
-        clb = np.array([0] * len(constraints))
-        def constraint_ub(c):
-          if isinstance(c, EqualityConstraint):
-            return [0] * len(c)
-          elif isinstance(c, InequalityConstraint):
-            return [np.inf] * len(c)
-        cub = np.array(sum([constraint_ub(c) for c in constraints], []))
-
-      nlp = pyipopt.create(n,    # length of parameter vector
-                           lb,   # lower bounds on parameter vector
-                           ub,   # upper bounds on parameter vector
-                           nconstraints,    # number of constraints (zero for now),
-                           clb,  # lower bounds on constraints,
-                           cub,  # upper bounds on constraints,
-                           nconstraints*n,    # number of nonzeros in the constraint Jacobian
-                           0,    # number of nonzeros in the Hessian
-                           self.__call__,   # to evaluate the functional
-                           partial(self.derivative, forget=False), # to evaluate the gradient
-                           fun_g,            # to evaluate the constraints
-                           jac_g)            # to evaluate the constraint Jacobian
-
-      pyipopt.set_loglevel(1) # turn off annoying pyipopt logging
-
-      rank = misc.rank()
-
-      if rank > 0:
-        nlp.int_option('print_level', 0) # disable redundant IPOPT output in parallel
-      else:
-        nlp.int_option('print_level', 6) # very useful IPOPT output
-
-
-      # At the moment, nlp.solve returns a bunch of numpy arrays, and
-      # the values of the parameters aren't changed. I'd like nlp.solve
-      # to instead return the high-level dolfin objects,
-
-      class IPOPTProblem(object):
-        def __init__(self, nlp):
-          self.nlp = nlp
-
-        def solve(newself, full=False):
-          # self refers to the ReducedFunctionalNumPy instance, newself to the IPOPTProblem instance
-          guess = self.get_parameters()
-          results = newself.nlp.solve(guess)
-          new_params = [copy_data(p.data()) for p in self.parameter]
-          self.set_local(new_params, results[0])
-
-          if len(new_params) == 1:
-            new_params = new_params[0]
-
-          if not full:
-            return new_params
-          else:
-            return [new_params] + results[1:]
-
-        def __getattr__(self, x):
-          return getattr(self.nlp, x)
-
-      return IPOPTProblem(nlp)
 
     def pyopt_problem(self, constraints=None, bounds=None, name="Problem", ignore_model_errors=False):
       '''Return a pyopt problem class that can be used with the PyOpt package,
@@ -345,7 +141,7 @@ class ReducedFunctionalNumPy(ReducedFunctional):
       constraints = optimization.constraints.canonicalise(constraints)
 
       def obj(x):
-          ''' Evaluates the functional for the parameter choice x. '''
+          ''' Evaluates the functional for the given controls values. '''
 
           fail = False
           if not ignore_model_errors:
@@ -357,15 +153,16 @@ class ReducedFunctionalNumPy(ReducedFunctional):
                   fail = True
 
           if constraints is not None:
-              g = constraints.function(x)
+              # Not sure how to do this in parallel, FIXME
+              g = np.concatenate(constraints.function(x))
           else:
               g = [0]  # SNOPT fails if no constraints are given, hence add a dummy constraint
 
           return j, g, fail
 
       def grad(x, f, g):
-          ''' Evaluates the gradient for the parameter choice x.
-          f is the associated functional value and g are the values 
+          ''' Evaluates the gradient for the control values.
+          f is the associated functional value and g are the values
           of the constraints. '''
 
           fail = False
@@ -391,17 +188,17 @@ class ReducedFunctionalNumPy(ReducedFunctional):
       opt_prob.addObj('J')
 
       # Compute bounds
-      m = self.get_parameters() 
+      m = self.get_controls()
       n = len(m)
 
       if bounds is not None:
-        bounds_arr = [None, None]  
+        bounds_arr = [None, None]
         for i in range(2):
             if isinstance(bounds[i], float) or isinstance(bounds[i], int):
                 bounds_arr[i] = np.ones(n) * bounds[i]
             else:
                 bounds_arr[i] = np.array(bounds[i])
-        lb, ub = bounds_arr 
+        lb, ub = bounds_arr
 
       else:
         mx = np.finfo(np.double).max
@@ -410,30 +207,32 @@ class ReducedFunctionalNumPy(ReducedFunctional):
         mn = np.finfo(np.double).min
         lb = mn * np.ones(n)
 
-      # Add parameters
-      opt_prob.addVarGroup(self.parameter[0].var.name, n, type='c', value=m, lower=lb, upper=ub)
+      # Add controls
+      opt_prob.addVarGroup("variables", n, type='c', value=m, lower=lb, upper=ub)
 
       # Add constraints
       if constraints is not None:
           for i, c in enumerate(constraints):
               if isinstance(c, optimization.constraints.EqualityConstraint):
-                opt_prob.addConGroup(str(i) + 'th constraint', len(c), type='e', equal=0.0)
+                opt_prob.addConGroup(str(i) + 'th constraint', c._get_constraint_dim(), type='e', equal=0.0)
               elif isinstance(c, optimization.constraints.InequalityConstraint):
-                opt_prob.addConGroup(str(i) + 'th constraint', len(c), type='i', lower=0.0, upper=np.inf)
+                opt_prob.addConGroup(str(i) + 'th constraint', c._get_constraint_dim(), type='i', lower=0.0, upper=np.inf)
 
       return opt_prob, grad
 
 
 def copy_data(m):
     ''' Returns a deep copy of the given Function/Constant. '''
-    if hasattr(m, "vector"): 
+    if hasattr(m, "vector"):
         return Function(m.function_space())
-    elif hasattr(m, "value_size"): 
+    elif hasattr(m, "value_size"):
         return Constant(m(()))
+    elif hasattr(m, "copy"):
+        return m.copy()
     else:
-        raise TypeError, 'Unknown parameter type %s.' % str(type(m)) 
+        raise TypeError, 'Unknown control type %s.' % str(type(m))
 
-def get_global(m_list, in_euclidian_space=False, has_cholmod=False, LT=None, factor=None, sqD=None):
+def get_global(m_list):
     ''' Takes a list of distributed objects and returns one np array containing their (serialised) values '''
     if not isinstance(m_list, (list, tuple)):
         m_list = [m_list]
@@ -445,40 +244,32 @@ def get_global(m_list, in_euclidian_space=False, has_cholmod=False, LT=None, fac
         if m == None or type(m) == float:
             m_global.append(m)
 
-        elif hasattr(m, "tolist"): 
+        elif hasattr(m, "tolist"):
             m_global += m.tolist()
 
-        # Function parameters of type Function 
-        elif hasattr(m, "vector") or hasattr(m, "gather"): 
+        # Control of type Function
+        elif hasattr(m, "vector") or hasattr(m, "gather"):
             if not hasattr(m, "gather"):
                 m_v = m.vector()
             else:
                 m_v = m
             m_a = gather(m_v)
 
-            # Map the result to Euclidian space
-            if in_euclidian_space:
-                #info("Mapping to Euclidian space")
-                if has_cholmod:
-                    m_a = sqD*factor.L_D()[0].transpose()*factor.apply_P(m_a)
-                else:
-                    m_a = np.dot(LT, m_a)
-
             m_global += m_a.tolist()
 
-        # Parameters of type Constant 
-        elif hasattr(m, "value_size"): 
+        # Parameters of type Constant
+        elif hasattr(m, "value_size"):
             a = np.zeros(m.value_size())
             p = np.zeros(m.value_size())
             m.eval(a, p)
             m_global += a.tolist()
 
         else:
-            raise TypeError, 'Unknown parameter type %s.' % str(type(m)) 
+            raise TypeError, 'Unknown control type %s.' % str(type(m))
 
     return np.array(m_global, dtype='d')
 
-def set_local(m_list, m_global_array, in_euclidian_space=False, has_cholmod=False, LT=None, factor=None, sqDinv=None):
+def set_local(m_list, m_global_array):
     ''' Sets the local values of one or a list of distributed object(s) to the values contained in the global array m_global_array '''
 
     if not isinstance(m_list, (list, tuple)):
@@ -486,30 +277,23 @@ def set_local(m_list, m_global_array, in_euclidian_space=False, has_cholmod=Fals
 
     offset = 0
     for m in m_list:
-        # Function parameters of type dolfin.Function 
-        if hasattr(m, "vector"): 
-
-            if in_euclidian_space:
-                #info("Mapping from Euclidian space")
-                if has_cholmod:
-                    m_global_array = factor.apply_Pt(factor.solve_Lt(sqDinv*m_global_array))
-                else:
-                    m_global_array = np.linalg.solve(LT, m_global_array)
+        # Control of type dolfin.Function
+        if hasattr(m, "vector"):
 
             range_begin, range_end = m.vector().local_range()
             m_a_local = m_global_array[offset + range_begin:offset + range_end]
             m.vector().set_local(m_a_local)
             m.vector().apply('insert')
-            offset += m.vector().size() 
-        # Parameters of type dolfin.Constant 
-        elif hasattr(m, "value_size"): 
+            offset += m.vector().size()
+        # Parameters of type dolfin.Constant
+        elif hasattr(m, "value_size"):
             m.assign(constant.Constant(np.reshape(m_global_array[offset:offset+m.value_size()], m.shape())))
-            offset += m.value_size()    
-        elif isinstance(m, np.ndarray): 
+            offset += m.value_size()
+        elif isinstance(m, np.ndarray):
             m[:] = m_global_array[offset:offset+len(m)]
             offset += len(m)
         else:
-            raise TypeError, 'Unknown parameter type %s' % m.__class__
+            raise TypeError, 'Unknown control type %s' % m.__class__
 
 
 ReducedFunctionalNumpy = ReducedFunctionalNumPy

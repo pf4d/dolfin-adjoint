@@ -315,7 +315,7 @@ class Matrix(libadjoint.Matrix):
           output = Vector(backend.Function(output.fn_space, backend.assemble(output.data)))
     elif b.data is None:
         backend.info_red("Warning: got zero RHS for the solve associated with variable %s" % var)
-        output = Vector(backedn.Function(self.test_function().function_space()))
+        output = Vector(backend.Function(self.test_function().function_space()))
     else:
         dirichlet_bcs = [backend.homogenize(bc) for bc in self.bcs if isinstance(bc, backend.DirichletBC)]
         other_bcs  = [bc for bc in self.bcs if not isinstance(bc, backend.DirichletBC)]
@@ -410,9 +410,23 @@ def wrap_solve(A, x, b, solver_parameters):
 
    # Comment. Why does list_lu_solver_methods() not return, a, uhm, list?
    lu_solvers = ["lu", "mumps", "umfpack", "spooles", "superlu", "superlu_dist", "pastix", "petsc"]
-   
+
    if backend.__name__ == "dolfin":
+     # dolfin's API for expressing linear_solvers and preconditioners has changed in 1.4. Here I try
+     # to support both.
      method = solver_parameters.get("linear_solver", "default")
+     pc = solver_parameters.get("preconditioner", "default")
+
+     if "nonlinear_solver" in solver_parameters or "newton_solver" in solver_parameters:
+        nonlinear_solver = solver_parameters.get("nonlinear_solver", "newton")
+        sub_options = nonlinear_solver + "_solver"
+
+        if sub_options in solver_parameters:
+          newton_options = solver_parameters[sub_options]
+
+          method = newton_options.get("linear_solver", method)
+          pc = newton_options.get("preconditioner", pc)
+
      if method in lu_solvers or method == "default":
        if method == "lu": method = "default"
        solver = backend.LUSolver(method)
@@ -423,8 +437,6 @@ def wrap_solve(A, x, b, solver_parameters):
        solver.solve(A, x, b)
        return
      else:
-       dangerous_parameters = ["preconditioner"]
-       pc = solver_parameters.get("preconditioner", "default")
        solver = backend.KrylovSolver(method, pc)
 
        if "krylov_solver" in solver_parameters:
@@ -433,7 +445,7 @@ def wrap_solve(A, x, b, solver_parameters):
        solver.solve(A, x, b)
        return
    else:
-     backend.solve(A, x, b)
+     backend.solve(A, x, b, solver_parameters=solver_parameters)
      return
 
 def wrap_assemble(form, test):

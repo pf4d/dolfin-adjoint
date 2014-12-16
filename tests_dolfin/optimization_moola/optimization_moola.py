@@ -11,7 +11,6 @@ except ImportError:
 
 dolfin.set_log_level(ERROR)
 parameters['std_out_all_processes'] = False
-x = triangle.x
 
 def solve_pde(u, V, m):
     v = TestFunction(V)
@@ -27,6 +26,9 @@ if __name__ == "__main__":
     u = Function(V, name='State')
     W = FunctionSpace(mesh, "DG", 0)
     m = Function(W, name='Control')
+    x = SpatialCoordinate(mesh)
+
+    x = SpatialCoordinate(mesh)
 
     u_d = 1/(2*pi**2)*sin(pi*x[0])*sin(pi*x[1]) 
 
@@ -36,7 +38,7 @@ if __name__ == "__main__":
     solve_pde(u, V, m)
 
     # Run the optimisation 
-    rf = ReducedFunctional(J, InitialConditionParameter(m, value=m))
+    rf = ReducedFunctional(J, Control(m, value=m))
     problem = rf.moola_problem()
     m_moola = moola.DolfinPrimalVector(m)
     

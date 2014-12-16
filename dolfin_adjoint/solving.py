@@ -348,8 +348,12 @@ def solve(*args, **kwargs):
 
   # Avoid recursive annotation
   flag = misc.pause_annotation()
-  ret = backend.solve(*args, **kwargs)
-  misc.continue_annotation(flag)
+  try:
+      ret = backend.solve(*args, **kwargs)
+  except:
+      raise
+  finally:
+      misc.continue_annotation(flag)
 
   if to_annotate:
     # Finally, if we want to record all of the solutions of the real forward model
@@ -382,7 +386,8 @@ def define_nonlinear_equation(F, u):
 
   return (mass, backend.action(mass, u) - F)
 
-def adj_checkpointing(strategy, steps, snaps_on_disk, snaps_in_ram, verbose=False, replay = False, replay_comparison_tolerance = 1e-10):
+def adj_checkpointing(strategy, steps, snaps_on_disk,
+        snaps_in_ram, verbose=False, replay = False, replay_comparison_tolerance = 1e-10):
   backend.parameters["adjoint"]["record_all"] = replay
   adjglobals.adjointer.set_checkpoint_strategy(strategy)
   adjglobals.adjointer.set_revolve_options(steps, snaps_on_disk, snaps_in_ram, verbose)
