@@ -18,8 +18,8 @@ class NonlinearVariationalProblem(backend.NonlinearVariationalProblem):
 class NonlinearVariationalSolver(backend.NonlinearVariationalSolver):
   '''This object is overloaded so that solves using this class are automatically annotated,
   so that libadjoint can automatically derive the adjoint and tangent linear models.'''
-  def __init__(self, problem):
-    backend.NonlinearVariationalSolver.__init__(self, problem)
+  def __init__(self, problem, solver_parameters=None):
+    backend.NonlinearVariationalSolver.__init__(self, problem, solver_parameters=solver_parameters)
     self.problem = problem
 
   def solve(self, annotate=None):
@@ -32,7 +32,7 @@ class NonlinearVariationalSolver(backend.NonlinearVariationalSolver):
 
     if annotate:
       problem = self.problem
-      solving.annotate(problem.F == 0, problem.u, problem.bcs, J=problem.J, solver_parameters=self.parameters.to_dict())
+      solving.annotate(problem.F == 0, problem.u, problem.bcs, J=problem.J, solver_parameters=self.parameters)
 
     out = backend.NonlinearVariationalSolver.solve(self)
 
@@ -68,7 +68,7 @@ class LinearVariationalSolver(backend.LinearVariationalSolver):
 
     if annotate:
       problem = self.problem
-      solving.annotate(problem.a == problem.L, problem.u, problem.bcs, solver_parameters=self.parameters.to_dict())
+      solving.annotate(problem.a == problem.L, problem.u, problem.bcs, solver_parameters=self.parameters)
 
     out = backend.LinearVariationalSolver.solve(self)
 

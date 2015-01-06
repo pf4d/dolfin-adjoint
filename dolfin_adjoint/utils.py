@@ -2,6 +2,7 @@ import libadjoint
 from backend import info_red, info_blue, info, warning
 import adjglobals
 import backend
+import compatibility
 import numpy
 import constant
 import adjresidual
@@ -486,10 +487,7 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
       perturbation_direction = numpy.array([get_const(x)/5.0 for x in m.v])
     elif isinstance(m, controls.FunctionControl):
       ic = get_value(m, value)
-      perturbation_direction = backend.Function(ic)
-      vec = perturbation_direction.vector()
-      for i in range(len(vec)):
-        vec[i] = random.random()
+      perturbation_direction = compatibility._create_random_function(ic.function_space())
     else:
       raise libadjoint.exceptions.LibadjointErrorNotImplemented("Don't know how to compute a perturbation direction")
   else:
