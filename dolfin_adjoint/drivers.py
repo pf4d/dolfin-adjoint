@@ -132,7 +132,7 @@ def compute_gradient(J, param, forget=True, ignore=[], callback=lambda var, outp
       continue
 
     (adj_var, output) = adjglobals.adjointer.get_adjoint_solution(i, J)
-    print "Output: ", output.data.vector().array()
+    print "In compute_gradient: output from get_adjoint_solution: ", output.data.vector().array()
 
     callback(adj_var, output.data)
 
