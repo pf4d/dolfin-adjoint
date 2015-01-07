@@ -565,7 +565,11 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
       if backend.__name__  == "dolfin":
         remainder = abs(functional_values[i] - Jm - dJdm.vector().inner(perturbations[i].vector()))
       else:
-        remainder = abs(functional_values[i] - Jm - numpy.dot(dJdm.vector().array(), perturbations[i].vector().array()))
+        total = 0
+        for j in range(len(dJdm.vector().array()[0])):
+           total += numpy.dot(dJdm.vector().array()[0][j], perturbations[i].vector().array()[0][j])
+        total += numpy.dot(dJdm.vector().array()[1], perturbations[i].vector().array()[1])
+        remainder = abs(functional_values[i] - Jm - total)
       with_gradient.append(remainder)
 
   if min(with_gradient + no_gradient) < 1e-16:
