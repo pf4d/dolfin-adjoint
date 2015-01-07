@@ -1,4 +1,5 @@
 import backend
+import random
 
 def _extract_args(*args, **kwargs):
     eq, u, bcs, _, _, _, _, solver_parameters, _ = backend.solving._extract_args(*args, **kwargs)
