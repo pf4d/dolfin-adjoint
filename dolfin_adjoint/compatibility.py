@@ -20,6 +20,7 @@ def _create_random_function(function_space):
         r = backend.Function(function_space)
         components = ("((float) rand()) / (float) RAND_MAX",)
         if isinstance(r, backend.Function):
+          if(r.rank() > 0):
             components *= len(r)
         temp = backend.Expression(components)
         r.interpolate(temp)
