@@ -59,7 +59,7 @@ class BoundConstraint(constraints.InequalityConstraint):
             out = Function(m)
 
             if isinstance(self.bound, float):
-                out_vec = out.vector() 
+                out_vec = out.vector()
                 out_vec *= self.scale
                 out_vec[:] -= self.scale*self.bound
             elif isinstance(self.bound, Function):
@@ -351,7 +351,7 @@ try:
 
         def __init__(self, problem, constraints):
             self.constraints = constraints
-            self.list_type = problem.reduced_functional.controls
+            self.list_type = problem.reduced_functional.parameter
 
         @optizelle_callback
         def eval(self, x, y):
@@ -468,7 +468,7 @@ class OptizelleSolver(OptimizationSolver):
         bound_inequality_constraints = []
         if self.problem.bounds is not None:
             # We need to process the damn bounds
-            for (parameter, bound) in zip(self.problem.reduced_functional.controls, self.problem.bounds):
+            for (parameter, bound) in zip(self.problem.reduced_functional.parameter, self.problem.bounds):
                 (lb, ub) = bound
 
                 if lb is not None:
@@ -488,7 +488,7 @@ class OptizelleSolver(OptimizationSolver):
             num_equality_constraints = self.problem.constraints.equality_constraints()._get_constraint_dim()
             num_inequality_constraints = self.problem.constraints.inequality_constraints()._get_constraint_dim() + len(bound_inequality_constraints)
 
-        x = [p.data() for p in self.problem.reduced_functional.controls]
+        x = [p.data() for p in self.problem.reduced_functional.parameter]
 
         # Unconstrained case
         if num_equality_constraints == 0 and num_inequality_constraints == 0:
@@ -610,5 +610,5 @@ class OptizelleSolver(OptimizationSolver):
         print("The algorithm converged due to: %s" % (Optizelle.StoppingCondition.to_string(self.state.opt_stop)))
 
         # Return the optimal control
-        list_type = self.problem.reduced_functional.controls
+        list_type = self.problem.reduced_functional.parameter
         return delist(self.state.x, list_type)
