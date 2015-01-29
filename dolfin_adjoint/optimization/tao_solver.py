@@ -75,7 +75,8 @@ class TAOSolver(OptimizationSolver):
             def __init__(self):
                 # create solution vector
                 # Use value of parameter object as initial guess for the optimisation
-                self.x = ctrl_vec.copy()
+                #self.x = ctrl_vec.copy()
+                self.x = ctrl_vec.duplicate()
                 
                 # create Hessian matrix
                 self.H = PETSc.Mat().create(comm=PETSc.COMM_WORLD)
