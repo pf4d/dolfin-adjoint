@@ -284,7 +284,10 @@ class Matrix(libadjoint.Matrix):
 
         assembled_lhs = self.assemble_data()
         [bc.apply(assembled_lhs) for bc in bcs]
-        assembled_rhs = backend.Function(b.data).vector()
+        if backend.__name__ == "dolfin":
+           assembled_rhs = backend.Function(b.data).vector()
+        else:
+           assembled_rhs = backend.Function(b.data)
         [bc.apply(assembled_rhs) for bc in bcs]
 
         wrap_solve(assembled_lhs, x.data.vector(), assembled_rhs, self.solver_parameters)

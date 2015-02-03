@@ -113,7 +113,10 @@ def dolfin_adjoint_interpolate(self, other, annotate=None):
 
 if hasattr(backend.Function, 'sub'):
   def dolfin_adjoint_sub(self, idx, deepcopy=False):
-      out = dolfin_sub(self, idx, deepcopy=deepcopy)
+      if backend.__name__ == "dolfin":
+         out = dolfin_sub(self, idx, deepcopy=deepcopy)
+      else:
+         out = dolfin_sub(self, idx)
       out.super_idx = idx
       out.super_fn  = self
       return out
@@ -150,7 +153,7 @@ class Function(backend.Function):
       if backend.__name__ == "dolfin":
         self.rename(self.adj_name, "a Function from dolfin-adjoint")
       else:
-        self.name = self.adj_name
+        self.name = self.__str__
 
     if to_annotate:
       if not isinstance(args[0], compatibility.function_space_type):
@@ -175,7 +178,7 @@ class Function(backend.Function):
 
   def __str__(self):
     return dolfin_adjoint_str(self)
-
+    
   def interpolate(self, other, annotate=None):
     if annotate is True and backend.parameters["adjoint"]["stop_annotating"]:
       raise AssertionError("The user insisted on annotation, but stop_annotating is True.")

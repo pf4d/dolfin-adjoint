@@ -548,8 +548,8 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
   # First-order Taylor remainders (not using adjoint)
   no_gradient = [abs(perturbed_J - Jm) for perturbed_J in functional_values]
 
-  info("Taylor remainder without gradient information: " + str(no_gradient))
-  info("Convergence orders for Taylor remainder without gradient information (should all be 1): " + str(convergence_order(no_gradient)))
+  warning("Taylor remainder without gradient information: " + str(no_gradient))
+  warning("Convergence orders for Taylor remainder without gradient information (should all be 1): " + str(convergence_order(no_gradient)))
 
   with_gradient = []
   if isinstance(m, controls.ConstantControl):
@@ -578,8 +578,11 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
   if min(with_gradient + no_gradient) < 1e-16:
     warning("Warning: The Taylor remainders are close to machine precision (< %s). Try increasing the seed value in case the Taylor remainder test fails." % min(with_gradient + no_gradient))
 
-  info("Taylor remainder with gradient information: " + str(with_gradient))
-  info("Convergence orders for Taylor remainder with gradient information (should all be 2): " + str(convergence_order(with_gradient)))
+  warning("Taylor remainder with gradient information: " + str(with_gradient))
+  warning("Convergence orders for Taylor remainder with gradient information (should all be 2): " + str(convergence_order(with_gradient)))
+
+  print no_gradient
+  print with_gradient
 
   if HJm is not None:
     with_hessian = []
