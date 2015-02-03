@@ -2,7 +2,6 @@ import libadjoint
 from backend import info_red, info_blue, info, warning
 import adjglobals
 import backend
-import compatibility
 import numpy
 import constant
 import adjresidual
@@ -34,6 +33,20 @@ def gather(vec):
       arr = vec # Assume it's a gathered numpy array already
 
   return arr
+
+def randomise(x):
+    """ Randomises the content of x, where x can be a Function or a numpy.array.
+    """
+
+    if hasattr(x, "vector"):
+        vec = x.vector()
+        vec_size = vec.local_size()
+        vec.set_local(numpy.random.random(vec_size))
+        vec.apply("")
+    else:
+        # Make sure we get consistent values in MPI environments
+        numpy.random.seed(seed=21)
+        x[:] = numpy.random.random(len(x))
 
 def convergence_order(errors, base = 2):
   import math
@@ -72,9 +85,7 @@ def test_initial_condition_adjoint(J, ic, final_adjoint, seed=0.01, perturbation
   # Randomise the perturbation direction:
   if perturbation_direction is None:
     perturbation_direction = backend.Function(ic.function_space())
-    vec = perturbation_direction.vector()
-    for i in range(len(vec)):
-      vec[i] = random.random()
+    randomise(perturbation_direction)
 
   # Run the forward problem for various perturbed initial conditions
   functional_values = []
@@ -167,9 +178,7 @@ def test_initial_condition_tlm(J, dJ, ic, seed=0.01, perturbation_direction=None
   # Randomise the perturbation direction:
   if perturbation_direction is None:
     perturbation_direction = backend.Function(ic.function_space())
-    vec = perturbation_direction.vector()
-    for i in range(len(vec)):
-      vec[i] = random.random()
+    randomise(perturbation_direction)
 
   # Run the forward problem for various perturbed initial conditions
   functional_values = []
@@ -229,9 +238,7 @@ def test_initial_condition_adjoint_cdiff(J, ic, final_adjoint, seed=0.01, pertur
   # Randomise the perturbation direction:
   if perturbation_direction is None:
     perturbation_direction = backend.Function(ic.function_space())
-    vec = perturbation_direction.vector()
-    for i in range(len(vec)):
-      vec[i] = random.random()
+    randomise(perturbation_direction)
 
   # Run the forward problem for various perturbed initial conditions
   functional_values_plus = []
@@ -487,7 +494,10 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
       perturbation_direction = numpy.array([get_const(x)/5.0 for x in m.v])
     elif isinstance(m, controls.FunctionControl):
       ic = get_value(m, value)
-      perturbation_direction = compatibility._create_random_function(ic.function_space())
+      perturbation_direction = backend.Function(ic)
+      vec = perturbation_direction.vector()
+      for i in range(len(vec)):
+        vec[i] = random.random()
     else:
       raise libadjoint.exceptions.LibadjointErrorNotImplemented("Don't know how to compute a perturbation direction")
   else:
@@ -548,8 +558,8 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
   # First-order Taylor remainders (not using adjoint)
   no_gradient = [abs(perturbed_J - Jm) for perturbed_J in functional_values]
 
-  warning("Taylor remainder without gradient information: " + str(no_gradient))
-  warning("Convergence orders for Taylor remainder without gradient information (should all be 1): " + str(convergence_order(no_gradient)))
+  info("Taylor remainder without gradient information: " + str(no_gradient))
+  info("Convergence orders for Taylor remainder without gradient information (should all be 1): " + str(convergence_order(no_gradient)))
 
   with_gradient = []
   if isinstance(m, controls.ConstantControl):
@@ -565,24 +575,14 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
       if backend.__name__  == "dolfin":
         remainder = abs(functional_values[i] - Jm - dJdm.vector().inner(perturbations[i].vector()))
       else:
-        total = 0
-        if(dJdm.rank() > 0):
-           for j in range(len(dJdm.vector().array()[0])):
-              total += numpy.dot(dJdm.vector().array()[0][j], perturbations[i].vector().array()[0][j])
-           total += numpy.dot(dJdm.vector().array()[1], perturbations[i].vector().array()[1])
-        else:
-           total += numpy.dot(dJdm.vector().array(), perturbations[i].vector().array())
-        remainder = abs(functional_values[i] - Jm - total)
+        remainder = abs(functional_values[i] - Jm - numpy.dot(dJdm.vector().array(), perturbations[i].vector().array()))
       with_gradient.append(remainder)
 
   if min(with_gradient + no_gradient) < 1e-16:
     warning("Warning: The Taylor remainders are close to machine precision (< %s). Try increasing the seed value in case the Taylor remainder test fails." % min(with_gradient + no_gradient))
 
-  warning("Taylor remainder with gradient information: " + str(with_gradient))
-  warning("Convergence orders for Taylor remainder with gradient information (should all be 2): " + str(convergence_order(with_gradient)))
-
-  print no_gradient
-  print with_gradient
+  info("Taylor remainder with gradient information: " + str(with_gradient))
+  info("Convergence orders for Taylor remainder with gradient information (should all be 2): " + str(convergence_order(with_gradient)))
 
   if HJm is not None:
     with_hessian = []
