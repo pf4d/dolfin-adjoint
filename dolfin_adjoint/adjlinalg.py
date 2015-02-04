@@ -284,20 +284,13 @@ class Matrix(libadjoint.Matrix):
 
         assembled_lhs = self.assemble_data()
         [bc.apply(assembled_lhs) for bc in bcs]
-        if backend.__name__ == "dolfin":
-           assembled_rhs = backend.Function(b.data).vector()
-        else:
-           assembled_rhs = backend.Function(b.data)
+        assembled_rhs = compatibility.assembled_rhs(b)
         [bc.apply(assembled_rhs) for bc in bcs]
 
         wrap_solve(assembled_lhs, x.data.vector(), assembled_rhs, self.solver_parameters)
       else:
         if hasattr(b, 'nonlinear_form'): # was a nonlinear solve
-          if backend.__name__ == "dolfin":
-            x.data.vector()[:] = b.nonlinear_u.vector()
-          else:
-            x = Vector(backend.Function(test.function_space()).assign(b.nonlinear_u))
-            
+          x = compatibility.assign_function_to_vector(x, b.nonlinear_u, function_space = test.function_space())            
           F = backend.replace(b.nonlinear_form, {b.nonlinear_u: x.data})
           J = backend.replace(b.nonlinear_J, {b.nonlinear_u: x.data})
           compatibility.solve(F == 0, x.data, b.nonlinear_bcs, J=J, solver_parameters=self.solver_parameters)

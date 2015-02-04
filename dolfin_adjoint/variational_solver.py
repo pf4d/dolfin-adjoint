@@ -4,6 +4,7 @@ import libadjoint
 import adjglobals
 import adjlinalg
 import utils
+import compatibility
 
 class NonlinearVariationalProblem(backend.NonlinearVariationalProblem):
   '''This object is overloaded so that solves using this class are automatically annotated,
@@ -13,10 +14,7 @@ class NonlinearVariationalProblem(backend.NonlinearVariationalProblem):
     self.F = F
     self.u = u
     self.bcs = bcs
-    if backend.__name__ == "dolfin":
-      self.J = J
-    else:
-      self.J = J or backend.ufl_expr.derivative(F, u)
+    self.J = compatibility.get_J(J, F, u)
 
 class NonlinearVariationalSolver(backend.NonlinearVariationalSolver):
   '''This object is overloaded so that solves using this class are automatically annotated,
