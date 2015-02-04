@@ -78,7 +78,6 @@ def test_initial_condition_adjoint(J, ic, final_adjoint, seed=0.01, perturbation
   # We will compute the gradient of the functional with respect to the initial condition,
   # and check its correctness with the Taylor remainder convergence test.
   info_blue("Running Taylor remainder convergence analysis for the adjoint model ... ")
-  import random
 
   # First run the problem unperturbed
   ic_copy = backend.Function(ic)
@@ -164,7 +163,6 @@ def test_initial_condition_tlm(J, dJ, ic, seed=0.01, perturbation_direction=None
   # We will compute the gradient of the functional with respect to the initial condition,
   # and check its correctness with the Taylor remainder convergence test.
   info_blue("Running Taylor remainder convergence analysis for the tangent linear model... ")
-  import random
   import controls
 
   adj_var = adjglobals.adj_variables[ic]; adj_var.timestep = 0
@@ -229,7 +227,6 @@ def test_initial_condition_adjoint_cdiff(J, ic, final_adjoint, seed=0.01, pertur
   # We will compute the gradient of the functional with respect to the initial condition,
   # and check its correctness with the Taylor remainder convergence test.
   info_blue("Running central differencing Taylor remainder convergence analysis for the adjoint model ... ")
-  import random
 
   # First run the problem unperturbed
   ic_copy = backend.Function(ic)
@@ -436,7 +433,6 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
      is correct.'''
 
   info_blue("Running Taylor remainder convergence test ... ")
-  import random
   import controls
 
   if isinstance(m, list):
@@ -572,6 +568,7 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
         remainder = abs(functional_values[i] - Jm - dJdm.vector().inner(perturbations[i].vector()))
       else:
         total = 0
+        # FIXME: This needs generalising for the VectorFunctionSpace and MixedFunctionSpace case. Currently this will give the wrong gradient information for VectorFunctionSpaces.
         if(dJdm.rank() > 0):
            for j in range(len(dJdm.vector().array()[0])):
               total += numpy.dot(dJdm.vector().array()[0][j], perturbations[i].vector().array()[0][j])

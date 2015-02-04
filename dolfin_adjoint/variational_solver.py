@@ -13,7 +13,10 @@ class NonlinearVariationalProblem(backend.NonlinearVariationalProblem):
     self.F = F
     self.u = u
     self.bcs = bcs
-    self.J = J
+    if backend.__name__ == "dolfin":
+      self.J = J
+    else:
+      self.J = J or backend.ufl_expr.derivative(F, u)
 
 class NonlinearVariationalSolver(backend.NonlinearVariationalSolver):
   '''This object is overloaded so that solves using this class are automatically annotated,
@@ -21,6 +24,7 @@ class NonlinearVariationalSolver(backend.NonlinearVariationalSolver):
   def __init__(self, problem, solver_parameters=None):
     backend.NonlinearVariationalSolver.__init__(self, problem, solver_parameters=solver_parameters)
     self.problem = problem
+    
 
   def solve(self, annotate=None):
     '''To disable the annotation, just pass :py:data:`annotate=False` to this routine, and it acts exactly like the
