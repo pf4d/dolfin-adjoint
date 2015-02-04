@@ -367,8 +367,7 @@ def test_gradient_array(J, dJdx, x, seed = 0.01, perturbation_direction = None, 
   # Randomise the perturbation direction:
   if perturbation_direction is None:
     perturbation_direction = x.copy()
-    for i in range(len(x)):
-      perturbation_direction[i] = random.random()
+    randomise(perturbation_direction)
 
   # Run the forward problem for various perturbed initial conditions
   functional_values = []

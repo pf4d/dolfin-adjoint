@@ -30,6 +30,5 @@ if __name__ == "__main__":
     return assemble(soln*soln*dx)
 
   minconv = taylor_test(J, FunctionControl(ic), Jic, dJdic)
-  if minconv < 1.9:
-    sys.exit(1)
-
+  assert minconv > 1.9
+  info_green("Test passed")
