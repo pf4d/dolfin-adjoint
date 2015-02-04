@@ -557,12 +557,23 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
         remainder = abs(functional_values[i] - Jm - dJdm.vector().inner(perturbations[i].vector()))
       else:
         total = 0
-        # FIXME: This needs generalising for the VectorFunctionSpace and MixedFunctionSpace case. Currently this will give the wrong gradient information for VectorFunctionSpaces.
         if(dJdm.rank() > 0):
-           for j in range(len(dJdm.vector().array()[0])):
-              total += numpy.dot(dJdm.vector().array()[0][j], perturbations[i].vector().array()[0][j])
-           total += numpy.dot(dJdm.vector().array()[1], perturbations[i].vector().array()[1])
+           if(isinstance(ic.function_space(), backend.VectorFunctionSpace)):
+              # VectorFunctionSpace
+              for j in range(len(dJdm.vector().array())):
+                 total += numpy.dot(dJdm.vector().array()[j], perturbations[i].vector().array()[j])
+           else:
+              # MixedFunctionSpace
+              for j in range(len(dJdm.vector().array())):
+                 if(isinstance(dJdm.vector().array()[j], list)):
+                    # Inner FunctionSpace
+                    total += numpy.dot(dJdm.vector().array()[j], perturbations[i].vector().array()[j])
+                 else:
+                    # Inner VectorFunctionSpace
+                    for k in range(len(dJdm.vector().array()[j])):
+                       total += numpy.dot(dJdm.vector().array()[j][k], perturbations[i].vector().array()[j][k])
         else:
+           # FunctionSpace
            total += numpy.dot(dJdm.vector().array(), perturbations[i].vector().array())
         remainder = abs(functional_values[i] - Jm - total)
       with_gradient.append(remainder)
