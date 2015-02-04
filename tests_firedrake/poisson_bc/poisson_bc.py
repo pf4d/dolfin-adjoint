@@ -17,9 +17,6 @@ This has the analytical solution
 from firedrake import *
 from firedrake_adjoint import *
 
-op2.init(lazy_evaluation=False)
-parameters["coffee"]["O2"] = False
-
 mesh = UnitSquareMesh(10, 10)
 V = FunctionSpace(mesh, "CG", 1)
 
