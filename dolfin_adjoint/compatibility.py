@@ -39,7 +39,7 @@ if backend.__name__ == "dolfin":
 
 else:
     solve = backend.solving.solve
-    matrix_types = lambda: backend.op2.petsc_base.Mat
+    matrix_types = lambda: backend.op2.base.Mat
     function_type = backend.Function
     function_space_type = (backend.FunctionSpace, backend.MixedFunctionSpace)
 
