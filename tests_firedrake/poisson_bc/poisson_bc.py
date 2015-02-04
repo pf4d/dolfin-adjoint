@@ -20,11 +20,11 @@ from firedrake_adjoint import *
 mesh = UnitSquareMesh(10, 10)
 V = FunctionSpace(mesh, "CG", 1)
 
-def model(s, annotate=True):
+def model(s):
     # Create mesh and define function space
 
     # Define variational problem
-    u = Function(V, name="u", annotate=annotate)
+    u = Function(V, name="u")
     v = TestFunction(V)
     a = dot(grad(v), grad(u)) * dx + s * v * dx
 
@@ -32,23 +32,19 @@ def model(s, annotate=True):
            DirichletBC(V, 42, 2)]
 
     # Compute solution
-    solve(a == 0, u, bcs=bcs, annotate=annotate)
+    solve(a == 0, u, bcs=bcs)
 
-    f = Function(V, name="f", annotate=annotate)
+    f = Function(V, name="f")
     f.interpolate(Expression("42*x[1]"))
 
     return assemble(dot(u - f, u - f) * dx), u, f
 
 if __name__ == '__main__':
-    s = Function(V, name="s", annotate=True)
+    s = Function(V, name="s")
     s.assign(1)
     
-    print s.vector().array()
-
     print "Running forward model"
-    j, u, f = model(s, annotate=True)
-
-    print u.vector().array()
+    j, u, f = model(s)
     
     adj_html("forward.html", "forward")
     print "Replaying forward model"
@@ -58,11 +54,11 @@ if __name__ == '__main__':
     m = FunctionControl(s)
 
     print "Running adjoint model"
-    dJdm = compute_gradient(J, m, forget=False)
+    dJdm = compute_gradient(J, m, forget=None)
 
     parameters["adjoint"]["stop_annotating"] = True
 
-    Jhat = lambda s: model(s, annotate=False)[0]
+    Jhat = lambda s: model(s)[0]
     conv_rate = taylor_test(Jhat, m, j, dJdm, seed=1e-3)
     assert conv_rate > 1.9
     info_green("Test passed")
