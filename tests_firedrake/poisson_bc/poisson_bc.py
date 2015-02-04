@@ -50,7 +50,7 @@ if __name__ == '__main__':
     print "Replaying forward model"
     assert replay_dolfin(tol=0.0, stop=True)
 
-    J = Functional(dot(u - f, u - f) * dx)
+    J = Functional(inner(u - f, u - f) * dx * dt[FINISH_TIME])
     m = FunctionControl(s)
 
     print "Running adjoint model"
