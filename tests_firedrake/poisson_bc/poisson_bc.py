@@ -42,10 +42,10 @@ def model(s):
 if __name__ == '__main__':
     s = Function(V, name="s")
     s.assign(1)
-    
+
     print "Running forward model"
     j, u, f = model(s)
-    
+
     adj_html("forward.html", "forward")
     print "Replaying forward model"
     assert replay_dolfin(tol=0.0, stop=True)
