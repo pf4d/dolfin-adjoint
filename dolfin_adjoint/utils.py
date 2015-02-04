@@ -343,7 +343,7 @@ def test_scalar_parameters_adjoint(J, a, dJda, seed=0.1):
 
   return min(convergence_order(with_gradient))
 
-def test_gradient_array(J, dJdx, x, seed = 0.01, perturbation_direction = None, random_seed = 118):
+def test_gradient_array(J, dJdx, x, seed = 0.01, perturbation_direction = None):
   '''Checks the correctness of the derivative dJ.
      x must be an array that specifies at which point in the parameter space
      the gradient is to be checked, and dJdx must be an array containing the gradient.
@@ -351,11 +351,6 @@ def test_gradient_array(J, dJdx, x, seed = 0.01, perturbation_direction = None, 
 
      This function returns the order of convergence of the Taylor
      series remainder, which should be 2 if the gradient is correct.'''
-
-  import random
-  # Set the random seed to a constant. This is important for parallel environments to ensure that the
-  # perturbation direction is consistent between all processors.
-  random.seed(random_seed)
 
   # We will compute the gradient of the functional with respect to the initial condition,
   # and check its correctness with the Taylor remainder convergence test.
@@ -367,7 +362,7 @@ def test_gradient_array(J, dJdx, x, seed = 0.01, perturbation_direction = None, 
   # Randomise the perturbation direction:
   if perturbation_direction is None:
     perturbation_direction = x.copy()
-    randomise(perturbation_direction)
+    compatibility.randomise(perturbation_direction)
 
   # Run the forward problem for various perturbed initial conditions
   functional_values = []
