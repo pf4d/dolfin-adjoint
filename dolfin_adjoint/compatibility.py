@@ -8,24 +8,28 @@ def _extract_args(*args, **kwargs):
             solver_parameters = solver_parameters.to_dict()
     return eq, u, bcs, None, None, None, None, solver_parameters
         
-        
-def _create_random_function(function_space):
-    if backend.__name__ == "dolfin":
-        r = backend.Function(function_space)
-        vec = r.vector()
-        for i in range(len(vec)):
-            vec[i] = random.random()
-        return r
+def randomise(x):
+    """ Randomises the content of x, where x can be a Function or a numpy.array.
+    """
+    
+    if hasattr(x, "vector"):
+       if backend.__name__ == "dolfin":
+           vec = x.vector()
+           vec_size = vec.local_size()
+           vec.set_local(numpy.random.random(vec_size))
+           vec.apply("")
+       else:
+           components = ("((float) rand()) / (float) RAND_MAX",)
+           if isinstance(x, backend.Function):
+             if(x.rank() > 0):
+               components *= len(x)
+           temp = backend.Expression(components)
+           x.interpolate(temp)
     else:
-        r = backend.Function(function_space)
-        components = ("((float) rand()) / (float) RAND_MAX",)
-        if isinstance(r, backend.Function):
-          if(r.rank() > 0):
-            components *= len(r)
-        temp = backend.Expression(components)
-        r.interpolate(temp)
-        return r
-        
+        # Make sure we get consistent values in MPI environments
+        numpy.random.seed(seed=21)
+        x[:] = numpy.random.random(len(x))
+
 if backend.__name__ == "dolfin":
     solve = backend.fem.solving.solve
     matrix_types = lambda: (backend.cpp.Matrix, backend.GenericMatrix)

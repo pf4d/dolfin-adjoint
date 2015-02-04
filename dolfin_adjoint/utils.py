@@ -35,21 +35,6 @@ def gather(vec):
 
   return arr
 
-def randomise(x):
-    """ Randomises the content of x, where x can be a Function or a numpy.array.
-    """
-
-    if hasattr(x, "vector"):
-        vec = x.vector()
-        vec_size = vec.local_size()
-        vec.set_local(numpy.random.random(vec_size))
-        if backend.__name__  == "dolfin":
-            vec.apply("")
-    else:
-        # Make sure we get consistent values in MPI environments
-        numpy.random.seed(seed=21)
-        x[:] = numpy.random.random(len(x))
-
 def convergence_order(errors, base = 2):
   import math
 
@@ -85,7 +70,8 @@ def test_initial_condition_adjoint(J, ic, final_adjoint, seed=0.01, perturbation
 
   # Randomise the perturbation direction:
   if perturbation_direction is None:
-    perturbation_direction = compatibility._create_random_function(ic.function_space())
+    perturbation_direction = backend.Function(ic.function_space())
+    compatibility.randomise(perturbation_direction)
 
   # Run the forward problem for various perturbed initial conditions
   functional_values = []
@@ -176,7 +162,8 @@ def test_initial_condition_tlm(J, dJ, ic, seed=0.01, perturbation_direction=None
 
   # Randomise the perturbation direction:
   if perturbation_direction is None:
-    perturbation_direction = compatibility._create_random_function(ic.function_space())
+    perturbation_direction = backend.Function(ic.function_space())
+    compatibility.randomise(perturbation_direction)
 
   # Run the forward problem for various perturbed initial conditions
   functional_values = []
@@ -234,7 +221,8 @@ def test_initial_condition_adjoint_cdiff(J, ic, final_adjoint, seed=0.01, pertur
 
   # Randomise the perturbation direction:
   if perturbation_direction is None:
-    perturbation_direction = compatibility._create_random_function(ic.function_space())
+    perturbation_direction = backend.Function(ic.function_space())
+    compatibility.randomise(perturbation_direction)
 
   # Run the forward problem for various perturbed initial conditions
   functional_values_plus = []
@@ -489,7 +477,8 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
       perturbation_direction = numpy.array([get_const(x)/5.0 for x in m.v])
     elif isinstance(m, controls.FunctionControl):
       ic = get_value(m, value)
-      perturbation_direction = compatibility._create_random_function(ic.function_space())
+      perturbation_direction = backend.Function(ic.function_space())
+      compatibility.randomise(perturbation_direction)
     else:
       raise libadjoint.exceptions.LibadjointErrorNotImplemented("Don't know how to compute a perturbation direction")
   else:
