@@ -1,13 +1,26 @@
 import backend
 import numpy
 
-def _extract_args(*args, **kwargs):
-    eq, u, bcs, _, _, _, _, solver_parameters, _ = backend.solving._extract_args(*args, **kwargs)
+def lvs_init(self, problem, solver_parameters=None):
     if backend.__name__ == "dolfin":
-        if(not isinstance(solver_parameters, dict)):
-            solver_parameters = solver_parameters.to_dict()
-    return eq, u, bcs, None, None, None, None, solver_parameters
+        backend.LinearVariationalSolver.__init__(self, problem)
+    else:
+        backend.LinearVariationalSolver.__init__(self, problem, solver_parameters)
+    self.problem = problem
 
+
+def nvs_init(self, problem, solver_parameters=None):
+    if backend.__name__ == "dolfin":
+        backend.NonlinearVariationalSolver.__init__(self, problem)
+    else:
+        backend.NonlinearVariationalSolver.__init__(self, problem, solver_parameters)
+    self.problem = problem
+
+def to_dict(d):
+    if isinstance(d, dict):
+        return d
+    else:
+        return d.to_dict()
 
 def randomise(x):
     """ Randomises the content of x, where x can be a Function or a numpy.array.
@@ -65,7 +78,7 @@ def assign_function_to_vector(x, b, function_space):
    """
    
    if backend.__name__ == "dolfin":
-      x.data.vector()[:] = b.nonlinear_u.vector()
+      x.data.vector()[:] = b.vector()
    else:
       from dolfin_adjoint.adjlinalg import Vector
       x = Vector(backend.Function(function_space).assign(b))
@@ -85,3 +98,6 @@ else:
     function_type = backend.Function
     function_space_type = (backend.FunctionSpace, backend.MixedFunctionSpace)
 
+    def _extract_args(*args, **kwargs):
+        eq, u, bcs, _, _, _, _, solver_parameters, _ = backend.solving._extract_args(*args, **kwargs)
+        return eq, u, bcs, None, None, None, None, solver_parameters
