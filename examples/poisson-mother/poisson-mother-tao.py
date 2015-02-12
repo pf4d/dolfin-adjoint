@@ -15,14 +15,7 @@ from dolfin_adjoint import *
 set_log_level(ERROR)
 
 # Create mesh, refined in the center
-
-#           === method: "lmvm" ===
-#n = 512 #  iter = 2
-#n = 256 #  iter = 3
-#n = 128 #  iter = 4
-n = 64   #  iter = 4
-#n = 32  #  iter = 6
-#n = 16  #  iter = 7
+n = 64
 mesh = UnitSquareMesh(n, n)
 
 cf = CellFunction("bool", mesh)
@@ -64,7 +57,7 @@ parameters = { "monitor": None,
                "grtol": 0.0,
              }
 
-solver = TAOSolver(problem, parameters=parameters)
+solver = TAOSolver(problem, parameters=parameters, nonzero_initial_vec=False)
 f_opt = solver.solve()
 plot(f_opt, interactive=True)
 

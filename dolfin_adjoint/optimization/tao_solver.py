@@ -23,7 +23,7 @@ class TAOSolver(OptimizationSolver):
 
     """
 
-    def __init__(self, problem, parameters=None):
+    def __init__(self, problem, parameters=None, nonzero_initial_vec=False):
        
         try:
             from petsc4py import PETSc
@@ -35,6 +35,7 @@ class TAOSolver(OptimizationSolver):
             raise Exception, "Your petsc4py version does not support TAO. Please upgrade to petsc4py >= 3.5."
 
         self.PETSc = PETSc
+        self.nonzero_initial_vec = nonzero_initial_vec
 
         OptimizationSolver.__init__(self, problem, parameters)
 
@@ -62,6 +63,11 @@ class TAOSolver(OptimizationSolver):
 
         # ...then concatenate
         ctrl_vec = self.__petsc_vec_concatenate(ctrl_vecs)
+        
+        # create initial vector - zero or value of parameter object
+        self.x = ctrl_vec.copy()
+        if not self.nonzero_initial_vec:
+            self.x.zeroEntries()
 
         # TODO: Remove below. Limits support to a single control. 
         #tmp_ctrl = Function(rf.controls[0].data())
@@ -72,15 +78,10 @@ class TAOSolver(OptimizationSolver):
         class AppCtx(object):
             ''' Implements the application context for the TAO solver '''
 
-            def __init__(self):
-                # create solution vector
-                # Use value of parameter object as initial guess for the optimisation
-                #self.x = ctrl_vec.copy()
-                self.x = ctrl_vec.duplicate()
-                
+            def __init__(self):                
                 # create Hessian matrix
                 self.H = PETSc.Mat().create(comm=PETSc.COMM_WORLD)
-                dims = (self.x.local_size, self.x.size)
+                dims = (ctrl_vec.local_size, ctrl_vec.size)
                 self.H.createPython((dims,dims), comm=PETSc.COMM_WORLD)
                 self.H.setPythonContext(self)
                 self.H.setOption(PETSc.Mat.Option.SYMMETRIC, True)
@@ -211,7 +212,7 @@ class TAOSolver(OptimizationSolver):
         
         self.tao_problem.setObjectiveGradient(self.__user.objective_and_gradient)
         self.tao_problem.setHessian(self.__user.hessian, self.__user.H)
-        self.tao_problem.setInitial(self.__user.x)
+        self.tao_problem.setInitial(self.x)
 
         # Set bounds if we have any
         if self.problem.bounds is not None:
@@ -317,7 +318,7 @@ class TAOSolver(OptimizationSolver):
         return cvec
 
     def solve(self):
-        self.tao_problem.solve(self.__user.x)
+        self.tao_problem.solve(self.x)
         sol_vec = self.tao_problem.getSolution()
         self.__user.update(sol_vec)
 
