@@ -537,41 +537,13 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
   info("Convergence orders for Taylor remainder without gradient information (should all be 1): " + str(convergence_order(no_gradient)))
 
   with_gradient = []
-  if isinstance(m, controls.ConstantControl):
-    for i in range(len(perturbations)):
-      remainder = abs(functional_values[i] - Jm - float(dJdm)*perturbations[i])
-      with_gradient.append(remainder)
-  elif isinstance(m, controls.ConstantControls):
-    for i in range(len(perturbations)):
-      remainder = abs(functional_values[i] - Jm - numpy.dot(dJdm, perturbations[i]))
-      with_gradient.append(remainder)
-  elif isinstance(m, controls.FunctionControl):
-    for i in range(len(perturbations)):
-      if backend.__name__  == "dolfin":
-        remainder = abs(functional_values[i] - Jm - dJdm.vector().inner(perturbations[i].vector()))
-      else:
-        total = 0
-        fs = ic.function_space()
-        if(isinstance(fs, backend.VectorFunctionSpace)):
-           # VectorFunctionSpace
-           for j in range(len(dJdm.vector().array())):
-              total += numpy.dot(dJdm.vector().array()[j], perturbations[i].vector().array()[j])
-        elif(isinstance(fs, backend.MixedFunctionSpace)):
-           # MixedFunctionSpace
-           for j in range(len(fs)):
-              if(isinstance(fs.sub(j), backend.VectorFunctionSpace)):
-                 # Inner VectorFunctionSpace
-                 for k in range(len(dJdm.vector().array()[j])):
-                    total += numpy.dot(dJdm.vector().array()[j][k], perturbations[i].vector().array()[j][k])
-              else:
-                 # Inner FunctionSpace
-                 total += numpy.dot(dJdm.vector().array()[j], perturbations[i].vector().array()[j])
-        else:
-           # FunctionSpace
-           total += numpy.dot(dJdm.vector().array(), perturbations[i].vector().array())
-        remainder = abs(functional_values[i] - Jm - total)
-      with_gradient.append(remainder)
-
+  for i in range(len(perturbations)):
+     if isinstance(m, controls.ConstantControl) or isinstance(m, controls.ConstantControls):
+        remainder = compatibility.taylor_remainder_with_gradient(m, Jm, dJdm, functional_values[i], perturbations[i])
+     else:
+        remainder = compatibility.taylor_remainder_with_gradient(m, Jm, dJdm, functional_values[i], perturbations[i], ic=ic)
+     with_gradient.append(remainder)
+      
   if min(with_gradient + no_gradient) < 1e-16:
     warning("Warning: The Taylor remainders are close to machine precision (< %s). Try increasing the seed value in case the Taylor remainder test fails." % min(with_gradient + no_gradient))
 
