@@ -57,7 +57,7 @@ parameters = { "monitor": None,
                "grtol": 0.0,
              }
 
-solver = TAOSolver(problem, parameters=parameters, nonzero_initial_vec=False)
+solver = TAOSolver(problem, parameters=parameters)
 f_opt = solver.solve()
 plot(f_opt, interactive=True)
 

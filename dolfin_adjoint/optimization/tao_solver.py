@@ -23,7 +23,7 @@ class TAOSolver(OptimizationSolver):
 
     """
 
-    def __init__(self, problem, nonzero_initial_vec=False, riesz_map=None, parameters=None):
+    def __init__(self, problem, initial_vec=None, riesz_map=None, parameters=None):
        
         try:
             from petsc4py import PETSc
@@ -35,7 +35,7 @@ class TAOSolver(OptimizationSolver):
             raise Exception, "Your petsc4py version does not support TAO. Please upgrade to petsc4py >= 3.5."
 
         self.PETSc = PETSc
-        self.nonzero_initial_vec = nonzero_initial_vec
+        self.initial_vec = initial_vec
         self.riesz_map = riesz_map
 
         OptimizationSolver.__init__(self, problem, parameters)
@@ -65,10 +65,10 @@ class TAOSolver(OptimizationSolver):
         # ...then concatenate
         ctrl_vec = self.__petsc_vec_concatenate(ctrl_vecs)
         
-        # create initial vector - zero or value of parameter object
-        self.x = ctrl_vec.copy()
-        if not self.nonzero_initial_vec:
-            self.x.zeroEntries()
+        # create initial vector - zero or user supplied
+        if self.initial_vec == None:
+            self.initial_vec = ctrl_vec.duplicate()
+            self.initial_vec.zeroEntries()
         
         class AppCtx(object):
             ''' Implements the application context for the TAO solver '''
@@ -207,7 +207,7 @@ class TAOSolver(OptimizationSolver):
         
         self.tao_problem.setObjectiveGradient(self.__user.objective_and_gradient)
         self.tao_problem.setHessian(self.__user.hessian, self.__user.H)
-        self.tao_problem.setInitial(self.x)
+        self.tao_problem.setInitial(self.initial_vec)
 
         # Set Riesz map - default None
         if (self.riesz_map != None):
@@ -317,7 +317,7 @@ class TAOSolver(OptimizationSolver):
         return cvec
 
     def solve(self):
-        self.tao_problem.solve(self.x)
+        self.tao_problem.solve(self.initial_vec)
         sol_vec = self.tao_problem.getSolution()
         self.__user.update(sol_vec)
 
