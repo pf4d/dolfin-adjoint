@@ -23,7 +23,7 @@ class TAOSolver(OptimizationSolver):
 
     """
 
-    def __init__(self, problem, parameters=None, nonzero_initial_vec=False):
+    def __init__(self, problem, nonzero_initial_vec=False, riesz_map=None, parameters=None):
        
         try:
             from petsc4py import PETSc
@@ -36,6 +36,7 @@ class TAOSolver(OptimizationSolver):
 
         self.PETSc = PETSc
         self.nonzero_initial_vec = nonzero_initial_vec
+        self.riesz_map = riesz_map
 
         OptimizationSolver.__init__(self, problem, parameters)
 
@@ -68,12 +69,6 @@ class TAOSolver(OptimizationSolver):
         self.x = ctrl_vec.copy()
         if not self.nonzero_initial_vec:
             self.x.zeroEntries()
-
-        # TODO: Remove below. Limits support to a single control. 
-        #tmp_ctrl = Function(rf.controls[0].data())
-        #work_vec = as_backend_type(tmp_ctrl.vector()).vec()
-        #self.tmp_ctrl = tmp_ctrl
-        #self.work_vec = work_vec
         
         class AppCtx(object):
             ''' Implements the application context for the TAO solver '''
@@ -213,6 +208,10 @@ class TAOSolver(OptimizationSolver):
         self.tao_problem.setObjectiveGradient(self.__user.objective_and_gradient)
         self.tao_problem.setHessian(self.__user.hessian, self.__user.H)
         self.tao_problem.setInitial(self.x)
+
+        # Set Riesz map - default None
+        if (self.riesz_map != None):
+          self.tao_problem.setRieszMap(self.riesz_map)
 
         # Set bounds if we have any
         if self.problem.bounds is not None:
