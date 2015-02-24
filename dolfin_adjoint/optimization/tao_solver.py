@@ -23,7 +23,7 @@ class TAOSolver(OptimizationSolver):
 
     """
 
-    def __init__(self, problem, initial_vec=None, riesz_map=None, parameters=None):
+    def __init__(self, problem, riesz_map=None, parameters=None):
        
         try:
             from petsc4py import PETSc
@@ -35,7 +35,6 @@ class TAOSolver(OptimizationSolver):
             raise Exception, "Your petsc4py version does not support TAO. Please upgrade to petsc4py >= 3.5."
 
         self.PETSc = PETSc
-        self.initial_vec = initial_vec
         self.riesz_map = riesz_map
 
         OptimizationSolver.__init__(self, problem, parameters)
@@ -65,10 +64,8 @@ class TAOSolver(OptimizationSolver):
         # ...then concatenate
         ctrl_vec = self.__petsc_vec_concatenate(ctrl_vecs)
         
-        # create initial vector - zero or user supplied
-        if self.initial_vec == None:
-            self.initial_vec = ctrl_vec.duplicate()
-            self.initial_vec.zeroEntries()
+        # Use value of control object as initial guess for the optimisation
+        self.initial_vec = ctrl_vec.copy()
         
         class AppCtx(object):
             ''' Implements the application context for the TAO solver '''
