@@ -208,7 +208,8 @@ class TAOSolver(OptimizationSolver):
 
         # Set Riesz map - default None
         if (self.riesz_map != None):
-          self.tao_problem.setRieszMap(self.riesz_map)
+          riesz_mat = as_backend_type(self.riesz_map).mat()
+          self.tao_problem.setRieszMap(riesz_mat)
 
         # Set bounds if we have any
         if self.problem.bounds is not None:
