@@ -14,13 +14,11 @@ from timeforms import NoTime, StartTimeConstant, FinishTimeConstant, dt, FINISH_
 from IPython import embed
 
 class NodalFunctional(functional.Functional):
-    def __init__(self, timeform, u, refs, times, coords, verbose=False, name=None):
+    def __init__(self, u, refs, times, coords, timeform=False, verbose=False, name=None):
 
-#        combined = zip(times, refs)
-#        I = sum(inner(u - u_obs, u - u_obs)*ds(1)*dt[t]
-#                       for (t, u_obs) in combined)
-
-        self.timeform = timeform
+        # we prepare a ghost timeform. Only the time instant is important
+        if not timeform: self.timeform = sum(u*dx*dt[t] for t in times)
+        else: self.timeform = timeform
         self.coords = coords
         self.verbose = verbose
         self.name = name
@@ -29,18 +27,8 @@ class NodalFunctional(functional.Functional):
         self.times = times
 
     def __call__(self, adjointer, timestep, dependencies, values):
-        print "eval ", timestep, " times ", _time_levels(adjointer, timestep)
-        functional_value = self._substitute_form(adjointer, timestep, dependencies, values)
-
-        if functional_value is not None:
-            args = ufl.algorithms.extract_arguments(functional_value)
-            if len(args) > 0:
-                backend.info_red("The form passed into Functional must be rank-0 (a scalar)! You have passed in a rank-%s form." % len(args))
-                raise libadjoint.exceptions.LibadjointErrorInvalidInputs
-
-#            embed()
-
-            toi = _time_levels(adjointer, timestep)[0]
+        toi = _time_levels(adjointer, timestep)[0]
+        if toi in self.times and len(values) > 0:
             solu = values[-1].data(self.coords)
             ref  = self.refs[self.times.index(toi)]
             my = (solu - float(ref))*(solu - float(ref))
@@ -50,17 +38,58 @@ class NodalFunctional(functional.Functional):
                 solu = values[0].data(self.coords)
                 ref  = self.refs[self.times.index(toi)]
                 my += (solu - float(ref))*(solu - float(ref))
+        else:
+            my = 0.0
+
+        print "my eval ", my
+        print "eval ", timestep, " times ", _time_levels(adjointer, timestep)
+        functional_value = self._substitute_form(adjointer, timestep, dependencies, values)
+
+        if functional_value is not None:
+            args = ufl.algorithms.extract_arguments(functional_value)
+            if len(args) > 0:
+                backend.info_red("The form passed into Functional must be rank-0 (a scalar)! You have passed in a rank-%s form." % len(args))
+                raise libadjoint.exceptions.LibadjointErrorInvalidInputs
 
             da = backend.assemble(functional_value)
-
-            print "da eval ", da
-            print "my eval ", my
-            if abs(da - my) > 1e-13: embed()
-            return my
         else:
-            return 0.0
+            da = 0.0
+
+        print "da eval ", da
+        if abs(da - my) > 1e-13: embed()
+        return my
 
     def derivative(self, adjointer, variable, dependencies, values):
+        print "derive ", variable.timestep, " num values ", len(values)
+        timesteps = self._derivative_timesteps(adjointer, variable)
+        if len(values) is 1: # one value (easy)
+            tsoi = timesteps[-1]
+            toi = _time_levels(adjointer, tsoi)[0]
+            ind = 0
+        elif len(values) is 2: # two values (hard)
+            tsoi = timesteps[-1]
+            if len(timesteps) is 1: # only occurs at atart and finish time
+                if tsoi is 0: toi = _time_levels(adjointer, tsoi)[0]; ind = 1
+                else: toi = _time_levels(adjointer, tsoi)[-1]; ind = 0
+            else:
+                toi = _time_levels(adjointer, tsoi)[0]
+                if _time_levels(adjointer, tsoi)[1] in self.times: ind = 0
+                else: ind = 1
+        else: # three values (easy)
+            tsoi = timesteps[1]
+            toi = _time_levels(adjointer, tsoi)[0]
+            ind = 1
+
+        coef = values[ind].data
+        ref  = self.refs[self.times.index(toi)]
+        solu = coef(self.coords)
+        ff = backend.Constant(2.0*(solu - float(ref)))
+
+        v = backend.project(ff*PointwiseEvaluator(self.coords), coef.function_space())
+        my = v.vector().array()[0]
+
+        print "my", my
+
         functional_value = None
         for timestep in self._derivative_timesteps(adjointer, variable):
           print "derive ", timestep, " times ", _time_levels(adjointer, timestep)
@@ -73,33 +102,11 @@ class NodalFunctional(functional.Functional):
 
         d = backend.derivative(functional_value, values[dependencies.index(variable)].data)
         d = ufl.algorithms.expand_derivatives(d)
-
-        tsoi = self._derivative_timesteps(adjointer, variable)[0]
-        toi = _time_levels(adjointer, tsoi)[-1]
-        if toi in self.times:
-            "showtime"
-            if len(values) > 1: # occurs for timestep 0
-                coef = values[-2].data
-            else :
-                coef = values[0].data
-                toi = _time_levels(adjointer, tsoi)[0]
-
-            ref  = self.refs[self.times.index(toi)]
-            solu = coef(self.coords)
-            ff = backend.Constant(2.0*(solu - float(ref)))
-        else:
-            ff = 0.0
-
-        v = backend.project(ff*PointwiseEvaluator(self.coords), coef.function_space())
         da = backend.assemble(d).array()[0]
-        my = v.vector().array()[0]
-        print "step", variable.timestep
         print "da", da
-        print "my", my
-#        embed()
+        print "tsoi", tsoi
+        print "toi", toi
         if abs(da - my) > 1e-13: embed()
-
-        if abs(backend.assemble(d).array()[0]-v.vector().array()[0]) > 1e-13: import IPython; IPython.embed()
 
         return adjlinalg.Vector(v)
 
