@@ -14,18 +14,20 @@ from timeforms import NoTime, StartTimeConstant, FinishTimeConstant, dt, FINISH_
 from IPython import embed
 
 class NodalFunctional(functional.Functional):
-    def __init__(self, u, refs, coords, times=None, timeform=False, verbose=False, name=None):
+    def __init__(self, u, refs, coords, times=None, f_ind=None, timeform=False, verbose=False, name=None):
         if times is None:
             times = ["FINISH_TIME"]
         # we prepare a ghost timeform. Only the time instant is important
         if not timeform: self.timeform = sum(u*dx*dt[t] for t in times)
         else: self.timeform = timeform
+
         self.coords = coords
         self.verbose = verbose
         self.name = name
         self.func = u
         self.refs = refs
         self.times = times
+        self.i = f_ind
 
     def __call__(self, adjointer, timestep, dependencies, values):
         print "eval ", len(values)
@@ -33,17 +35,17 @@ class NodalFunctional(functional.Functional):
         if len(values) > 0:
             if timestep is adjointer.timestep_count -1:
                 # add final contribution
-                solu = values[0].data(self.coords)
+                if self.i is None: solu = values[0].data(self.coords)
                 ref  = self.refs[self.times.index(self.times[-1])]
                 my = (solu - float(ref))*(solu - float(ref))
 
                 # if necessary, add one but last contribution
                 if toi in self.times and len(values) > 0:
-                    solu = values[-1].data(self.coords)
+                    if self.i is None: solu = values[-1].data(self.coords)
                     ref  = self.refs[self.times.index(toi)]
                     my += (solu - float(ref))*(solu - float(ref))
             else:
-                solu = values[-1].data(self.coords)
+                if self.i is None: solu = values[-1].data(self.coords)
                 ref  = self.refs[self.times.index(toi)]
                 my = (solu - float(ref))*(solu - float(ref))
         else:
@@ -95,7 +97,8 @@ class NodalFunctional(functional.Functional):
                 ind = 1
         coef = values[ind].data
         ref  = self.refs[self.times.index(toi)]
-        solu = coef(self.coords)
+        if self.i is None: solu = coef(self.coords)
+        else: solu = coef[self.i](self.coords)
         ff = backend.Constant(2.0*(solu - float(ref)))
 
         v = backend.project(ff*PointwiseEvaluator(self.coords), coef.function_space())
