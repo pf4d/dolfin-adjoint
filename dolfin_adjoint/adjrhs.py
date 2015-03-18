@@ -17,6 +17,11 @@ def find_previous_variable(var):
 
   raise libadjoint.exceptions.LibadjointErrorInvalidInputs, 'No previous variable found'
 
+def _extract_function_coeffs(form):
+    for c in ufl.algorithms.extract_coefficients(form):
+        if isinstance(c, backend.Function):
+            yield c
+
 class RHS(libadjoint.RHS):
   '''This class implements the libadjoint.RHS abstract base class for the Dolfin adjoint.
   It takes in a form, and implements the necessary routines such as calling the right-hand side
@@ -26,12 +31,12 @@ class RHS(libadjoint.RHS):
     self.form=form
 
     if isinstance(self.form, ufl.form.Form):
-      self.deps = [adjglobals.adj_variables[coeff] for coeff in ufl.algorithms.extract_coefficients(self.form) if hasattr(coeff, "function_space")]      
+      self.deps = [adjglobals.adj_variables[coeff] for coeff in _extract_function_coeffs(self.form)]
     else:
       self.deps = []
 
     if isinstance(self.form, ufl.form.Form):
-      self.coeffs = [coeff for coeff in ufl.algorithms.extract_coefficients(self.form) if hasattr(coeff, "function_space")]      
+      self.coeffs = [coeff for coeff in _extract_function_coeffs(self.form)]
     else:
       self.coeffs = []
 
@@ -39,7 +44,7 @@ class RHS(libadjoint.RHS):
 
     if isinstance(self.form, ufl.form.Form):
 
-      dolfin_dependencies=[dep for dep in ufl.algorithms.extract_coefficients(self.form) if hasattr(dep, "function_space")]
+      dolfin_dependencies=[dep for dep in _extract_function_coeffs(self.form)]
 
       dolfin_values=[val.data for val in values]
 
@@ -60,7 +65,7 @@ class RHS(libadjoint.RHS):
       # Find the dolfin Function corresponding to variable.
       dolfin_variable = values[dependencies.index(variable)].data
 
-      dolfin_dependencies = [dep for dep in ufl.algorithms.extract_coefficients(self.form) if hasattr(dep, "function_space")]
+      dolfin_dependencies = [dep for dep in _extract_function_coeffs(self.form)]
 
       dolfin_values = [val.data for val in values]
 
@@ -86,7 +91,7 @@ class RHS(libadjoint.RHS):
       dolfin_inner_variable = values[dependencies.index(inner_variable)].data
       dolfin_outer_variable = values[dependencies.index(outer_variable)].data
 
-      dolfin_dependencies = [dep for dep in ufl.algorithms.extract_coefficients(self.form) if hasattr(dep, "function_space")]
+      dolfin_dependencies = [dep for dep in _extract_function_coeffs(self.form)]
 
       dolfin_values = [val.data for val in values]
 
