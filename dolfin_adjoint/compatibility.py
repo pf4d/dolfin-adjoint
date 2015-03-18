@@ -83,41 +83,7 @@ def assign_function_to_vector(x, b, function_space):
       from dolfin_adjoint.adjlinalg import Vector
       x = Vector(backend.Function(function_space).assign(b))
    return x
-   
-def taylor_remainder_with_gradient(m, Jm, dJdm, functional_value, perturbation, ic=None):
-   """ Compute the Taylor remainder with the provided gradient information. Note that this
-   computes the remainder for just one functional value. """
-   import controls
-   if isinstance(m, controls.ConstantControl):
-      remainder = abs(functional_value - Jm - float(dJdm)*perturbation)
-   elif isinstance(m, controls.ConstantControls):
-      remainder = abs(functional_value - Jm - numpy.dot(dJdm, perturbation))
-   elif isinstance(m, controls.FunctionControl):
-      if backend.__name__  == "dolfin":
-        remainder = abs(functional_value - Jm - dJdm.vector().inner(perturbation.vector()))
-      else:
-        total = 0
-        fs = ic.function_space()
-        if(isinstance(fs, backend.VectorFunctionSpace)):
-           # VectorFunctionSpace
-           for j in range(len(dJdm.vector().array())):
-              total += numpy.dot(dJdm.vector().array()[j], perturbation.vector().array()[j])
-        elif(isinstance(fs, backend.MixedFunctionSpace)):
-           # MixedFunctionSpace
-           for j in range(len(fs)):
-              if(isinstance(fs.sub(j), backend.VectorFunctionSpace)):
-                 # Inner VectorFunctionSpace
-                 for k in range(len(dJdm.vector().array()[j])):
-                    total += numpy.dot(dJdm.vector().array()[j][k], perturbation.vector().array()[j][k])
-              else:
-                 # Inner FunctionSpace
-                 total += numpy.dot(dJdm.vector().array()[j], perturbation.vector().array()[j])
-        else:
-           # FunctionSpace
-           total += numpy.dot(dJdm.vector().array(), perturbation.vector().array())
-        remainder = abs(functional_value - Jm - total)
-   return remainder
-   
+
 if backend.__name__ == "dolfin":
     solve = backend.fem.solving.solve
     matrix_types = lambda: (backend.cpp.Matrix, backend.GenericMatrix)

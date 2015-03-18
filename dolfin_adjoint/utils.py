@@ -394,6 +394,18 @@ def test_gradient_array(J, dJdx, x, seed = 0.01, perturbation_direction = None):
 
   return min(convergence_order(with_gradient))
 
+def taylor_remainder_with_gradient(m, Jm, dJdm, functional_value, perturbation, ic=None):
+   """ Compute the Taylor remainder with the provided gradient information. Note that this
+   computes the remainder for just one functional value. """
+   import controls
+   if isinstance(m, controls.ConstantControl):
+      remainder = abs(functional_value - Jm - float(dJdm)*perturbation)
+   elif isinstance(m, controls.ConstantControls):
+      remainder = abs(functional_value - Jm - numpy.dot(dJdm, perturbation))
+   elif isinstance(m, controls.FunctionControl):
+      remainder = abs(functional_value - Jm - dJdm.vector().inner(perturbation.vector()))
+   return remainder
+
 def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None, value=None):
   '''J must be a function that takes in a parameter value m and returns the value
      of the functional:
@@ -486,13 +498,7 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
     perturbations = []
     for x in perturbation_sizes:
       perturbation = backend.Function(perturbation_direction)
-      if backend.__name__  == "dolfin":
-        vec = perturbation.vector()
-        vec *= x
-      else:
-        with perturbation.dat.vec as vec:
-          vec *= x
-
+      vec = perturbation.vector()*x
       perturbations.append(perturbation)
 
   # And now the perturbed inputs:
@@ -509,11 +515,8 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
     pinputs = []
     for x in perturbations:
       pinput = backend.Function(x)
-      if backend.__name__  == "dolfin":
-        pinput.vector()[:] += ic.vector()
-      else:
-        pinput += ic
-
+      vec = pinput.vector()
+      vec += ic.vector()
       pinputs.append(pinput)
 
   # Issue 34: We must evaluate HJm before we evaluate the tape at the
@@ -539,9 +542,9 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
   with_gradient = []
   for i in range(len(perturbations)):
      if isinstance(m, controls.ConstantControl) or isinstance(m, controls.ConstantControls):
-        remainder = compatibility.taylor_remainder_with_gradient(m, Jm, dJdm, functional_values[i], perturbations[i])
+        remainder = taylor_remainder_with_gradient(m, Jm, dJdm, functional_values[i], perturbations[i])
      else:
-        remainder = compatibility.taylor_remainder_with_gradient(m, Jm, dJdm, functional_values[i], perturbations[i], ic=ic)
+        remainder = taylor_remainder_with_gradient(m, Jm, dJdm, functional_values[i], perturbations[i], ic=ic)
      with_gradient.append(remainder)
       
   if min(with_gradient + no_gradient) < 1e-16:
