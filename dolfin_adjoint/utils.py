@@ -498,7 +498,8 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
     perturbations = []
     for x in perturbation_sizes:
       perturbation = backend.Function(perturbation_direction)
-      vec = perturbation.vector()*x
+      vec = perturbation.vector()
+      vec *= x
       perturbations.append(perturbation)
 
   # And now the perturbed inputs:
