@@ -1,20 +1,23 @@
 import backend
 import numpy
 
-def lvs_init(self, problem, solver_parameters=None):
-    if backend.__name__ == "dolfin":
-        backend.LinearVariationalSolver.__init__(self, problem)
-    else:
-        backend.LinearVariationalSolver.__init__(self, problem, solver_parameters)
-    self.problem = problem
 
+if backend.__name__ == "firedrake":
+    class Timer(object):
+        def __init__(self, name):
+            pass
 
-def nvs_init(self, problem, solver_parameters=None):
-    if backend.__name__ == "dolfin":
-        backend.NonlinearVariationalSolver.__init__(self, problem)
-    else:
-        backend.NonlinearVariationalSolver.__init__(self, problem, solver_parameters)
-    self.problem = problem
+        def start(self):
+            pass
+
+        def stop(self):
+            return 0.0
+
+        def value(self):
+            return 0.0
+
+    backend.Timer = Timer
+
 
 def to_dict(d):
     if isinstance(d, dict):
@@ -44,12 +47,6 @@ def randomise(x):
         numpy.random.seed(seed=21)
         x[:] = numpy.random.random(len(x))
 
-
-def get_J(J, F, u):
-   if backend.__name__ == "dolfin":
-      return J
-   else:
-      return (J or backend.ufl_expr.derivative(F, u))
 
 if hasattr(backend.Function, 'sub'):
   dolfin_sub    = backend.Function.sub

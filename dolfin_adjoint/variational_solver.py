@@ -10,16 +10,18 @@ class NonlinearVariationalProblem(backend.NonlinearVariationalProblem):
   '''This object is overloaded so that solves using this class are automatically annotated,
   so that libadjoint can automatically derive the adjoint and tangent linear models.'''
   def __init__(self, F, u, bcs=None, J=None, *args, **kwargs):
-    backend.NonlinearVariationalProblem.__init__(self, F, u, bcs, J, *args, **kwargs)
     self.F = F
     self.u = u
     self.bcs = bcs
-    self.J = compatibility.get_J(J, F, u)
+    self.J = J
+    backend.NonlinearVariationalProblem.__init__(self, F, u, bcs, J, *args, **kwargs)
 
 class NonlinearVariationalSolver(backend.NonlinearVariationalSolver):
   '''This object is overloaded so that solves using this class are automatically annotated,
   so that libadjoint can automatically derive the adjoint and tangent linear models.'''
-  __init__ = compatibility.nvs_init
+  def __init__(self, problem, *args, **kwargs):
+      super(NonlinearVariationalSolver, self).__init__(problem, *args, **kwargs)
+      self.problem = problem
 
   def solve(self, annotate=None):
     '''To disable the annotation, just pass :py:data:`annotate=False` to this routine, and it acts exactly like the
@@ -53,7 +55,9 @@ class LinearVariationalProblem(backend.LinearVariationalProblem):
 class LinearVariationalSolver(backend.LinearVariationalSolver):
   '''This object is overloaded so that solves using this class are automatically annotated,
   so that libadjoint can automatically derive the adjoint and tangent linear models.'''
-  __init__ = compatibility.lvs_init
+  def __init__(self, problem, *args, **kwargs):
+      super(LinearVariationalSolver, self).__init__(problem, *args, **kwargs)
+      self.problem = problem
 
   def solve(self, annotate=None):
     '''To disable the annotation, just pass :py:data:`annotate=False` to this routine, and it acts exactly like the
