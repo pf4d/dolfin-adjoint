@@ -20,6 +20,36 @@ import sys, os, datetime
 
 # -- General configuration -----------------------------------------------------
 
+# No need to install 3rd party packages to generate the docs
+class Mock(object):
+
+    __all__ = []
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __call__(self, *args, **kwargs):
+        return Mock()
+
+    @classmethod
+    def __getattr__(cls, name):
+        if name in ('__file__', '__path__'):
+            return '/dev/null'
+        elif name[0] == name[0].upper():
+            mockType = type(name, (Mock, ), {})
+            mockType.__module__ = __name__
+            return mockType
+        else:
+            return Mock()
+
+MOCK_MODULES = ['dolfin', 'ufl', 'numpy', 'scipy', 'scipy.optimize']
+for mod_name in MOCK_MODULES:
+    try:
+        importlib.import_module(mod_name)
+    except:
+            print "Generating mock module %s." % mod_name
+            sys.modules[mod_name] = Mock()
+
 # If your documentation needs a minimal Sphinx version, state it here.
 needs_sphinx = '1.1'
 
