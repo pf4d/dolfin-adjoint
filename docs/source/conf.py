@@ -42,7 +42,8 @@ class Mock(object):
         else:
             return Mock()
 
-MOCK_MODULES = ['dolfin', 'ufl', 'numpy', 'scipy', 'scipy.optimize']
+MOCK_MODULES = ['dolfin', 'ufl', 'numpy', 'scipy', 'scipy.optimize',
+                'ufl.classes']
 for mod_name in MOCK_MODULES:
     try:
         importlib.import_module(mod_name)
