@@ -133,6 +133,4 @@ Accessing tape
    .. automethod:: known_timesteps
 
 
-# .. autofunction:: replace_control_value
-# .. autofunction:: replace_tape_value
 .. autofunction:: adj_reset
