@@ -1,7 +1,13 @@
 .. title:: Automating the derivation of adjoint and tangent linear models
 
+*****
+Dummy
+*****
+
+.. This is here because of Sphinx Issue #632
+
 .. toctree::
-   :maxdepth: 10
+   :maxdepth: 1
    :hidden:
 
    about/index
