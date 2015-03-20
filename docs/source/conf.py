@@ -34,6 +34,7 @@ class Mock(object):
     __add__ = None
     __mul__ = None
     __neg__ = None
+    get_gst = None
 
     def __init__(self, *args, **kwargs):
         pass
@@ -52,9 +53,10 @@ class Mock(object):
         else:
             return Mock()
 
-MOCK_MODULES = ['dolfin', 'ffc', 'backend.fem', 'backend.fem.projection',
-                'backend.PeriodicBC', 'backend', 'ufl', 'numpy', 'scipy', 'scipy.optimize',
-                'ufl.classes', 'ufl.algorithms', 'ufl.operators']
+MOCK_MODULES = ['libadjoint', 'libadjoint.exceptions', 'libadjoint.GSTHandle',
+                'dolfin', 'ffc', 'backend.fem', 'backend.fem.projection', 'backend.PeriodicBC',
+                'backend', 'ufl', 'numpy', 'scipy', 'scipy.optimize', 'ufl.classes',
+                'ufl.algorithms', 'ufl.operators']
 for mod_name in MOCK_MODULES:
     try:
         importlib.import_module(mod_name)
