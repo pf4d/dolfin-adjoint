@@ -25,6 +25,16 @@ class Mock(object):
 
     __all__ = []
 
+    assign = None
+    apply = None
+    vector = None
+    split = None
+    interpolate = None
+    copy = None
+    __add__ = None
+    __mul__ = None
+    __neg__ = None
+
     def __init__(self, *args, **kwargs):
         pass
 
@@ -42,14 +52,17 @@ class Mock(object):
         else:
             return Mock()
 
-MOCK_MODULES = ['dolfin', 'ufl', 'numpy', 'scipy', 'scipy.optimize',
-                'ufl.classes', 'ufl.algorithms' 'ufl.operators']
+MOCK_MODULES = ['dolfin', 'ffc', 'backend.fem', 'backend.fem.projection',
+                'backend.PeriodicBC', 'backend', 'ufl', 'numpy', 'scipy', 'scipy.optimize',
+                'ufl.classes', 'ufl.algorithms', 'ufl.operators']
 for mod_name in MOCK_MODULES:
     try:
         importlib.import_module(mod_name)
     except:
             print "Generating mock module %s." % mod_name
             sys.modules[mod_name] = Mock()
+import backend
+backend.__name__ = "dolfin"
 
 # If your documentation needs a minimal Sphinx version, state it here.
 needs_sphinx = '1.1'
