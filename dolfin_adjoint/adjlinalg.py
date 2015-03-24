@@ -293,7 +293,11 @@ class Matrix(libadjoint.Matrix):
           x.data.vector()[:] = b.nonlinear_u.vector()
           F = backend.replace(b.nonlinear_form, {b.nonlinear_u: x.data})
           J = backend.replace(b.nonlinear_J, {b.nonlinear_u: x.data})
-          compatibility.solve(F == 0, x.data, b.nonlinear_bcs, J=J, solver_parameters=self.solver_parameters)
+          try:
+            compatibility.solve(F == 0, x.data, b.nonlinear_bcs, J=J, solver_parameters=self.solver_parameters)
+      	  except RuntimeError as rte:
+ 	    x.data.vector()[:] = float("nan")
+  
         else:
           assembled_lhs = self.assemble_data()
           [bc.apply(assembled_lhs) for bc in bcs]
