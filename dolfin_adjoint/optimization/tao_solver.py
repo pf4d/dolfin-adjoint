@@ -52,20 +52,15 @@ class TAOSolver(OptimizationSolver):
         # Map each control to a PETSc Vec...
         ctrl_vecs = []
         for control in rf.controls:
-
-            if isinstance(control, FunctionControl):
-                tmp_vec = as_backend_type(Function(control.data()).vector()).vec()
-                
-            elif isinstance(control, ConstantControl):
-                tmp_vec = self.__constant_as_vec(Constant(control.data()))
-                
-            ctrl_vecs.append(tmp_vec)
+            as_vec = self.__control_as_vec(control)
+            ctrl_vecs.append(as_vec)
 
         # ...then concatenate
         ctrl_vec = self.__petsc_vec_concatenate(ctrl_vecs)
         
         # Use value of control object as initial guess for the optimisation
         self.initial_vec = ctrl_vec.copy()
+        #self.initial_vec = ctrl_vec.duplicate() # DSM temporary to reproduce dependency results
         
         class AppCtx(object):
             ''' Implements the application context for the TAO solver '''
@@ -215,32 +210,40 @@ class TAOSolver(OptimizationSolver):
         if self.problem.bounds is not None:
             (lb, ub) = self.__get_bounds()
             self.tao_problem.setVariableBounds(lb, ub)
-        
+
+        # Similarly for constraints
+        if self.problem.constraints is not None:
+            eval_fn = self.__get_constraints()
 
     def __get_bounds(self):
         """Convert bounds to PETSc vectors - TAO's accepted format"""
         bounds = self.problem.bounds
+        controls = self.problem.reduced_functional.controls
 
         lbvecs = []
         ubvecs = []
 
-        for (lb,ub) in bounds:
+        for (bound, control) in zip(bounds, controls):
+
+            len_control = self.__control_as_vec(control).size
+            (lb,ub) = bound # could be float, int, Constant, or Function
 
             if isinstance(lb, Function):
                 lbvec = as_backend_type(lb.vector()).vec()
             elif isinstance(lb, (float, int, Constant)):
-                lbvec = self.__constant_as_vec(Constant(lb))
+                lbvec_list = [float(lb)] * len_control
+                lbvec = self.__list_as_vec(lbvec_list)
             else:
                 raise TypeError("Unknown lower bound type %s" % lb.__class__)
+            lbvecs.append(lbvec)
 
             if isinstance(ub, Function):
                 ubvec = as_backend_type(ub.vector()).vec()
             elif isinstance(ub, (float, int, Constant)):
-                ubvec = self.__constant_as_vec(Constant(ub))
+                ubvec_list = [float(ub)] * len_control
+                ubvec = self.__list_as_vec(ubvec_list)
             else:
                 raise TypeError("Unknown upper bound type %s" % ub.__class__)
-
-            lbvecs.append(lbvec)
             ubvecs.append(ubvec)
 
         lbvec = self.__petsc_vec_concatenate(lbvecs)
@@ -272,7 +275,6 @@ class TAOSolver(OptimizationSolver):
                         
             concat_vec.setValues(range(rstarti,rendi), vec[ostarti:oendi])    
             concat_vec.assemble()
-            # TODO: Ghost update required?
             nvec += vec.size
 
         return concat_vec
@@ -313,6 +315,28 @@ class TAOSolver(OptimizationSolver):
 
         cvec.assemble()    
         return cvec
+
+    def __control_as_vec(self, control):
+        """Return a PETSc Vec representing the supplied Control"""
+        if isinstance(control, FunctionControl):
+            as_vec = as_backend_type(Function(control.data()).vector()).vec()
+        elif isinstance(control, ConstantControl):
+            as_vec = self.__constant_as_vec(Constant(control.data()))
+        else:
+            raise TypeError("Unknown control type %s" % control.__class__)
+        return as_vec
+
+    def __list_as_vec(self, lst):
+        """Return a PETSc Vec representing the supplied list"""
+        PETSc = self.PETSc
+        as_vec = PETSc.Vec().create(PETSc.COMM_WORLD)
+        as_vec.setSizes((PETSc.DECIDE,len(lst)))
+        as_vec.setFromOptions()
+
+        ostarti, oendi = as_vec.owner_range
+        as_vec.setValues(range(ostarti,oendi),lst)
+        as_vec.assemble()
+        return as_vec
 
     def solve(self):
         self.tao_problem.solve(self.initial_vec)
