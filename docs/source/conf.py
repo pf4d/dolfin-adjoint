@@ -35,6 +35,7 @@ class Mock(object):
     __mul__ = None
     __neg__ = None
     get_gst = None
+    LU  = None
 
     def __init__(self, *args, **kwargs):
         pass
