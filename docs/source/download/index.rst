@@ -37,11 +37,11 @@ Virtual machine
 
 If you'd like to try dolfin-adjoint out without any installation headaches,
 try out `our VirtualBox virtual machine with dolfin-adjoint 1.4 installed
-<http://dolfin-adjoint.org/_static/dolfin-adjoint-1.4.ova>`_. Here are
+<http://amcg.ese.ic.ac.uk/~pef/vm/dolfin-adjoint-1.4.ova>`_. Here are
 the instructions:
 
 * Download and install VirtualBox from https://www.virtualbox.org, or from your operating system.
-* Download the `virtual machine <http://dolfin-adjoint.org/_static/dolfin-adjoint-1.4.ova>`_.
+* Download the `virtual machine <http://amcg.ese.ic.ac.uk/~pef/vm/dolfin-adjoint-1.4.ova>`_.
 * Start VirtualBox, click on "File -> Import Appliance", select the virtual machine image and click on "Import".
 * Select the "dolfin-adjoint VM" and click on "Start" to boot the machine.
 * For installing new software you need the login credentials:
