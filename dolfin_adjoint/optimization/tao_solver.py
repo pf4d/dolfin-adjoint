@@ -23,7 +23,7 @@ class TAOSolver(OptimizationSolver):
 
     """
 
-    def __init__(self, problem, riesz_map=None, parameters=None):
+    def __init__(self, problem, parameters=None, riesz_map=None, hessian_precon=None):
        
         try:
             from petsc4py import PETSc
@@ -35,7 +35,16 @@ class TAOSolver(OptimizationSolver):
             raise Exception, "Your petsc4py version does not support TAO. Please upgrade to petsc4py >= 3.5."
 
         self.PETSc = PETSc
-        self.riesz_map = riesz_map
+
+        # Use PETSc forms
+        if riesz_map is not None:
+            self.riesz_map = as_backend_type(riesz_map).mat()
+        else:
+            self.riesz_map = None
+        if hessian_precon is not None:
+            self.hessian_precon = as_backend_type(hessian_precon).mat()
+        else:
+            self.hessian_precon = None
 
         OptimizationSolver.__init__(self, problem, parameters)
 
@@ -57,7 +66,7 @@ class TAOSolver(OptimizationSolver):
 
         # ...then concatenate
         ctrl_vec = self.__petsc_vec_concatenate(ctrl_vecs)
-        
+
         # Use value of control object as initial guess for the optimisation
         self.initial_vec = ctrl_vec.copy()
         #self.initial_vec = ctrl_vec.duplicate() # DSM temporary to reproduce dependency results
@@ -65,7 +74,7 @@ class TAOSolver(OptimizationSolver):
         class AppCtx(object):
             ''' Implements the application context for the TAO solver '''
 
-            def __init__(self):                
+            def __init__(self):               
                 # create Hessian matrix
                 self.H = PETSc.Mat().create(comm=PETSc.COMM_WORLD)
                 dims = (ctrl_vec.local_size, ctrl_vec.size)
@@ -76,21 +85,19 @@ class TAOSolver(OptimizationSolver):
 
             def objective(self, x):
                 ''' Evaluates the functional. '''
-                self.update(x)
+                self.update(x)                
                 # TODO: Multiple controls
                 return rf(rf.controls[0].data())
 
             def objective_and_gradient(self, tao, x, G):
                 ''' Evaluates the functional and gradient for the parameter choice x. '''
                 j = self.objective(x)
-                
                 # TODO: Concatenated gradient vector
                 gradient = rf.derivative(forget=False)[0]
                 gradient_vec = as_backend_type(gradient.vector()).vec()
 
                 G.set(0)
                 G.axpy(1, gradient_vec)
-
                 return j
 
             def hessian(self, tao, x, H, HP):
@@ -108,15 +115,14 @@ class TAOSolver(OptimizationSolver):
             def stats(self, x):
                 return "(min, max): (%s, %s)" % (x.min()[-1], x.max()[-1])
 
-            def mult(self, mat, X, Y):
-                self.update(X)
-                
-                # TODO: Add multiple control support to Hessian stack
-                hes = rf.hessian(rf.controls[0].data())[0]
+            def mult(self, mat, x, y):
+                # TODO: Add multiple control support to Hessian stack and check for ConstantControl
+                x_wrap = Function(rf.controls[0].data().function_space(), PETScVector(x))
+                hes = rf.hessian(x_wrap)[0]
                 hes_vec = as_backend_type(hes.vector()).vec()
                 
-                Y.set(0)
-                Y.axpy(1, hes_vec)
+                y.set(0)
+                y.axpy(1, hes_vec)
 
             def update(self, x):
                 ''' Split input vector and update all control values '''
@@ -198,13 +204,9 @@ class TAOSolver(OptimizationSolver):
         self.tao_problem.setFromOptions()
         
         self.tao_problem.setObjectiveGradient(self.__user.objective_and_gradient)
-        self.tao_problem.setHessian(self.__user.hessian, self.__user.H)
         self.tao_problem.setInitial(self.initial_vec)
-
-        # Set Riesz map - default None
-        if (self.riesz_map != None):
-          riesz_mat = as_backend_type(self.riesz_map).mat()
-          self.tao_problem.setRieszMap(riesz_mat)
+        self.tao_problem.setRieszMap(self.riesz_map)
+        self.tao_problem.setHessian(self.__user.hessian, self.__user.H, self.hessian_precon)
 
         # Set bounds if we have any
         if self.problem.bounds is not None:
@@ -339,7 +341,7 @@ class TAOSolver(OptimizationSolver):
         return as_vec
 
     def solve(self):
-        self.tao_problem.solve(self.initial_vec)
+        self.tao_problem.solve()
         sol_vec = self.tao_problem.getSolution()
         self.__user.update(sol_vec)
 
