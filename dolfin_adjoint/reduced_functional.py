@@ -236,9 +236,10 @@ class ReducedFunctional(object):
 
         # Call callback
         values = [p.data() for p in self.controls]
-        self.derivative_cb_post(self.scale * self.current_func_value,
-                delist(scaled_dfunc_value, list_type=self.controls),
-                delist(values, list_type=self.controls))
+        if self.current_func_value is not None:
+            self.derivative_cb_post(self.scale * self.current_func_value,
+                    delist(scaled_dfunc_value, list_type=self.controls),
+                    delist(values, list_type=self.controls))
 
         # Cache the result
         if self.cache is not None:
