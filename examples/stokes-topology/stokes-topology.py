@@ -283,7 +283,7 @@ if __name__ == "__main__":
 
   J = Functional(0.5 * inner(alpha(rho) * u, u) * dx + mu * inner(grad(u), grad(u)) * dx)
   m = Control(rho)
-  Jhat = ReducedFunctional(J, m, eval_cb=eval_cb)
+  Jhat = ReducedFunctional(J, m, eval_cb_post=eval_cb)
 
 # We can now solve the optimisation problem with :math:`q=0.1`, starting
 # from the solution of :math:`q=0.01`:
