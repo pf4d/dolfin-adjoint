@@ -94,10 +94,10 @@ Penalisation (SIMP) rule.
 ::
 
   V = Constant(0.4)      # volume bound on the control
-  p = Constant(5)        # power used in the solid isotropic material 
-                         # with penalisation (SIMP) rule, to encourage the control 
+  p = Constant(5)        # power used in the solid isotropic material
+                         # with penalisation (SIMP) rule, to encourage the control
                          # solution to attain either 0 or 1
-  eps = Constant(1.0e-3) # epsilon used in the solid isotropic material 
+  eps = Constant(1.0e-3) # epsilon used in the solid isotropic material
   alpha = Constant(1.0e-8) # regularisation coefficient in functional
   
   
@@ -127,7 +127,7 @@ Next we define the forward boundary condition and source term.
   
   # the Dirichlet BC; the Neumann BC will be implemented implicitly by
   # dropping the surface integral after integration by parts
-  bc = [DirichletBC(P, 0.0, WestNorth())]                 
+  bc = [DirichletBC(P, 0.0, WestNorth())]
   f = interpolate(Constant(1.0e-2), P, name="SourceTerm") # the volume source term for the PDE
   
 Next we define a function that given a control :math:`a` solves the
@@ -195,7 +195,7 @@ term on the gradient of the material
 
     J = Functional(f*T*dx + alpha * inner(grad(a), grad(a))*dx)
     m = Control(a)
-    Jhat = ReducedFunctional(J, m, eval_cb=eval_cb)
+    Jhat = ReducedFunctional(J, m, eval_cb_post=eval_cb)
   
 This :py:class:`ReducedFunctional` object solves the forward PDE using
 dolfin-adjoint's tape each time the functional is to be evaluated, and

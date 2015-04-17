@@ -215,7 +215,7 @@ Now we define the functional and :doc:`reduced functional
 
     J = Functional(0.5 * inner(alpha(rho) * u, u) * dx + mu * inner(grad(u), grad(u)) * dx)
     m = Control(rho)
-    Jhat = ReducedFunctional(J, m, eval_cb=eval_cb)
+    Jhat = ReducedFunctional(J, m, eval_cb_post=eval_cb)
   
 The control constraints are the same as the :doc:`Poisson topology
 example <../poisson-topology/poisson-topology>`, and so won't be
@@ -273,7 +273,7 @@ completion, as its only purpose is to generate an initial guess.
   
     solver = IPOPTSolver(problem, parameters=parameters)
     rho_opt = solver.solve()
-    
+  
     File("output/control_solution_guess.xdmf") << rho_opt
   
 With the optimised value for :math:`q=0.01` in hand, we *reset* the
