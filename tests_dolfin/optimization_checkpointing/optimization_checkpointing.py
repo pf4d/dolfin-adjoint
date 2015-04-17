@@ -8,7 +8,7 @@ import scipy
 import libadjoint
 
 dolfin.set_log_level(ERROR)
-dolfin.parameters["optimization"]["test_gradient"] = True 
+dolfin.parameters["optimization"]["test_gradient"] = True
 
 n = 20
 end = 0.2
@@ -59,11 +59,12 @@ if __name__ == "__main__":
     u.assign(ic)
     main(u, annotate=True)
 
-    # Run the optimisation 
+    # Run the optimisation
     lb = project(Expression("-1"),  V)
-    
+
     # Define the reduced funtional
-    reduced_functional = ReducedFunctional(J, Control(u, value=ic), derivative_cb = derivative_cb)
+    reduced_functional = ReducedFunctional(J, Control(u, value=ic),
+            derivative_cb_post=derivative_cb)
 
     print "\n === Solving problem with L-BFGS-B. === \n"
     try:
@@ -80,7 +81,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # Run the problem again with SQP, this time for performance reasons with the gradient test switched off
-    dolfin.parameters["optimization"]["test_gradient"] = False 
+    dolfin.parameters["optimization"]["test_gradient"] = False
 
     # Method specific arguments:
     options = {"SLSQP": {"bounds": (lb, 1)},
@@ -89,7 +90,7 @@ if __name__ == "__main__":
                "TNC": {"bounds": None},
                "L-BFGS-B": {"bounds": (lb, 1)},
                "Newton-CG": {"bounds": None, "maxiter": 1},
-               "Nelder-Mead": {"bounds": None }, 
+               "Nelder-Mead": {"bounds": None },
                "Anneal": {"bounds": None, "lower": -0.1, "upper": 0.1},
                "CG": {"bounds": None},
                "Powell": {"bounds": None}
@@ -99,9 +100,9 @@ if __name__ == "__main__":
         print "\n === Solving problem with %s. ===\n" % method
         u_opt.assign(ic, annotate = False)
         reduced_functional(u_opt)
-        u_opt = minimize(reduced_functional, 
-                         bounds = options[method].pop("bounds"), 
-                         method = method, tol = 1e-10, 
+        u_opt = minimize(reduced_functional,
+                         bounds = options[method].pop("bounds"),
+                         method = method, tol = 1e-10,
                          options = dict({'disp': True, "maxiter": 2}, **options[method]))
     info_green("Test passed")
 

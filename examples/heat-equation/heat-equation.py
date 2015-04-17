@@ -56,7 +56,7 @@ if __name__ == "__main__":
     m_ex.assign(m)
     viz << m_ex
 
-  rf = ReducedFunctional(J, m, derivative_cb=derivative_cb)
+  rf = ReducedFunctional(J, m, derivative_cb_post=derivative_cb)
 
   problem = MinimizationProblem(rf)
   parameters = { 'maximum_iterations': 50 }

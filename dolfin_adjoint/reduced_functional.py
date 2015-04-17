@@ -17,7 +17,14 @@ class ReducedFunctional(object):
     compute functional derivatives with respect to the controls using the
     adjoint method. '''
 
-    def __init__(self, functional, controls, scale=1.0, eval_cb=None, derivative_cb=None, replay_cb=None, hessian_cb=None, cache=None):
+    def __init__(self, functional, controls, scale=1.0,
+                 eval_cb_pre=lambda *args: None,
+                 eval_cb_post=lambda *args: None,
+                 derivative_cb_pre=lambda *args: None,
+                 derivative_cb_post=lambda *args: None,
+                 replay_cb=lambda *args: None,
+                 hessian_cb=lambda *args: None,
+                 cache=None):
 
         #: The objective functional.
         self.functional = functional
@@ -31,18 +38,30 @@ class ReducedFunctional(object):
         #: An optional scaling factor for the functional
         self.scale = scale
 
+        #: An optional callback function that is executed before each functional
+        #: evaluation.
+        #: The interace must be eval_cb_pre(m) where
+        #: m is the control value at which the functional is evaluated.
+        self.eval_cb_pre = eval_cb_pre
+
         #: An optional callback function that is executed after each functional
         #: evaluation.
-        #: The interace must be eval_cb(j, m) where j is the functional value and
+        #: The interace must be eval_cb_post(j, m) where j is the functional value and
         #: m is the control value at which the functional is evaluated.
-        self.eval_cb = eval_cb
+        self.eval_cb_post = eval_cb_post
+
+        #: An optional callback function that is executed before each functional
+        #: gradient evaluation.
+        #: The interface must be eval_cb_pre(m) where m is the control
+        #: value at which the gradient is evaluated.
+        self.derivative_cb_pre = derivative_cb_pre
 
         #: An optional callback function that is executed after each functional
         #: gradient evaluation.
-        #: The interface must be eval_cb(j, dj, m) where j and dj are the
+        #: The interface must be eval_cb_post(j, dj, m) where j and dj are the
         #: functional and functional gradient values, and m is the control
         #: value at which the gradient is evaluated.
-        self.derivative_cb = derivative_cb
+        self.derivative_cb_post = derivative_cb_post
 
         #: An optional callback function that is executed after each hessian
         #: action evaluation. The interface must be hessian_cb(j, m, mdot, h)
@@ -119,6 +138,9 @@ class ReducedFunctional(object):
         #: The control values at which the reduced functional is to be evaluated.
         value = enlist(value)
 
+        # Call callback
+        self.eval_cb_pre(delist(value, list_type=self.controls))
+
         # Update the control values on the tape
         ListControl(self.controls).update(value)
 
@@ -137,8 +159,8 @@ class ReducedFunctional(object):
             if isinstance(output.data, Function):
               output.data.rename(str(fwd_var), "a Function from dolfin-adjoint")
 
-            if self.replay_cb is not None:
-              self.replay_cb(fwd_var, output.data, delist(value, list_type=self.controls))
+            # Call callback
+            self.replay_cb(fwd_var, output.data, delist(value, list_type=self.controls))
 
             # Check if we checkpointing is active and if yes
             # record the exact same checkpoint variables as
@@ -171,9 +193,10 @@ class ReducedFunctional(object):
                     adjointer.forget_forward_equation(i)
 
         self.current_func_value = func_value
-        if self.eval_cb:
-            self.eval_cb(self.scale * func_value, delist(value,
-                list_type=self.controls))
+
+        # Call callback
+        self.eval_cb_post(self.scale * func_value, delist(value,
+            list_type=self.controls))
 
         if self.cache:
             # Add result to cache
@@ -197,6 +220,10 @@ class ReducedFunctional(object):
                 info_green("Got a derivative cache hit.")
                 return cache_load(self._cache["derivative_cache"][hash], fnspaces)
 
+        # Call callback
+        values = [p.data() for p in self.controls]
+        self.derivative_cb_pre(delist(values, list_type=self.controls))
+
         # Compute the gradient by solving the adjoint equations
         dfunc_value = drivers.compute_gradient(self.functional, self.controls, forget=forget, project=project)
         dfunc_value = enlist(dfunc_value)
@@ -207,15 +234,11 @@ class ReducedFunctional(object):
         # Apply the scaling factor
         scaled_dfunc_value = [utils.scale(df, self.scale) for df in list(dfunc_value)]
 
-        # Call the user-specific callback routine
-        if self.derivative_cb:
-            if self.current_func_value is not None:
-              values = [p.data() for p in self.controls]
-              self.derivative_cb(self.scale * self.current_func_value,
-                      delist(scaled_dfunc_value, list_type=self.controls),
-                      delist(values, list_type=self.controls))
-            else:
-              info_red("Gradient evaluated without functional evaluation, not calling derivative callback function")
+        # Call callback
+        values = [p.data() for p in self.controls]
+        self.derivative_cb_post(self.scale * self.current_func_value,
+                delist(scaled_dfunc_value, list_type=self.controls),
+                delist(values, list_type=self.controls))
 
         # Cache the result
         if self.cache is not None:
@@ -252,12 +275,11 @@ class ReducedFunctional(object):
         # Apply the scaling factor
         scaled_Hm = [utils.scale(Hm, self.scale)]
 
-        # Call the user-specific callback routine
-        if self.hessian_cb:
-            control_data = [p.data() for p in self.controls]
-            self.hessian_cb(self.scale * self.current_func_value,
-                            delist(control_data, list_type=self.controls),
-                            m_dot, scaled_Hm[0])
+        # Call callback
+        control_data = [p.data() for p in self.controls]
+        self.hessian_cb(self.scale * self.current_func_value,
+                        delist(control_data, list_type=self.controls),
+                        m_dot, scaled_Hm[0])
 
         # Cache the result
         if self.cache is not None:
