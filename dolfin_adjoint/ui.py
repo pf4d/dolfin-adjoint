@@ -29,14 +29,15 @@ from timeforms import dt, TimeMeasure, START_TIME, FINISH_TIME
 from optimization.optimization_problem import *
 from optimization.optimization_solver import *
 from optimization.ipopt_solver import *
-from optimization.optizelle_solver import OptizelleSolver
+from optimization.optizelle_solver import *
 
 if backend.__name__ == "dolfin":
   from newton_solver import NewtonSolver
   from krylov_solver import KrylovSolver
   from linear_solver import LinearSolver
   from lusolver import LUSolver
-  from reduced_functional import ReducedFunctional, replace_control_value, replace_tape_value
+  from localsolver import LocalSolver
+  from reduced_functional import ReducedFunctional
   from reduced_functional_numpy import ReducedFunctionalNumPy, ReducedFunctionalNumpy
   from optimization.optimization import minimize, maximize, print_optimization_methods, minimise, maximise
   from optimization.multistage_optimization import minimize_multistage

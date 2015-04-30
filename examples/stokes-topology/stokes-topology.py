@@ -197,7 +197,7 @@ if __name__ == "__main__":
 
   J = Functional(0.5 * inner(alpha(rho) * u, u) * dx + mu * inner(grad(u), grad(u)) * dx)
   m = Control(rho)
-  Jhat = ReducedFunctional(J, m, eval_cb=eval_cb)
+  Jhat = ReducedFunctional(J, m, eval_cb_post=eval_cb)
 
 # The control constraints are the same as the :doc:`Poisson topology
 # example <../poisson-topology/poisson-topology>`, and so won't be
@@ -249,7 +249,7 @@ if __name__ == "__main__":
 
   solver = IPOPTSolver(problem, parameters=parameters)
   rho_opt = solver.solve()
-  
+
   File("output/control_solution_guess.xdmf") << rho_opt
 
 # With the optimised value for :math:`q=0.01` in hand, we *reset* the
@@ -283,7 +283,7 @@ if __name__ == "__main__":
 
   J = Functional(0.5 * inner(alpha(rho) * u, u) * dx + mu * inner(grad(u), grad(u)) * dx)
   m = Control(rho)
-  Jhat = ReducedFunctional(J, m, eval_cb=eval_cb)
+  Jhat = ReducedFunctional(J, m, eval_cb_post=eval_cb)
 
 # We can now solve the optimisation problem with :math:`q=0.1`, starting
 # from the solution of :math:`q=0.01`:

@@ -43,9 +43,17 @@
 # :math:`p` prescribed constants, :math:`\alpha` is a regularisation
 # term, and :math:`V` is the volume bound on the control.
 #
-# Physically, this corresponds to finding the material distribution
-# :math:`a(x)` that produces the least heat when the amount of high
-# conduction material is limited.
+# Physically, the problem is to finding the material distribution
+# :math:`a(x)` that minimises the integral of the temperature when the amount of highly
+# conducting material is limited. This code makes several approximations to
+# this physical problem. Instead of solving an integer optimisation problem (at each
+# location, we either have conducting material or we do not), a continuous relaxation
+# is performed; this is standard in topology optimisation :cite:`bendsoe2003`. Furthermore,
+# the discrete solution varies as the mesh is refined: the continuous solution exhibits
+# features at all scales, and these must be carefully handled in a discretisation
+# of the problem. In this example we merely add a fixed :math:`H^1` regularisation
+# term; a better approach is to add a mesh-dependent Helmholtz filter (see for example
+# :cite:`lazarov2011`).
 #
 # This example demonstrates how to implement general control
 # constraints, and how to use IPOPT :cite:`wachter2006` to solve the
@@ -80,10 +88,10 @@ parameters["std_out_all_processes"] = False
 # Penalisation (SIMP) rule.
 
 V = Constant(0.4)      # volume bound on the control
-p = Constant(5)        # power used in the solid isotropic material 
-# with penalisation (SIMP) rule, to encourage the control solution to attain either 0 or 1
-eps = Constant(1.0e-3) # epsilon used in the solid isotropic material 
-# with penalisation (SIMP) rule, used to encourage the control solution to attain either 0 or 1
+p = Constant(5)        # power used in the solid isotropic material
+                       # with penalisation (SIMP) rule, to encourage the control
+                       # solution to attain either 0 or 1
+eps = Constant(1.0e-3) # epsilon used in the solid isotropic material
 alpha = Constant(1.0e-8) # regularisation coefficient in functional
 
 
@@ -95,7 +103,7 @@ rule, equation (11)."""
 # Next we define the mesh (a unit square) and the function spaces to be
 # used for the control :math:`a` and forward solution :math:`T`.
 
-n = 100
+n = 250
 mesh = UnitSquareMesh(n, n)
 A = FunctionSpace(mesh, "CG", 1)  # function space for control
 P = FunctionSpace(mesh, "CG", 1)  # function space for solution
@@ -109,7 +117,7 @@ class WestNorth(SubDomain):
 
 # the Dirichlet BC; the Neumann BC will be implemented implicitly by
 # dropping the surface integral after integration by parts
-bc = [DirichletBC(P, 0.0, WestNorth())]                 
+bc = [DirichletBC(P, 0.0, WestNorth())]
 f = interpolate(Constant(1.0e-2), P, name="SourceTerm") # the volume source term for the PDE
 
 # Next we define a function that given a control :math:`a` solves the
@@ -169,7 +177,7 @@ if __name__ == "__main__":
 
   J = Functional(f*T*dx + alpha * inner(grad(a), grad(a))*dx)
   m = Control(a)
-  Jhat = ReducedFunctional(J, m, eval_cb=eval_cb)
+  Jhat = ReducedFunctional(J, m, eval_cb_post=eval_cb)
 
 # This :py:class:`ReducedFunctional` object solves the forward PDE using
 # dolfin-adjoint's tape each time the functional is to be evaluated, and
@@ -235,7 +243,7 @@ if __name__ == "__main__":
 # this and pass it to :py:mod:`pyipopt` to solve:
 
   problem = MinimizationProblem(Jhat, bounds=(lb, ub), constraints=VolumeConstraint(V))
-  parameters = None
+  parameters = {"acceptable_tol": 1.0e-200, "maximum_iterations": 100}
 
   solver = IPOPTSolver(problem, parameters=parameters)
   a_opt = solver.solve()
