@@ -271,31 +271,17 @@ class SolverCache(object):
     
     def expanded_linear_solver_parameters(form, linear_solver_parameters, static, bcs, symmetric_bcs):
       if static:
-        if dolfin_version() < (1, 3, 0):
-          default = {"lu_solver":{"reuse_factorization":True, "same_nonzero_pattern":True},
-                    "krylov_solver":{"preconditioner":{"reuse":True}}}
-        else:
-          default = {"lu_solver":{"reuse_factorization":True, "same_nonzero_pattern":True},
-                    "krylov_solver":{"preconditioner":{"structure":"same"}}}
+        default = {"lu_solver":{"reuse_factorization":True, "same_nonzero_pattern":True},
+                   "krylov_solver":{"preconditioner":{"structure":"same"}}}
         if (len(bcs) == 0 or symmetric_bcs) and is_self_adjoint_form(form):
-          if dolfin_version() < (1, 3, 0):
-            default["lu_solver"]["symmetric_operator"] = True
-          else:
-            default["lu_solver"]["symmetric"] = True
+          default["lu_solver"]["symmetric"] = True
         linear_solver_parameters = expand_linear_solver_parameters(linear_solver_parameters,
           default_linear_solver_parameters = default)
       else:
-        if dolfin_version() < (1, 3, 0):
-          default = {"lu_solver":{"reuse_factorization":False, "same_nonzero_pattern":False},
-                    "krylov_solver":{"preconditioner":{"reuse":False}}}
-        else:
-          default = {"lu_solver":{"reuse_factorization":False, "same_nonzero_pattern":False},
-                    "krylov_solver":{"preconditioner":{"structure":"different_nonzero_pattern"}}}
+        default = {"lu_solver":{"reuse_factorization":False, "same_nonzero_pattern":False},
+                   "krylov_solver":{"preconditioner":{"structure":"different_nonzero_pattern"}}}
         if (len(bcs) == 0 or symmetric_bcs) and is_self_adjoint_form(form):
-          if dolfin_version() < (1, 3, 0):
-            default["lu_solver"]["symmetric_operator"] = True
-          else:
-            default["lu_solver"]["symmetric"] = True
+          default["lu_solver"]["symmetric"] = True
         linear_solver_parameters = expand_linear_solver_parameters(linear_solver_parameters,
           default_linear_solver_parameters = default)
         
@@ -304,10 +290,7 @@ class SolverCache(object):
           static_parameters = linear_solver_parameters["lu_solver"]["reuse_factorization"] or \
                               linear_solver_parameters["lu_solver"]["same_nonzero_pattern"]
         else:
-          if dolfin_version() < (1, 3, 0):
-            static_parameters = linear_solver_parameters["krylov_solver"]["preconditioner"]["reuse"]
-          else:
-            static_parameters = not linear_solver_parameters["krylov_solver"]["preconditioner"]["structure"] == "different_nonzero_pattern"
+          static_parameters = not linear_solver_parameters["krylov_solver"]["preconditioner"]["structure"] == "different_nonzero_pattern"
         if static_parameters:
           raise ParameterException("Non-static solve supplied with static linear solver parameters")
         

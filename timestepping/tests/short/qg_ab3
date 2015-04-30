@@ -3,7 +3,7 @@
 
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
-# Copyright (C) 2014 University of Edinburgh
+# Copyright (C) 2014-2015 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -31,8 +31,6 @@ from timestepping import *
 import numpy
 
 parameters["form_compiler"]["optimize"] = True
-if dolfin_version() < (1, 3, 0):
-  parameters["form_compiler"]["representation"] = "quadrature"
 
 Constant = StaticConstant
 DirichletBC = StaticDirichletBC

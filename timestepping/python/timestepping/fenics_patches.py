@@ -6,7 +6,7 @@
 # Copyright (C) 2010-2012 Anders Logg
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
-# Copyright (C) 2014 University of Edinburgh
+# Copyright (C) 2014-2015 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -54,14 +54,14 @@ from versions import *
 
 __all__ = []
 
-# Only versions 1.2.x and 1.3.x have been tested.
-if dolfin_version() < (1, 2, 0) or dolfin_version() >= (1, 5, 0):
+# Only versions 1.3.x, and 1.4.x have been tested.
+if dolfin_version() < (1, 3, 0) or dolfin_version() >= (1, 5, 0):
   dolfin.warning("DOLFIN version %s not supported" % dolfin.__version__)
-if ufl_version() < (1, 2, 0) or ufl_version() >= (1, 5, 0):
+if ufl_version() < (1, 3, 0) or ufl_version() >= (1, 5, 0):
   dolfin.warning("UFL version %s not supported" % ufl.__version__)
-if ffc_version() < (1, 2, 0) or ffc_version() >= (1, 5, 0):
+if ffc_version() < (1, 3, 0) or ffc_version() >= (1, 5, 0):
   dolfin.warning("FFC version %s not supported" % ffc.__version__)
-if instant_version() < (1, 2, 0) or instant_version() >= (1, 5, 0):
+if instant_version() < (1, 3, 0) or instant_version() >= (1, 5, 0):
   dolfin.warning("Instant version %s not supported" % instant.__version__)
 
 # DOLFIN patches.
