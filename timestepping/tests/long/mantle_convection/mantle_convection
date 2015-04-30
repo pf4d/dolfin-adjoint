@@ -44,7 +44,7 @@ from timestepping import *
 dolfin.parameters["form_compiler"]["representation"] = "quadrature"
 
 def viscosity(T):
-    eta = eta0 * exp(-b_val*T/deltaT + c_val*(1.0 - triangle.x[1])/height )
+    eta = eta0 * exp(-b_val*T/deltaT + c_val*(1.0 - SpatialCoordinate(mesh)[1])/height )
     return eta
 
 def store(T, w, t):

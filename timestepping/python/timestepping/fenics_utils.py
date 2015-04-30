@@ -72,7 +72,12 @@ def form_quadrature_degree(form):
   else:
     # This is based upon code from _analyze_form and
     # _attach_integral_metadata in analysis.py, FFC bzr trunk revision 1761
-    form_data = extract_form_data(copy.copy(form))
+    if ufl_version() < (1, 5, 0):
+      form_data = form.form_data()
+      if form_data is None:
+        form_data = form.compute_form_data()
+    else:
+      form_data = ffc.analysis._analyze_form(-form, dolfin.parameters["form_compiler"])
     quadrature_degree = -1
     for integral in form.integrals():
       rep = dolfin.parameters["form_compiler"]["representation"]
@@ -81,21 +86,6 @@ def form_quadrature_degree(form):
       quadrature_degree = max(quadrature_degree, ffc.analysis._auto_select_quadrature_degree(integral, rep, form_data.unique_sub_elements, form_data.element_replace_map))
   return quadrature_degree
   
-def extract_form_data(form):
-  """
-  Wrapper for the form.form_data and form.compute_form_data methods of Form s.
-  Calls the latter only if the former returns None.
-  """
-  
-  if not isinstance(form, ufl.form.Form):
-    raise InvalidArgumentException("form must be a Form")
-
-  form_data = form.form_data()
-  if form_data is None:
-    form_data = form.compute_form_data()
-
-  return form_data
-
 def form_rank(form):
   """
   Return the rank of the supplied Form.
@@ -148,7 +138,7 @@ def evaluate_expr(expr, copy = False):
   expected in this case that the return value will never be modified.
   """
   
-  if not isinstance(expr, ufl.expr.Expr):
+  if not isinstance(expr, ufl.core.expr.Expr):
     raise InvalidArgumentException("expr must be an Expr")
 
   if isinstance(expr, ufl.algebra.Product):
@@ -195,7 +185,7 @@ def differentiate_expr(expr, u, expand = True):
   Constant(1.0). Form s should be differentiated using the derivative function.
   """
   
-  if not isinstance(expr, ufl.expr.Expr):
+  if not isinstance(expr, ufl.core.expr.Expr):
     raise InvalidArgumentException("expr must be an Expr")
   if isinstance(u, ufl.indexed.Indexed):
     op = u.operands()
@@ -228,7 +218,7 @@ def expand_expr(expr):
   Recursively expand the supplied Expr into the largest possible Sum.
   """
   
-  if not isinstance(expr, ufl.expr.Expr):
+  if not isinstance(expr, ufl.core.expr.Expr):
     raise InvalidArgumentException("expr must be an Expr")
   
   if isinstance(expr, ufl.algebra.Sum):
@@ -319,7 +309,7 @@ def expand(form, dim = None):
   Expand the supplied Expr or Form. This attempts to yield a canonical form.
   """
   
-  if not isinstance(form, (ufl.expr.Expr, ufl.form.Form)):
+  if not isinstance(form, (ufl.core.expr.Expr, ufl.form.Form)):
     raise InvalidArgumentException("form must be an Expr or Form")
 
   return ufl.algorithms.expand_indices(ufl.algorithms.expand_compounds(ufl.algorithms.expand_derivatives(form, dim = dim)))
@@ -507,12 +497,7 @@ def is_empty_form(form):
   if len(form.integrals()) == 0:
     return True
   
-  zero = True
   for integral in form.integrals():
     if not isinstance(integral.integrand(), ufl.constantvalue.Zero):
-      zero = False
-      break
-  if zero:
-    return True
-  
-  return len(extract_form_data(copy.copy(form)).integral_data) == 0
+      return False
+  return True

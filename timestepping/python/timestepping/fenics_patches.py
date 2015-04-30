@@ -55,13 +55,13 @@ from versions import *
 __all__ = []
 
 # Only versions 1.3.x, and 1.4.x have been tested.
-if dolfin_version() < (1, 3, 0) or dolfin_version() >= (1, 5, 0):
+if dolfin_version() < (1, 3, 0) or dolfin_version() >= (1, 6, 0):
   dolfin.warning("DOLFIN version %s not supported" % dolfin.__version__)
-if ufl_version() < (1, 3, 0) or ufl_version() >= (1, 5, 0):
+if ufl_version() < (1, 3, 0) or ufl_version() >= (1, 6, 0):
   dolfin.warning("UFL version %s not supported" % ufl.__version__)
-if ffc_version() < (1, 3, 0) or ffc_version() >= (1, 5, 0):
+if ffc_version() < (1, 3, 0) or ffc_version() >= (1, 6, 0):
   dolfin.warning("FFC version %s not supported" % ffc.__version__)
-if instant_version() < (1, 3, 0) or instant_version() >= (1, 5, 0):
+if instant_version() < (1, 3, 0) or instant_version() >= (1, 6, 0):
   dolfin.warning("Instant version %s not supported" % instant.__version__)
 
 # DOLFIN patches.
@@ -336,6 +336,11 @@ elif dolfin_version() < (1, 5, 0):
     return
   dolfin.GenericMatrix.compress = GenericMatrix_compress
   del(GenericMatrix_compress)
+elif dolfin_version() < (1, 6, 0):
+  def GenericMatrix_compress(self):
+    return
+  dolfin.GenericMatrix.compress = GenericMatrix_compress
+  del(GenericMatrix_compress)
 if dolfin_version() < (1, 1, 0):
   # Modified version of code from DirichletBC.cpp, DOLFIN bzr 1.2.x branch
   # revision 7509
@@ -532,7 +537,17 @@ elif dolfin_version() < (1, 5, 0):
     return
   dolfin.DirichletBC.zero_columns = DirichletBC_zero_columns
   del(DirichletBC_zero_columns)
-if dolfin_version() >= (1, 4, 0) and dolfin_version < (1, 5, 0):
+if dolfin_version() >= (1, 4, 0) and dolfin_version() < (1, 5, 0):
+  __GenericVector_resize_orig = dolfin.GenericVector.resize
+  def GenericVector_resize(self, *args):
+    if len(args) == 1:
+      __GenericVector_resize_orig(self, dolfin.mpi_comm_world(), args[0])
+    else:
+      __GenericVector_resize_orig(self, *args)
+    return
+  dolfin.GenericVector.resize = GenericVector_resize
+  del(GenericVector_resize)
+if dolfin_version() >= (1, 4, 0) and dolfin_version() < (1, 6, 0):
   __all__ += \
     [
       "info_blue",
@@ -572,16 +587,6 @@ if dolfin_version() >= (1, 4, 0) and dolfin_version < (1, 5, 0):
     return
   dolfin.MPI.barrier = types.MethodType(MPI_barrier, dolfin.MPI)
   del(MPI_barrier)
-  
-  __GenericVector_resize_orig = dolfin.GenericVector.resize
-  def GenericVector_resize(self, *args):
-    if len(args) == 1:
-      __GenericVector_resize_orig(self, dolfin.mpi_comm_world(), args[0])
-    else:
-      __GenericVector_resize_orig(self, *args)
-    return
-  dolfin.GenericVector.resize = GenericVector_resize
-  del(GenericVector_resize)
 
 # UFL patches.
 if ufl_version() < (1, 1, 0):
@@ -602,6 +607,8 @@ if ufl_version() < (1, 1, 0):
     return NotImplemented
   ufl.Form.__mul__ = Form__mul__
   del(Form__mul__)
+if ufl_version() < (1, 5, 0):
+  ufl.core = ufl
 
 # FFC patches.
 if ffc_version() < (1, 2, 0):

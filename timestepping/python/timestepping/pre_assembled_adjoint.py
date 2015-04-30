@@ -2,7 +2,7 @@
 
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
-# Copyright (C) 2014 University of Edinburgh
+# Copyright (C) 2014-2015 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -247,7 +247,7 @@ class PAAdjointSolvers(object):
       a_dep = a_map[f_x]
       if isinstance(f_solve, AssignmentSolver):
         f_rhs = f_solve.rhs()
-        if isinstance(f_rhs, ufl.expr.Expr):
+        if isinstance(f_rhs, ufl.core.expr.Expr):
           # Adjoin an expression assignment RHS
           for f_dep in ufl.algorithms.extract_coefficients(f_rhs):
             if isinstance(f_dep, dolfin.Function):
@@ -404,7 +404,7 @@ class PAAdjointSolvers(object):
       a_solver = self.__a_solvers[i]
 
       def evaluate_a_L_as(i):
-        if isinstance(a_L_as[i], ufl.expr.Expr):
+        if isinstance(a_L_as[i], ufl.core.expr.Expr):
           if is_r0_function(a_x):
             L = evaluate_expr(a_L_as[i], copy = False)
             if isinstance(L, dolfin.GenericVector):
@@ -426,7 +426,7 @@ class PAAdjointSolvers(object):
           L = float(a_L_as[i][0]) * a_L_as[i][1].vector()
         return L
       def add_a_L_as(i, L):
-        if isinstance(a_L_as[i], ufl.expr.Expr):
+        if isinstance(a_L_as[i], ufl.core.expr.Expr):
           l_L = evaluate_expr(a_L_as[i], copy = False)
           if is_r0_function(a_x):
             if isinstance(l_L, dolfin.GenericVector):

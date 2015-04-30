@@ -31,7 +31,7 @@
   showstringspaces = false
 }
 
-\newcommand{\version}{1.4.1}
+\newcommand{\version}{1.4.1+}
 
 \begin{document}
 
@@ -457,11 +457,11 @@ system.add_assignment(y, x)
 Here \verb+x+ is a \verb+dolfin.Function+ corresponding to a time level of a
 \verb+TimeFunction+, and \verb+y+ is a float, a \verb+dolfin.Constant+, a
 \verb+dolfin.Function+, a \verb+LinearCombination+ (explained below), or a
-general \verb+ufl.expr.Expr+ (an arbitrary expression). This call corresponds to
-an equation in which \verb+x+ is set equal to the value of \verb+y+. The value
-of \verb+y+ must correspond to a either a constant value or a function defined
-in the function space of \verb+x+. The assignment must also be linear, with
-\verb+y+ independent of \verb+x+.
+general \verb+ufl.core.expr.Expr+ (an arbitrary expression). This call
+corresponds to an equation in which \verb+x+ is set equal to the value of
+\verb+y+. The value of \verb+y+ must correspond to a either a constant value or
+a function defined in the function space of \verb+x+. The assignment must also
+be linear, with \verb+y+ independent of \verb+x+.
 
 A \verb+LinearCombination+ is instantiated via:
 \begin{lstlisting}
@@ -469,7 +469,7 @@ lc = LinearCombination(*args)
 \end{lstlisting}
 where the arguments \verb+args+ are an arbitrary list of tuples
 \verb+(alpha, y)+. Each \verb+alpha+ is a float, a \verb+dolfin.Constant+, a
-\verb+dolfin.Function+, or a general \linebreak \verb+ufl.expr.Expr+. The
+\verb+dolfin.Function+, or a general \linebreak \verb+ufl.core.expr.Expr+. The
 \verb+LinearCombination+ then represents the value of $\sum_i \alpha_i y_i$.
 Note that the \verb+LinearCombination+ constructor does not check that all the
 \verb+alpha+ are independent of all the \verb+y+, and consequently does not

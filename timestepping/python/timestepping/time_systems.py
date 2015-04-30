@@ -2,7 +2,7 @@
 
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
-# Copyright (C) 2014 University of Edinburgh
+# Copyright (C) 2014-2015 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -187,7 +187,7 @@ class TimeSystem(object):
     """
     
     if len(args) == 2 and len(kwargs) == 0 and \
-      (isinstance(args[0], (int, float, LinearCombination, ufl.expr.Expr)) or is_general_constant(args[0])) \
+      (isinstance(args[0], (int, float, LinearCombination, ufl.core.expr.Expr)) or is_general_constant(args[0])) \
       and isinstance(args[1], dolfin.Function):
       self.add_assignment(args[0], args[1])
       return
@@ -1415,7 +1415,7 @@ class ManagedModel(object):
           f_x = f_solve.x()
           if isinstance(f_solve, AssignmentSolver):
             f_rhs = f_solve.rhs()
-            if isinstance(f_rhs, ufl.expr.Expr):
+            if isinstance(f_rhs, ufl.core.expr.Expr):
               f_der = differentiate_expr(f_rhs, parameter)
               if not isinstance(f_der, ufl.constantvalue.Zero):
                 dFdm[j][i][f_x] = f_der
@@ -1451,7 +1451,7 @@ class ManagedModel(object):
               cp_cs.add(c)
             elif isinstance(c, (dolfin.Constant, dolfin.Function, dolfin.Expression)) and not is_static_coefficient(c):
               update_cs.add(c)
-        elif isinstance(f_der, ufl.expr.Expr):
+        elif isinstance(f_der, ufl.core.expr.Expr):
           for c in ufl.algorithms.extract_coefficients(f_der):
             if isinstance(c, dolfin.Function) and hasattr(c, "_time_level_data"):
               cp_cs.add(c)
@@ -1513,7 +1513,7 @@ class ManagedModel(object):
             else:
               assert(isinstance(f_der_a, dolfin.GenericVector))
               grad[i] -= f_der_a.inner(a_x.vector())
-          elif isinstance(f_der, ufl.expr.Expr):
+          elif isinstance(f_der, ufl.core.expr.Expr):
             f_der = evaluate_expr(f_der, copy = False)
             if isinstance(f_der, float):
               if isinstance(grad[i], float):
