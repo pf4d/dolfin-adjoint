@@ -2,7 +2,7 @@
 
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
-# Copyright (C) 2014 University of Edinburgh
+# Copyright (C) 2014-2015 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -46,7 +46,7 @@ def cache_info(msg, info = dolfin.info):
     info(msg)
   return
 
-def form_key(form, static):
+def form_key(form, static = True):
   """
   Generate a hashable key from a Form.
   """
@@ -137,7 +137,7 @@ class AssemblyCache(object):
     if len(bcs) == 0:
       if not rank == 2:
         compress = None
-      key = (form_key(form, True), parameters_key(form_compiler_parameters), bc_key(bcs, symmetric_bcs), compress)
+      key = (form_key(form), parameters_key(form_compiler_parameters), bc_key(bcs, symmetric_bcs), compress)
       if not key in self.__cache:
         cache_info("Assembling form with rank %i" % rank, dolfin.info_red)
         self.__cache[key] = assemble(form, form_compiler_parameters = form_compiler_parameters)
@@ -149,7 +149,7 @@ class AssemblyCache(object):
       if not rank == 2:
         raise InvalidArgumentException("form must be rank 2 when applying boundary conditions")
 
-      key = (form_key(form, True), parameters_key(form_compiler_parameters), bc_key(bcs, symmetric_bcs), compress)
+      key = (form_key(form), parameters_key(form_compiler_parameters), bc_key(bcs, symmetric_bcs), compress)
       if not key in self.__cache:
         cache_info("Assembling form with rank 2, with boundary conditions", dolfin.info_red)
         mat = assemble(form, form_compiler_parameters = form_compiler_parameters)
@@ -338,7 +338,7 @@ class SolverCache(object):
         npre_assembly_parameters.update(pre_assembly_parameters)
         pre_assembly_parameters = npre_assembly_parameters;  del(npre_assembly_parameters)
               
-      key = (form_key(form, static),
+      key = (form_key(form, static = static),
              parameters_key(linear_solver_parameters),
              None if pre_assembly_parameters is None else parameters_key(pre_assembly_parameters),
              bc_key(bcs, symmetric_bcs),
@@ -356,7 +356,7 @@ class SolverCache(object):
       
       linear_solver_parameters = expanded_linear_solver_parameters(form, linear_solver_parameters, True, bcs, symmetric_bcs)    
       
-      key = (form_key(form, True),
+      key = (form_key(form),
              parameters_key(linear_solver_parameters),
              None,
              bc_key(bcs, symmetric_bcs),
