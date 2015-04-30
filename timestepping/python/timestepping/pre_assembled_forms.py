@@ -2,7 +2,7 @@
 
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
-# Copyright (C) 2014 University of Edinburgh
+# Copyright (C) 2014-2015 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -318,9 +318,9 @@ class PAStaticFilter(PAFilter):
     if tensor is None:
       return self.__pre_assembled.copy()
     else:
-      if isinstance(self.__pre_assembled, dolfin.GenericMatrix):
-        self.__pre_assembled.axpy(0.0, tensor, False)
-        tensor.axpy(0.0, self.__pre_assembled, False)
+      assert(isinstance(self.__pre_assembled, dolfin.GenericMatrix))
+      self.__pre_assembled.axpy(0.0, tensor, False)
+      tensor.axpy(0.0, self.__pre_assembled, False)
       return tensor
   
   def assemble(self, tensor = None, same_nonzero_pattern = False, copy = False):
@@ -437,7 +437,7 @@ class PAMatrixFilter(PAFilter):
         L += mat * fn.vector()
       return L
     else:
-      for fn, mat in self.__pre_assembled.items():
+      for fn, mat in self.__pre_assembled.iteritems():
         tensor += mat * fn.vector()
       return tensor
   
@@ -526,7 +526,7 @@ class NonPAFilter(PAFilter):
     """
     
     if self._n == 0:
-      return tensor
+      raise StateException("Cannot assemble empty Form")
     
     if self._rank == 2:
       if self.__tensor is None:
@@ -561,8 +561,8 @@ class PAForm(object):
   """
   
   def __init__(self, form, pre_assembly_parameters = {}):
-    if not isinstance(form, ufl.form.Form):
-      raise InvalidArgumentException("form must be a Form")
+    if not isinstance(form, ufl.form.Form) or is_empty_form(form):
+      raise InvalidArgumentException("form must be a non-empty Form")
     
     rank = form_rank(form)
     if rank == 0:
@@ -597,13 +597,17 @@ class PAForm(object):
     
     for filter in pa_filters:
       form, n_added = filter.add(form)
-
-    if self.pre_assembly_parameters["expand_form"]:
-      expand_expr = fenics_utils.expand_expr
-    else:
-      expand_expr = lambda expr : [expr]
       
     if not is_empty_form(form):
+      if self.pre_assembly_parameters["expand_form"]:
+        expand_expr = fenics_utils.expand_expr
+      else:
+        def expand_expr(e):
+          if isinstance(e, ufl.algebra.Sum):
+            return e.operands()
+          else:
+            return e
+          
       if self.pre_assembly_parameters["term_optimisation"]:
         terms = []
         for integral in form.integrals():
@@ -629,19 +633,18 @@ class PAForm(object):
         
     n = {}
     n_pa = 0
-    n_non_pa = 0
-    filters = [non_pa_filter] + pa_filters
-    for filter in copy.copy(filters):
+    filters = []
+    for filter in pa_filters:
       n_filter = filter.n()
       n[filter.name()] = n_filter
-      if isinstance(filter, NonPAFilter):
-        n_non_pa += n_filter
-      else:
-        n_pa += n_filter
-      if filter.n() == 0:
-        filters.remove(filter)
-      else:
+      n_pa += n_filter
+      if n_filter > 0:
         filter.pre_assemble()
+        filters.append(filter)
+    n_non_pa = non_pa_filter.n()
+    if n_non_pa > 0:
+      non_pa_filter.pre_assemble()
+      filters.insert(0, non_pa_filter)
     
     if self.__rank == 2 and len(filters) > 1:
       tensor = filters[0].match_tensor()
