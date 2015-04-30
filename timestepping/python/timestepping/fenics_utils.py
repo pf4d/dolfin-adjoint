@@ -4,7 +4,7 @@
 # Copyright (C) 2008-2013 Martin Sandve Alnes
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
-# Copyright (C) 2014 University of Edinburgh
+# Copyright (C) 2014-2015 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -64,22 +64,22 @@ def form_quadrature_degree(form):
   internal behaviour of FFC.
   """
 
-  if isinstance(form, ufl.form.Form):
-    if dolfin.parameters["form_compiler"]["quadrature_degree"] > 0:
-      quadrature_degree = dolfin.parameters["form_compiler"]["quadrature_degree"]
-    else:
-      # This is based upon code from _analyze_form and
-      # _attach_integral_metadata in analysis.py, FFC bzr trunk revision 1761
-      form_data = extract_form_data(copy.copy(form))
-      quadrature_degree = -1
-      for integral in form.integrals():
-        rep = dolfin.parameters["form_compiler"]["representation"]
-        if rep == "auto":
-          rep = ffc.analysis._auto_select_representation(integral, form_data.unique_sub_elements, form_data.function_replace_map)
-        quadrature_degree = max(quadrature_degree, ffc.analysis._auto_select_quadrature_degree(integral, rep, form_data.unique_sub_elements, form_data.element_replace_map))
-    return quadrature_degree
-  else:
+  if not isinstance(form, ufl.form.Form):
     raise InvalidArgumentException("form must be a Form")
+
+  if dolfin.parameters["form_compiler"]["quadrature_degree"] > 0:
+    quadrature_degree = dolfin.parameters["form_compiler"]["quadrature_degree"]
+  else:
+    # This is based upon code from _analyze_form and
+    # _attach_integral_metadata in analysis.py, FFC bzr trunk revision 1761
+    form_data = extract_form_data(copy.copy(form))
+    quadrature_degree = -1
+    for integral in form.integrals():
+      rep = dolfin.parameters["form_compiler"]["representation"]
+      if rep == "auto":
+        rep = ffc.analysis._auto_select_representation(integral, form_data.unique_sub_elements, form_data.function_replace_map)
+      quadrature_degree = max(quadrature_degree, ffc.analysis._auto_select_quadrature_degree(integral, rep, form_data.unique_sub_elements, form_data.element_replace_map))
+  return quadrature_degree
   
 def extract_form_data(form):
   """
@@ -322,8 +322,7 @@ def expand(form, dim = None):
   if not isinstance(form, (ufl.expr.Expr, ufl.form.Form)):
     raise InvalidArgumentException("form must be an Expr or Form")
 
-  nform = ufl.algorithms.expand_indices(ufl.algorithms.expand_compounds(ufl.algorithms.expand_derivatives(form, dim = dim)))
-  return nform
+  return ufl.algorithms.expand_indices(ufl.algorithms.expand_compounds(ufl.algorithms.expand_derivatives(form, dim = dim)))
 
 if dolfin_version() < (1, 4, 0):
   def extract_test_and_trial(form):
