@@ -46,8 +46,7 @@ for form in [inner(test, F ** sc) * dx,
              inner(test, ufl.classes.Conditional(eq(1, 1), F + sc, F + sc)) * dx
              ]:
   pform = PAForm(form, pre_assembly_parameters = {"term_optimisation":False,
-                                                  "matrix_optimisation":True,
-                                                  "compress_matrices":True})
+                                                  "matrix_optimisation":True})
   print(pform.n_pre_assembled(), pform.n_non_pre_assembled())
   assert(pform.n_pre_assembled() == 0)
   assert(pform.n_non_pre_assembled() == 1)
@@ -68,8 +67,7 @@ for form in [inner(test, F) * dx,
              inner(as_vector([sc, sc]) * test, grad(F)) * dx,
              inner(grad(test), as_vector([F, 0])) * dx]:
   pform = PAForm(form, pre_assembly_parameters = {"term_optimisation":False,
-                                                  "matrix_optimisation":True,
-                                                  "compress_matrices":True})
+                                                  "matrix_optimisation":True})
   print(pform.n_pre_assembled(), pform.n_non_pre_assembled())
   assert(pform.n_pre_assembled() > 0)
   assert(pform.n_non_pre_assembled() == 0)

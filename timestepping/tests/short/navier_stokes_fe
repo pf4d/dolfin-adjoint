@@ -97,17 +97,14 @@ system.add_solve(ic, Us[0])
 system.add_solve(a2 == -div(Us[0]) * q * dx,
   P[0], bcp, solver_parameters = {"linear_solver":"gmres", "preconditioner":prec})
 system.add_solve(a3 == inner(Us[0], v) * dx - inner(grad(P[0]), v) * dx,
-  U[0], bcu, solver_parameters = {"linear_solver":"gmres", "preconditioner":"default"},
-  pre_assembly_parameters = {"bilinear_forms":{"compress_matrices":False}})
+  U[0], bcu, solver_parameters = {"linear_solver":"gmres", "preconditioner":"default"})
 
 system.add_solve(a1 == L1,
-  u1s, bcu, solver_parameters = {"linear_solver":"gmres", "preconditioner":"default"},
-  pre_assembly_parameters = {"bilinear_forms":{"compress_matrices":False}})
+  u1s, bcu, solver_parameters = {"linear_solver":"gmres", "preconditioner":"default"})
 system.add_solve(a2 == L2,
   p1, bcp, solver_parameters = {"linear_solver":"gmres", "preconditioner":prec})
 system.add_solve(a3 == L3,
-  u1, bcu, solver_parameters = {"linear_solver":"gmres", "preconditioner":"default"},
-  pre_assembly_parameters = {"bilinear_forms":{"compress_matrices":False}})
+  u1, bcu, solver_parameters = {"linear_solver":"gmres", "preconditioner":"default"})
 def update(s, cs = None):
   p_in.t = s * dt
   return
@@ -163,13 +160,20 @@ if dolfin_version() < (1, 4, 0):
   print("%.16e" % ref)
   print("%.16e" % err)
   assert(err < 1.0e-14)
-else:
+elif dolfin_version() < (1, 5, 0):
   ref = 2.4175721526152145e+00
   err = abs(comp - ref)
   print("%.16e" % comp)
   print("%.16e" % ref)
   print("%.16e" % err)
   assert(err < 4.0e-14)
+else:
+  ref = 2.4175738757720437e+00
+  err = abs(comp - ref)
+  print("%.16e" % comp)
+  print("%.16e" % ref)
+  print("%.16e" % err)
+  assert(err < 2.0e-14)
 
 timer = Timer("adjoint")
 dJdm = system.compute_gradient(ic)
@@ -182,13 +186,20 @@ if dolfin_version() < (1, 4, 0):
   print("%.16e" % ref)
   print("%.16e" % err)
   assert(err < 4.0e-19)
-else:
+elif dolfin_version() < (1, 5, 0):
   ref = 2.6753558262684706e-05
   err = abs(comp - ref)
   print("%.16e" % comp)
   print("%.16e" % ref)
   print("%.16e" % err)
   assert(err < 4.0e-19)
+else:
+  ref = 2.6753588007501447e-05
+  err = abs(comp - ref)
+  print("%.16e" % comp)
+  print("%.16e" % ref)
+  print("%.16e" % err)
+  assert(err < 8.0e-20)
 
 orders = system.taylor_test(ic, grad = dJdm, fact = 1.0e-7)
 assert((orders > 1.98).all())
