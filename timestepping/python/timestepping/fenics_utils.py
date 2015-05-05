@@ -73,7 +73,7 @@ def form_quadrature_degree(form):
     # This is based upon code from _analyze_form and
     # _attach_integral_metadata in analysis.py, FFC bzr trunk revision 1761
     form = copy.copy(form)
-    if ufl_version() < (1, 6, 0):
+    if ufl_version() < (1, 5, 0):
       form_data = form.form_data()
       if form_data is None:
         form_data = form.compute_form_data()
