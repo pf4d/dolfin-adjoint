@@ -1855,25 +1855,18 @@ class ManagedModel(object):
           l_N += n
 
         n_p = dolfin.MPI.num_processes()
-        if n_p > 1:          
-          p_N = dolfin.Vector()
-          p_N.resize((p, p + 1))
-          p_N.set_local(numpy.array([l_N], dtype = numpy.float_))
-          p_N.apply("insert")
-          p_N = numpy.array([int(N + 0.5) for N in p_N.gather(numpy.arange(n_p, dtype = numpy.intc))], dtype = numpy.intc)
+        if n_p > 1:
+          import mpi4py.MPI as MPI
+          
+          p_N = numpy.array(MPI.COMM_WORLD.allgather(l_N), dtype = numpy.uint64)
           g_N = p_N.sum()
 
           l_arr = numpy.empty(l_N, dtype = numpy.float_)
           g_indices = p_N[:p].sum();  g_indices = (g_indices, g_indices + l_N)
-          l_vec = dolfin.Vector()
-          l_vec.resize(g_indices)
-          g_range = numpy.arange(g_N, dtype = numpy.intc)
 
           self.__g_N = g_N
           self.__l_arr = l_arr
           self.__g_indices = g_indices
-          self.__l_vec = l_vec
-          self.__g_range = g_range
         else:
           self.__g_N = l_N
         self.__p = p
@@ -1887,9 +1880,16 @@ class ManagedModel(object):
         if self.__n_p == 1:
           return arr.copy()
         else:
-          self.__l_vec.set_local(arr)
-          self.__l_vec.apply("insert")
-          return self.__l_vec.gather(self.__g_range)
+          import mpi4py.MPI as MPI
+          
+          p_arr = MPI.COMM_WORLD.allgather(arr)
+          g_arr = numpy.empty(self.__g_N, dtype = arr.dtype)
+          index = 0
+          for l_arr in p_arr:
+            g_arr[index:index + l_arr.shape[0]] = l_arr
+            index += l_arr.shape[0]
+          
+          return g_arr
 
       def serialised_bounds(self, bounds):
         l_bounds = numpy.empty(self.__l_N, dtype = numpy.float_)

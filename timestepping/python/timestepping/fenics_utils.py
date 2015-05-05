@@ -400,7 +400,7 @@ def apply_bcs(a, bcs, L = None, symmetric_bcs = False):
       bc.apply(a)
     if symmetric_bcs:
       L = a.factory().create_vector()
-      L.resize(a.local_range(0))
+      a.init_vector(L, 0)
       for bc in bcs:
         bc.zero_columns(a, L, 1.0)
   else:

@@ -104,6 +104,11 @@ def system_info():
   dolfin.info("Python version : %s" % platform.python_version())
   dolfin.info("NumPy version  : %s" % numpy.__version__)
   dolfin.info("SciPy version  : %s" % scipy.__version__)
+  try:
+    import mpi4py
+    dolfin.info("MPI4Py version : %s" % mpi4py.__version__)
+  except ImportError:
+    pass
   dolfin.info("VTK version    : %s" % vtk.vtkVersion().GetVTKVersion())
   dolfin.info("DOLFIN version : %s" % dolfin.__version__)
   dolfin.info("FIAT version   : %s" % FIAT.__version__)
@@ -131,5 +136,5 @@ def system_info():
     dolfin.info("PETSc version  : Unknown")
   else:
     dolfin.info("PETSc version  : %i.%i.%ip%i" % petsc_ver.tuple())
-
+    
   return
