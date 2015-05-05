@@ -54,7 +54,7 @@ from versions import *
 
 __all__ = []
 
-# Only versions 1.3.x, and 1.4.x have been tested.
+# Only versions 1.3.x, 1.4.x, and 1.5.x have been tested.
 if dolfin_version() < (1, 3, 0) or dolfin_version() >= (1, 6, 0):
   dolfin.warning("DOLFIN version %s not supported" % dolfin.__version__)
 if ufl_version() < (1, 3, 0) or ufl_version() >= (1, 6, 0):
