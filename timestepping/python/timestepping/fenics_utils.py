@@ -72,12 +72,13 @@ def form_quadrature_degree(form):
   else:
     # This is based upon code from _analyze_form and
     # _attach_integral_metadata in analysis.py, FFC bzr trunk revision 1761
-    if ufl_version() < (1, 5, 0):
+    form = copy.copy(form)
+    if ufl_version() < (1, 6, 0):
       form_data = form.form_data()
       if form_data is None:
         form_data = form.compute_form_data()
     else:
-      form_data = ffc.analysis._analyze_form(-form, dolfin.parameters["form_compiler"])
+      form_data = ffc.analysis._analyze_form(form, dolfin.parameters["form_compiler"])
     quadrature_degree = -1
     for integral in form.integrals():
       rep = dolfin.parameters["form_compiler"]["representation"]
