@@ -330,17 +330,15 @@ elif dolfin_version() < (1, 4, 0):
   dolfin.GenericMatrix.compress = GenericMatrix_compress
   del(GenericMatrix_compress)
 elif dolfin_version() < (1, 5, 0):
-  def GenericMatrix_compress(self):
+  __GenericMatrix_compressed_orig = dolfin.GenericMatrix.compressed
+  def GenericMatrix_compressed(self, B):
     if dolfin.MPI.num_processes() == 1 or self.size(0) == self.size(1):
-      self.compressed(self)
+      __GenericMatrix_compressed_orig(self, B)
+    elif not B is self:
+      B.assign(self)
     return
-  dolfin.GenericMatrix.compress = GenericMatrix_compress
-  del(GenericMatrix_compress)
-elif dolfin_version() < (1, 6, 0):
-  def GenericMatrix_compress(self):
-    return
-  dolfin.GenericMatrix.compress = GenericMatrix_compress
-  del(GenericMatrix_compress)
+  dolfin.GenericMatrix.compressed = GenericMatrix_compressed
+  del(GenericMatrix_compressed)
 if dolfin_version() < (1, 1, 0):
   # Modified version of code from DirichletBC.cpp, DOLFIN bzr 1.2.x branch
   # revision 7509

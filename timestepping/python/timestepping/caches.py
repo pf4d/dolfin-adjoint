@@ -142,7 +142,11 @@ class AssemblyCache(object):
         cache_info("Assembling form with rank %i" % rank, dolfin.info_red)
         self.__cache[key] = assemble(form, form_compiler_parameters = form_compiler_parameters)
         if rank == 2 and compress:
-          self.__cache[key].compress()
+          dolfin.warning("Matrix compression deprecated")
+          if dolfin_version() < (1, 4, 0):
+            self.__cache[key].compress()
+          elif dolfin_version() < (1, 5, 0):
+            self.__cache[key].compressed(self.__cache[key])
       else:
         cache_info("Using cached assembled form with rank %i" % rank, dolfin.info_green)
     else:
@@ -156,7 +160,11 @@ class AssemblyCache(object):
         apply_bcs(mat, bcs, symmetric_bcs = symmetric_bcs)
         self.__cache[key] = mat
         if compress:
-          mat.compress()
+          dolfin.warning("Matrix compression deprecated")
+          if dolfin_version() < (1, 4, 0):
+            mat.compress()
+          elif dolfin_version() < (1, 5, 0):
+            mat.compressed(mat)
       else:
         cache_info("Using cached assembled form with rank 2, with boundary conditions", dolfin.info_green)
 
