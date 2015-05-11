@@ -2,7 +2,7 @@
 
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
-# Copyright (C) 2014 University of Edinburgh
+# Copyright (C) 2014-2015 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -168,7 +168,7 @@ class PAEquationSolver(EquationSolver):
     both the LHS and RHS. Otherwise, only reassemble the LHS or RHS if they
     depend upon the supplied Constant s or Function s. Note that this does
     not clear the assembly or linear solver caches -- hence if a static
-    Constant, Function, or DicichletBC is modified then one should clear the
+    Constant, Function, or DirichletBC is modified then one should clear the
     caches before calling reassemble on the PAEquationSolver.
     """
     

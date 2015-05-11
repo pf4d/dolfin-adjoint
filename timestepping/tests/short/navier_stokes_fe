@@ -134,9 +134,9 @@ class Functional(TimeFunctional):
       return ufl.form.Form([])
   def dependencies(self, s = None, non_symbolic = False):
     if s is None or s in [0, max_s]:
-      return [U[n]]
+      return {U[n]}
     else:
-      return []
+      return set()
 system.set_functional(Functional())
 
 # Time-stepping
