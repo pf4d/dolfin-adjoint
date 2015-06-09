@@ -55,7 +55,7 @@ class OptizelleBoundConstraint(constraints.InequalityConstraint):
 
     def output_workspace(self):
         if isinstance(self.m, Function):
-            return numpy.zeros(self.m.vector().size())
+            return numpy.zeros(self.m.vector().local_size())
         elif isinstance(self.m, Constant):
             return [0.0]
 
