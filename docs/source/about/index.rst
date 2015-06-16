@@ -28,6 +28,14 @@ where the model is implemented in the Python interface to DOLFIN.
 
 .. _his recent book: http://dx.doi.org/10.1137/1.9781611972078
 
+
+News
+====
+**11.6.2015**: P. E. Farrell, S. W. Funke, D. A. Ham and M. E. Rognes were awarded the 2015 `Wilkinson prize for numerical software`_ for dolfin-adjoint.
+
+
+.. _Wilkinson prize for numerical software: http://www.nag.co.uk/other/WilkinsonPrize.html
+
 Features
 ========
 
