@@ -23,7 +23,7 @@ class TAOSolver(OptimizationSolver):
 
     """
 
-    def __init__(self, problem, parameters=None, riesz_map=None, hessian_precon=None):
+    def __init__(self, problem, parameters=None, riesz_map=None):
        
         try:
             from petsc4py import PETSc
@@ -41,10 +41,6 @@ class TAOSolver(OptimizationSolver):
             self.riesz_map = as_backend_type(riesz_map).mat()
         else:
             self.riesz_map = None
-        if hessian_precon is not None:
-            self.hessian_precon = as_backend_type(hessian_precon).mat()
-        else:
-            self.hessian_precon = None
 
         OptimizationSolver.__init__(self, problem, parameters)
 
@@ -206,7 +202,7 @@ class TAOSolver(OptimizationSolver):
         self.tao_problem.setObjectiveGradient(self.__user.objective_and_gradient)
         self.tao_problem.setInitial(self.initial_vec)
         self.tao_problem.setRieszMap(self.riesz_map)
-        self.tao_problem.setHessian(self.__user.hessian, self.__user.H, self.hessian_precon)
+        self.tao_problem.setHessian(self.__user.hessian, self.__user.H)
 
         # Set bounds if we have any
         if self.problem.bounds is not None:
@@ -233,8 +229,8 @@ class TAOSolver(OptimizationSolver):
             if isinstance(lb, Function):
                 lbvec = as_backend_type(lb.vector()).vec()
             elif isinstance(lb, (float, int, Constant)):
-                lbvec_list = [float(lb)] * len_control
-                lbvec = self.__list_as_vec(lbvec_list)
+                lbvec = self.initial_vec.duplicate()
+                lbvec.set(float(lb))
             else:
                 raise TypeError("Unknown lower bound type %s" % lb.__class__)
             lbvecs.append(lbvec)
@@ -242,8 +238,8 @@ class TAOSolver(OptimizationSolver):
             if isinstance(ub, Function):
                 ubvec = as_backend_type(ub.vector()).vec()
             elif isinstance(ub, (float, int, Constant)):
-                ubvec_list = [float(ub)] * len_control
-                ubvec = self.__list_as_vec(ubvec_list)
+                ubvec = self.initial_vec.duplicate()
+                ubvec.set(float(ub))
             else:
                 raise TypeError("Unknown upper bound type %s" % ub.__class__)
             ubvecs.append(ubvec)
@@ -328,17 +324,9 @@ class TAOSolver(OptimizationSolver):
             raise TypeError("Unknown control type %s" % control.__class__)
         return as_vec
 
-    def __list_as_vec(self, lst):
-        """Return a PETSc Vec representing the supplied list"""
-        PETSc = self.PETSc
-        as_vec = PETSc.Vec().create(PETSc.COMM_WORLD)
-        as_vec.setSizes((PETSc.DECIDE,len(lst)))
-        as_vec.setFromOptions()
-
-        ostarti, oendi = as_vec.owner_range
-        as_vec.setValues(range(ostarti,oendi),lst)
-        as_vec.assemble()
-        return as_vec
+    def get_tao(self):
+        """Returns the PETSc TAO instance associated with the solver"""
+        return self.tao_problem
 
     def solve(self):
         self.tao_problem.solve()
