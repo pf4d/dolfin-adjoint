@@ -9,7 +9,7 @@ class TAOSolver(OptimizationSolver):
     """Uses PETSc TAO to solve the given optimization problem.
        http://www.mcs.anl.gov/research/projects/tao/
 
-       Valid methods: 
+       Valid methods:
          ------ Unconstrained optimisation --------
          nm:    Nelder-Mead method
          lmvm:  Limited memory, variable metric method
@@ -24,7 +24,7 @@ class TAOSolver(OptimizationSolver):
     """
 
     def __init__(self, problem, parameters=None, riesz_map=None):
-       
+
         try:
             from petsc4py import PETSc
         except:
@@ -45,7 +45,7 @@ class TAOSolver(OptimizationSolver):
         OptimizationSolver.__init__(self, problem, parameters)
 
         self.tao_problem = PETSc.TAO().create(PETSc.COMM_WORLD)
-        
+
         self.__build_app_context()
         self.__set_parameters()
         self.__build_tao_problem()
@@ -66,11 +66,11 @@ class TAOSolver(OptimizationSolver):
         # Use value of control object as initial guess for the optimisation
         self.initial_vec = ctrl_vec.copy()
         #self.initial_vec = ctrl_vec.duplicate() # DSM temporary to reproduce dependency results
-        
+
         class AppCtx(object):
             ''' Implements the application context for the TAO solver '''
 
-            def __init__(self):               
+            def __init__(self):
                 # create Hessian matrix
                 self.H = PETSc.Mat().create(comm=PETSc.COMM_WORLD)
                 dims = (ctrl_vec.local_size, ctrl_vec.size)
@@ -81,7 +81,7 @@ class TAOSolver(OptimizationSolver):
 
             def objective(self, x):
                 ''' Evaluates the functional. '''
-                self.update(x)                
+                self.update(x)
                 # TODO: Multiple controls
                 return rf(rf.controls[0].data())
 
@@ -116,14 +116,14 @@ class TAOSolver(OptimizationSolver):
                 x_wrap = Function(rf.controls[0].data().function_space(), PETScVector(x))
                 hes = rf.hessian(x_wrap)[0]
                 hes_vec = as_backend_type(hes.vector()).vec()
-                
+
                 y.set(0)
                 y.axpy(1, hes_vec)
 
             def update(self, x):
                 ''' Split input vector and update all control values '''
                 x.copy(ctrl_vec) # Refresh concatenated control vector first
-                
+
                 nvec = 0
                 for i in range(0,len(rf.controls)):
                     control = rf.controls[i]
@@ -155,17 +155,17 @@ class TAOSolver(OptimizationSolver):
                             vsizex, vsizey = control.data().shape()
                             vsize = vsizex*vsizey
                             as_array = x[nvec:nvec+vsize]
-                            
+
                             # Sort into matrix restoring rows and columns
                             val = []
                             for row in range(0,vsizex):
                                 val_inner = []
-                                
+
                                 for column in range(0,vsizey):
                                     val_inner.append(as_array[row*vsizey + column])
-                                    
+
                                 val.append(val_inner)
-                            
+
                         # Replace control in rf
                         cons = Constant(val) # Loss of information? No coeff in init
                         rf.controls[i] = ConstantControl(cons)
@@ -191,14 +191,14 @@ class TAOSolver(OptimizationSolver):
                 elif param == "maximum_iterations" or param == "max_iter":
                     self.parameters["max_it"] = self.parameters.pop(param)
                     param = "max_it"
-                    
+
                 # Unlike IPOPT and Optizelle solver, this doesn't raise ValueError on unknown option.
                 # Presented as a "WARNING!" message following solve attempt.
                 OptDB.setValue(param,self.parameters[param])
 
     def __build_tao_problem(self):
         self.tao_problem.setFromOptions()
-        
+
         self.tao_problem.setObjectiveGradient(self.__user.objective_and_gradient)
         self.tao_problem.setInitial(self.initial_vec)
         self.tao_problem.setRieszMap(self.riesz_map)
@@ -209,7 +209,7 @@ class TAOSolver(OptimizationSolver):
             (lb, ub) = self.__get_bounds()
             self.tao_problem.setVariableBounds(lb, ub)
 
-        # Similarly for constraints
+        # Similarly for constraints TODO
         if self.problem.constraints is not None:
             eval_fn = self.__get_constraints()
 
@@ -255,11 +255,11 @@ class TAOSolver(OptimizationSolver):
     def __petsc_vec_concatenate(self, vecs):
         """Concatenates the supplied list of PETSc Vecs."""
         PETSc = self.PETSc
-        
+
         # Make a Vec with appropriate local/global sizes and copy in each rank's local entries
         lsizes = [vec.sizes for vec in vecs]
         nlocal, nglobal = map(sum, zip(*lsizes))
-        
+
         concat_vec = PETSc.Vec().create(PETSc.COMM_WORLD)
         concat_vec.setSizes((nlocal,nglobal))
         concat_vec.setFromOptions()
@@ -270,8 +270,8 @@ class TAOSolver(OptimizationSolver):
             ostarti, oendi = vec.owner_range
             rstarti = ostarti + nvec
             rendi = rstarti + vec.local_size
-                        
-            concat_vec.setValues(range(rstarti,rendi), vec[ostarti:oendi])    
+
+            concat_vec.setValues(range(rstarti,rendi), vec[ostarti:oendi])
             concat_vec.assemble()
             nvec += vec.size
 
@@ -281,7 +281,7 @@ class TAOSolver(OptimizationSolver):
         """Return a PETSc Vec representing the supplied Constant"""
         PETSc = self.PETSc
         cvec = PETSc.Vec().create(PETSc.COMM_WORLD)
-        
+
         # Scalar case e.g. Constant(0.1)
         if cons.shape() == ():
             cvec.setSizes((PETSc.DECIDE,1))
@@ -293,11 +293,11 @@ class TAOSolver(OptimizationSolver):
             # Vector case e.g. Constant((0.1,0.1))
             if len(cons.shape()) == 1:
                 vec_length = cons.shape()[0]
-                
+
             # Matrix case e.g. Constant(((1,2),(3,4)))
             else:
                 vec_length = cons.shape()[0] * cons.shape()[1]
-                
+
             cvec.setSizes((PETSc.DECIDE,vec_length))
             cvec.setFromOptions()
 
@@ -311,7 +311,7 @@ class TAOSolver(OptimizationSolver):
             for i in range(ostarti, oendi):
                 cvec.setValue(i,vals[i])
 
-        cvec.assemble()    
+        cvec.assemble()
         return cvec
 
     def __control_as_vec(self, control):
