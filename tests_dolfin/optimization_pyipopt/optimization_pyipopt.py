@@ -60,12 +60,12 @@ if __name__ == "__main__":
     u.assign(ic)
     main(u, annotate=True)
 
-    # Run the optimisation 
+    # Run the optimisation
     lb = interpolate(Constant(-1),  V)
     ub = interpolate(Constant(1.0e200), V)
 
     # Define the reduced funtional
-    rf = ReducedFunctional(J, Control(u, value=ic), derivative_cb = derivative_cb)
+    rf = ReducedFunctional(J, Control(u, value=ic), derivative_cb_post=derivative_cb)
 
     problem = MinimizationProblem(rf, bounds=(lb, ub))
 

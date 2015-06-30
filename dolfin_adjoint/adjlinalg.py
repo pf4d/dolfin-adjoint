@@ -78,9 +78,8 @@ class Vector(libadjoint.Vector):
       else:
         # This occurs when adding a RHS derivative to an adjoint equation
         # corresponding to the initial conditions.
-        #print "axpy assembling FuncForm. self.data is a %s; x.data is a %s" % (self.data.__class__, x.data.__class__)
-        #import IPython; IPython.embed()
         self.data.vector().axpy(alpha, backend.assemble(x.data))
+        self.data.form = alpha * x.data
     elif isinstance(x.data, ufl.form.Form) and isinstance(self.data, ufl.form.Form):
 
       # Let's do a bit of argument shuffling, shall we?
@@ -303,7 +302,11 @@ class Matrix(libadjoint.Matrix):
           x.data.vector()[:] = b.nonlinear_u.vector()
           F = backend.replace(b.nonlinear_form, {b.nonlinear_u: x.data})
           J = backend.replace(b.nonlinear_J, {b.nonlinear_u: x.data})
-          compatibility.solve(F == 0, x.data, b.nonlinear_bcs, J=J, solver_parameters=self.solver_parameters)
+          try:
+            compatibility.solve(F == 0, x.data, b.nonlinear_bcs, J=J, solver_parameters=self.solver_parameters)
+      	  except RuntimeError as rte:
+ 	    x.data.vector()[:] = float("nan")
+  
         else:
           assembled_lhs = self.assemble_data()
           [bc.apply(assembled_lhs) for bc in bcs]
