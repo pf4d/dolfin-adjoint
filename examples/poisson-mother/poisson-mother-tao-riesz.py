@@ -17,6 +17,7 @@ parameters['std_out_all_processes'] = False
 tao_args = """
             --petsc.tao_view
             --petsc.tao_monitor
+            --petsc.tao_converged_reason
             --petsc.tao_nls_ksp_type cg
             --petsc.tao_nls_pc_type riesz
             --petsc.tao_ntr_ksp_type stcg
@@ -26,14 +27,14 @@ tao_args = """
             --petsc.tao_lmm_scale_type riesz
             --petsc.tao_riesz_ksp_type cg
             --petsc.tao_riesz_pc_type gamg
-            --petsc.tao_ls_type unit
+            --petsc.tao_ls_type armijo
            """.split()
             #--petsc.tao_max_it 0   # Should be used with the NLS algorithm to determine the correct number of KSP solves (and carefully checking that the tolerance is reached within one Newton iteration
 print "Tao arguments:", tao_args
 parameters.parse(tao_args)
 
 # Create mesh, refined in the center
-n = 8   # Use n = 4 for random refine
+n = 16   # Use n = 4 for random refine
         # Use n = 4, 8, 16, 32 for uniform refinement
         # Use n = 8 for center refine
 mesh = UnitSquareMesh(n, 2*n)
@@ -116,14 +117,14 @@ riesz_map = assemble(inner(riesz_u, riesz_v)*dx)
 #riesz_map.zero()
 #riesz_map.ident_zeros()
 
-problem = MinimizationProblem(rf, bounds=(-1.0,1.0))
-#problem = MinimizationProblem(rf)
+#problem = MinimizationProblem(rf, bounds=(-1.0,1.0))
+problem = MinimizationProblem(rf)
 #parameters = None
 parameters = { "type": "blmvm",
                "max_it": 2000,
                "fatol": 1e-100,
                "frtol": 0.0,
-               "gatol": 1e-7,
+               "gatol": 1e-8,
                "grtol": 0.0
              }
 solver = TAOSolver(problem, parameters=parameters, riesz_map=riesz_map)

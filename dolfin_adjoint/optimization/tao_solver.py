@@ -64,8 +64,8 @@ class TAOSolver(OptimizationSolver):
         ctrl_vec = self.__petsc_vec_concatenate(ctrl_vecs)
 
         # Use value of control object as initial guess for the optimisation
-        #self.initial_vec = ctrl_vec.copy()
-        self.initial_vec = ctrl_vec.duplicate() # DSM temporary to reproduce dependency results
+        self.initial_vec = ctrl_vec.copy()
+        #self.initial_vec = ctrl_vec.duplicate() # DSM temporary to reproduce dependency results
 
         class AppCtx(object):
             ''' Implements the application context for the TAO solver '''
