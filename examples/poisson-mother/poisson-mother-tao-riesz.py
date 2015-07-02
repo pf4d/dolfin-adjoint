@@ -24,8 +24,8 @@ tao_args = """
             --petsc.tao_ntr_init_type constant
             --petsc.tao_lmm_vectors 20
             --petsc.tao_lmm_scale_type riesz
-            --petsc.tao_riesz_ksp_type gmres
-            --petsc.tao_riesz_pc_type none
+            --petsc.tao_riesz_ksp_type cg
+            --petsc.tao_riesz_pc_type gamg
             --petsc.tao_ls_type unit
            """.split()
             #--petsc.tao_max_it 0   # Should be used with the NLS algorithm to determine the correct number of KSP solves (and carefully checking that the tolerance is reached within one Newton iteration
@@ -122,9 +122,9 @@ problem = MinimizationProblem(rf, bounds=(-1.0,1.0))
 parameters = { "type": "blmvm",
                "max_it": 2000,
                "fatol": 1e-100,
-               "frtol": 1e-1000,
+               "frtol": 0.0,
                "gatol": 1e-7,
-               "grtol": 1e-1000
+               "grtol": 0.0
              }
 solver = TAOSolver(problem, parameters=parameters, riesz_map=riesz_map)
 #solver = TAOSolver(problem, parameters=parameters, riesz_map=None)
