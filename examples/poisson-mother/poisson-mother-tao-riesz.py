@@ -1,6 +1,6 @@
 """ Solves a optimal control problem constrained by the Poisson equation:
 
-    min_(u, m) \int_\Omega 1/2 || u - d ||^2 + 1/2 || f ||^2
+    min_(u, m) \int_\Omega 1/2 || u - d ||^2 + alpha/2 || f ||^2
 
     subjecct to
 
