@@ -49,20 +49,17 @@ if __name__ == "__main__":
 
     # Run the optimisation 
     rf = ReducedFunctional(J, FunctionControl(m, value=m))
-    #rf = ReducedFunctional(J, [FunctionControl(m, value=m),ConstantControl(Constant(0.1))])
-    #problem = rf.tao_problem(method="nls")
-    #problem.tao.setFunctionTolerances(fatol=1e-100, frtol=1e-1000)
-    
-    #m_opt = problem.solve()
-
     problem = MinimizationProblem(rf)
-    parameters = { 'method': 'nls', 'fatol':1e-100, 'frtol':1e-1000 }
+    parameters = { 'method': 'nls',
+                   'max_it': 20,
+                   'fatol' : 0.0,
+                   'frtol' : 0.0,
+                   'gatol' : 1e-9,
+                   'grtol' : 0.0
+                 }
 
     solver = TAOSolver(problem, parameters=parameters)
     m_opt = solver.solve()
-
-    #assert max(abs(sol["Optimizer"].data + 1./2*np.pi)) < 1e-9
-    #assert sol["Number of iterations"] < 50
 
     #plot(m_opt, interactive=True)
 
@@ -76,5 +73,11 @@ if __name__ == "__main__":
     control_error = errornorm(m_analytic, m_opt)
     state_error = errornorm(u_analytic, u)
 
-    print "Control error", control_error
-    print "State error", state_error
+    #print "Control error", control_error
+    #print "State error", state_error
+
+    # Check that values are below the threshold
+    tao_p = solver.get_tao()
+    assert tao_p.getGradientNorm() < 1e-9
+    assert tao_p.getIterationNumber() <= 20
+
