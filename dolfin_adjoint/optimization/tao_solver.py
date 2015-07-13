@@ -84,6 +84,11 @@ class TAOSolver(OptimizationSolver):
                 self.H.setOption(PETSc.Mat.Option.SYMMETRIC, True)
                 self.H.setUp()
 
+                self.shift_ = 0.0 # the cumulative arguments to MatShift, used in TAO a lot
+
+            def shift(self, mat, s):
+                self.shift_ += s
+
             def objective(self, x):
                 ''' Evaluates the functional. '''
                 self.update(x)
@@ -124,6 +129,7 @@ class TAOSolver(OptimizationSolver):
 
                 y.set(0)
                 y.axpy(1, hes_vec)
+                y.axpy(self.shift_, x)
 
             def update(self, x):
                 ''' Split input vector and update all control values '''
