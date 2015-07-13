@@ -37,7 +37,7 @@ solve(a == L, u_, bc)
 J = Functional(u_*dPP(1) + u_*dx)
 Jhat = ReducedFunctional(J, Control(f))
 
-dJ = compute_gradient(J, Control(f))
-plot(dJ, interactive=True, title="dJ")
+dJ = compute_gradient(J, Control(f), forget=False)
+#plot(dJ, interactive=True, title="dJ")
 
 Jhat.derivative(project=True)
