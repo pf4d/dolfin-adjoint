@@ -55,7 +55,7 @@ class OptizelleBoundConstraint(constraints.InequalityConstraint):
 
     def output_workspace(self):
         if isinstance(self.m, Function):
-            return numpy.zeros(self.m.vector().local_size())
+            return Function(self.m.function_space())
         elif isinstance(self.m, Constant):
             return [0.0]
 
@@ -64,32 +64,30 @@ class OptizelleBoundConstraint(constraints.InequalityConstraint):
             return [self.scale*(float(m) - float(self.bound))]
         elif isinstance(self.m, Function):
             out = Function(m)
-            out_vec = out.vector()
 
             if isinstance(self.bound, float):
+                out_vec = out.vector()
                 out_vec *= self.scale
                 out_vec[:] -= self.scale*self.bound
             elif isinstance(self.bound, Function):
                 out.assign(self.scale*out - self.scale*self.bound)
-
-            return out_vec.array()
+            return out
 
     def jacobian_action(self, m, dm, result):
         if isinstance(self.m, Constant):
             result[0] = self.scale*dm[0]
         elif isinstance(self.m, Function):
-            # We need to finalise the dm vector, otherwise we get PETSc 73 errors
-            dm.vector().apply("")
-
-            result[:] = self.scale*dm.vector().array()
+            # Make sure dm is in the right PETSc state (why would it not be?)
+            as_backend_type(dm.vector()).apply("")
+            result.assign(self.scale*dm)
 
     def jacobian_adjoint_action(self, m, dp, result):
         if isinstance(self.m, Constant):
             result[0] = self.scale*dp[0]
         elif isinstance(self.m, Function):
-            tmp = Vector(result.vector())
-            tmp[:] = self.scale*dp
-            solve(self.mass, result.vector(), tmp)
+            # Make sure dm is in the right PETSc state (why would it not be?)
+            as_backend_type(dp.vector()).apply("")
+            result.assign(self.scale*dp)
 
     def hessian_action(self, m, dm, dp, result):
         if isinstance(self.m, Constant):
