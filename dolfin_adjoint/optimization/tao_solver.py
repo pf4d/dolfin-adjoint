@@ -23,7 +23,7 @@ class TAOSolver(OptimizationSolver):
 
     """
 
-    def __init__(self, problem, parameters=None, riesz_map=None):
+    def __init__(self, problem, parameters=None, riesz_map=None, prefix=""):
 
         try:
             from petsc4py import PETSc
@@ -41,6 +41,11 @@ class TAOSolver(OptimizationSolver):
             self.riesz_map = as_backend_type(riesz_map).mat()
         else:
             self.riesz_map = None
+
+        if len(prefix) > 0 and prefix[-1] != "_":
+            prefix += "_"
+
+        self.prefix = prefix
 
         OptimizationSolver.__init__(self, problem, parameters)
 
@@ -178,7 +183,7 @@ class TAOSolver(OptimizationSolver):
         """Set some basic parameters from the parameters dictionary that the user
         passed in, if any."""
 
-        OptDB = self.PETSc.Options(prefix="tao_")
+        OptDB = self.PETSc.Options(prefix=self.prefix + "tao_")
 
         if self.parameters is not None:
             for param in self.parameters:
@@ -197,6 +202,7 @@ class TAOSolver(OptimizationSolver):
                 OptDB.setValue(param,self.parameters[param])
 
     def __build_tao_problem(self):
+        self.tao_problem.setOptionsPrefix(self.prefix)
         self.tao_problem.setFromOptions()
 
         self.tao_problem.setObjectiveGradient(self.__user.objective_and_gradient)
