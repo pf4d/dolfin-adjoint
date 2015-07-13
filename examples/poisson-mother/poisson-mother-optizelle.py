@@ -133,7 +133,7 @@ problem = MinimizationProblem(rf, constraints=VolumeConstraint(0.3, W),
 #problem = MinimizationProblem(rf, bounds=(0.1, 0.8), constraints=VolumeConstraint(0.3, W))
 #problem = MinimizationProblem(rf, bounds=(None, 0.8))
 parameters = {
-             "maximum_iterations": 50,
+             "maximum_iterations": 10,
              "optizelle_parameters":
                  {
                  "msg_level" : 10,
