@@ -75,7 +75,7 @@ class TAOSolver(OptimizationSolver):
         class AppCtx(object):
             ''' Implements the application context for the TAO solver '''
 
-            def __init__(self):
+            def __init__(self, riesz_map):
                 # create Hessian matrix
                 self.H = PETSc.Mat().create(comm=PETSc.COMM_WORLD)
                 dims = (ctrl_vec.local_size, ctrl_vec.size)
@@ -85,6 +85,7 @@ class TAOSolver(OptimizationSolver):
                 self.H.setUp()
 
                 self.shift_ = 0.0 # the cumulative arguments to MatShift, used in TAO a lot
+                self.riesz_map = riesz_map
 
             def shift(self, mat, s):
                 self.shift_ += s
@@ -110,6 +111,8 @@ class TAOSolver(OptimizationSolver):
                 ''' Updates the Hessian. '''
                 print "Updating Hessian: %s" % self.stats(x)
 
+                self.shift_ = 0.0
+
                 diff = x.copy()
                 diff.axpy(-1.0, ctrl_vec)
                 diffnorm = diff.norm()
@@ -127,9 +130,15 @@ class TAOSolver(OptimizationSolver):
                 hes = rf.hessian(x_wrap)[0]
                 hes_vec = as_backend_type(hes.vector()).vec()
 
-                y.set(0)
+                y.set(0.0)
+                if self.shift_ != 0.0:
+                    if self.riesz_map is not None:
+                        self.riesz_map.mult(x, y)
+                    else:
+                        y.axpy(1.0, x) # use the identity matrix
+                    y.scale(self.shift_)
+
                 y.axpy(1, hes_vec)
-                y.axpy(self.shift_, x)
 
             def update(self, x):
                 ''' Split input vector and update all control values '''
@@ -183,7 +192,7 @@ class TAOSolver(OptimizationSolver):
                         nvec += vsize
 
         # create user application context
-        self.__user = AppCtx()
+        self.__user = AppCtx(self.riesz_map)
 
     def __set_parameters(self):
         """Set some basic parameters from the parameters dictionary that the user
