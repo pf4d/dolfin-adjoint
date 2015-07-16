@@ -120,7 +120,7 @@ class LinearSolver(dolfin.LinearSolver):
             return adjlinalg.Vector(x)
 
           if var.type in ['ADJ_TLM', 'ADJ_ADJOINT']:
-            self.bcs = [dolfin.homogenize(bc) for bc in self.bcs if isinstance(bc, dolfin.cpp.DirichletBC)] + [bc for bc in self.bcs if not isinstance(bc, dolfin.cpp.DirichletBC)]
+            self.bcs = [utils.homogenize(bc) for bc in self.bcs if isinstance(bc, dolfin.cpp.DirichletBC)] + [bc for bc in self.bcs if not isinstance(bc, dolfin.cpp.DirichletBC)]
 
           # This is really hideous. Sorry.
           if isinstance(b.data, dolfin.Function):
@@ -190,14 +190,14 @@ def transpose_operators(operators):
       dolfin.assemble(dolfin.adjoint(op.form), tensor=out[i])
 
       if hasattr(op, 'bcs'):
-        adjoint_bcs = [dolfin.homogenize(bc) for bc in op.bcs if isinstance(bc, dolfin.cpp.DirichletBC)] + [bc for bc in op.bcs if not isinstance(bc, dolfin.DirichletBC)]
+        adjoint_bcs = [utils.homogenize(bc) for bc in op.bcs if isinstance(bc, dolfin.cpp.DirichletBC)] + [bc for bc in op.bcs if not isinstance(bc, dolfin.DirichletBC)]
         [bc.apply(out[i]) for bc in adjoint_bcs]
 
     elif isinstance(op, dolfin.Form) or isinstance(op, ufl.form.Form):
       out[i] = dolfin.adjoint(op)
 
       if hasattr(op, 'bcs'):
-        out[i].bcs = [dolfin.homogenize(bc) for bc in op.bcs if isinstance(bc, dolfin.cpp.DirichletBC)] + [bc for bc in op.bcs if not isinstance(bc, dolfin.DirichletBC)]
+        out[i].bcs = [utils.homogenize(bc) for bc in op.bcs if isinstance(bc, dolfin.cpp.DirichletBC)] + [bc for bc in op.bcs if not isinstance(bc, dolfin.DirichletBC)]
 
     elif isinstance(op, AdjointKrylovMatrix):
       pass

@@ -38,7 +38,7 @@ def annotate_split(bigfn, idx, smallfn, bcs):
     eq_l = eq_lhs
 
     if hermitian:
-      adjoint_bcs = [backend.homogenize(bc) for bc in bcs if isinstance(bc, backend.DirichletBC)] + [bc for bc in bcs if not isinstance(bc, backend.DirichletBC)]
+      adjoint_bcs = [utils.homogenize(bc) for bc in bcs if isinstance(bc, backend.DirichletBC)] + [bc for bc in bcs if not isinstance(bc, backend.DirichletBC)]
       if len(adjoint_bcs) == 0: adjoint_bcs = None
       return (adjlinalg.Matrix(backend.adjoint(eq_l), bcs=adjoint_bcs), adjlinalg.Vector(None, fn_space=fn_space))
     else:

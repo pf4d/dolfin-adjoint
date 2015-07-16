@@ -189,7 +189,7 @@ def annotate(*args, **kwargs):
     if hermitian:
       # Homogenise the adjoint boundary conditions. This creates the adjoint
       # solution associated with the lifted discrete system that is actually solved.
-      adjoint_bcs = [backend.homogenize(bc) for bc in eq_bcs if isinstance(bc, backend.DirichletBC)] + [bc for bc in eq_bcs if not isinstance(bc, backend.DirichletBC)]
+      adjoint_bcs = [utils.homogenize(bc) for bc in eq_bcs if isinstance(bc, backend.DirichletBC)] + [bc for bc in eq_bcs if not isinstance(bc, backend.DirichletBC)]
       if len(adjoint_bcs) == 0:
         adjoint_bcs = None
       else:

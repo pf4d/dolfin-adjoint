@@ -4,6 +4,7 @@ import ufl
 import ufl.algorithms
 import adjglobals
 import adjlinalg
+import utils
 
 def find_previous_variable(var):
   ''' Returns the previous instance of the given variable. '''
@@ -240,7 +241,7 @@ class NonlinearRHS(RHS):
 
     if hermitian:
       deriv = backend.adjoint(deriv)
-      bcs = [backend.homogenize(bc) for bc in self.bcs if isinstance(bc, backend.DirichletBC)] + [bc for bc in self.bcs if not isinstance(bc, backend.DirichletBC)]
+      bcs = [utils.homogenize(bc) for bc in self.bcs if isinstance(bc, backend.DirichletBC)] + [bc for bc in self.bcs if not isinstance(bc, backend.DirichletBC)]
     else:
       bcs = self.bcs
 

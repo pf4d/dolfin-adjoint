@@ -7,6 +7,7 @@ import os.path
 import misc
 import caching
 import compatibility
+import utils
 
 class Vector(libadjoint.Vector):
   '''This class implements the libadjoint.Vector abstract base class for the Dolfin adjoint.
@@ -264,7 +265,7 @@ class Matrix(libadjoint.Matrix):
         x = Vector(backend.Function(x.fn_space, backend.assemble(x.data)))
     else:
       if var.type in ['ADJ_TLM', 'ADJ_ADJOINT', 'ADJ_SOA']:
-        dirichlet_bcs = [backend.homogenize(bc) for bc in self.bcs if isinstance(bc, backend.DirichletBC)]
+        dirichlet_bcs = [utils.homogenize(bc) for bc in self.bcs if isinstance(bc, backend.DirichletBC)]
         other_bcs  = [bc for bc in self.bcs if not isinstance(bc, backend.DirichletBC)]
         bcs = dirichlet_bcs + other_bcs
       else:
@@ -320,7 +321,7 @@ class Matrix(libadjoint.Matrix):
         backend.info_red("Warning: got zero RHS for the solve associated with variable %s" % var)
         output = Vector(backend.Function(self.test_function().function_space()))
     else:
-        dirichlet_bcs = [backend.homogenize(bc) for bc in self.bcs if isinstance(bc, backend.DirichletBC)]
+        dirichlet_bcs = [utils.homogenize(bc) for bc in self.bcs if isinstance(bc, backend.DirichletBC)]
         other_bcs  = [bc for bc in self.bcs if not isinstance(bc, backend.DirichletBC)]
         bcs = dirichlet_bcs + other_bcs
 
