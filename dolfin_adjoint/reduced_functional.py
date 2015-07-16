@@ -278,7 +278,12 @@ class ReducedFunctional(object):
 
         # Call callback
         control_data = [p.data() for p in self.controls]
-        self.hessian_cb(self.scale * self.current_func_value,
+        if self.current_func_value is not None:
+            current_func_value = self.scale * self.current_func_value
+        else:
+            current_func_value = None
+
+        self.hessian_cb(current_func_value,
                         delist(control_data, list_type=self.controls),
                         m_dot, scaled_Hm[0])
 

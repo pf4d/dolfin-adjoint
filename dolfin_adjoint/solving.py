@@ -343,6 +343,8 @@ def solve(*args, **kwargs):
 
   # First, decide if we should annotate or not.
   to_annotate = utils.to_annotate(kwargs.pop("annotate", None))
+  if to_annotate:
+    linear = annotate(*args, **kwargs)
 
   # Avoid recursive annotation
   flag = misc.pause_annotation()
@@ -354,8 +356,6 @@ def solve(*args, **kwargs):
       misc.continue_annotation(flag)
 
   if to_annotate:
-    linear = annotate(*args, **kwargs)
-  
     # Finally, if we want to record all of the solutions of the real forward model
     # (for comparison with a libadjoint replay later),
     # then we should record the value of the variable we just solved for.
