@@ -27,7 +27,8 @@ test_cmds = {'tlm_simple': 'mpirun -n 2 python tlm_simple.py',
              'svd_burgers': None,
              'rush_larsen': None,
              'function_assigner': None,
-             'mantle_convection': None}
+             'mantle_convection': None,
+             'nullspace': None}
 
 parser = OptionParser()
 parser.add_option("-n", type="int", dest="num_procs", default = 1, help = "To run on N cores, use -n N; to use all processors available, run test.py -n 0.")
