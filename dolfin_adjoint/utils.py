@@ -32,6 +32,10 @@ def scale(obj, factor):
         scaled_obj = factor * obj
     return scaled_obj
 
+def homogenize(bc):
+    bc_copy = backend.DirichletBC(bc)
+    bc_copy.homogenize()
+    return bc_copy
 
 def constant_to_array(c):
     """ Converts a Constant to a numpy.array. """

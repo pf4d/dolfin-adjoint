@@ -50,8 +50,8 @@ if __name__ == "__main__":
 
   # Run the optimisation
   reduced_functional = ReducedFunctional(J, ConstantControl("Nu"),
-                                         eval_cb= eval_cb,
-                                         derivative_cb=derivative_cb,
+                                         eval_cb_post= eval_cb,
+                                         derivative_cb_post=derivative_cb,
                                          replay_cb=replay_cb,
                                          scale=2.0)
   try:

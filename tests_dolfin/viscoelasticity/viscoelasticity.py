@@ -69,10 +69,7 @@ def A11_tensor(tau, mu, lamda):
 def get_box():
     "Use this for simple testing."
     n = 1
-    try:
-      mesh = BoxMesh(0., 0., 0., 20., 20., 100., 2*n, 2*n, 10*n)
-    except:
-      mesh = Box(0., 0., 0., 20., 20., 100., 2*n, 2*n, 10*n)
+    mesh = BoxMesh(Point(0., 0., 0.), Point(20., 20., 100.), 2*n, 2*n, 10*n)
 
     # Mark all facets by 0, exterior facets by 1, and then top and
     # bottom by 2

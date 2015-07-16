@@ -7,6 +7,7 @@ import os.path
 import misc
 import caching
 import compatibility
+import utils
 
 class Vector(libadjoint.Vector):
   '''This class implements the libadjoint.Vector abstract base class for the Dolfin adjoint.
@@ -78,9 +79,8 @@ class Vector(libadjoint.Vector):
       else:
         # This occurs when adding a RHS derivative to an adjoint equation
         # corresponding to the initial conditions.
-        #print "axpy assembling FuncForm. self.data is a %s; x.data is a %s" % (self.data.__class__, x.data.__class__)
-        #import IPython; IPython.embed()
         self.data.vector().axpy(alpha, backend.assemble(x.data))
+        self.data.form = alpha * x.data
     elif isinstance(x.data, ufl.form.Form) and isinstance(self.data, ufl.form.Form):
 
       # Let's do a bit of argument shuffling, shall we?
@@ -265,7 +265,7 @@ class Matrix(libadjoint.Matrix):
         x = Vector(backend.Function(x.fn_space, backend.assemble(x.data)))
     else:
       if var.type in ['ADJ_TLM', 'ADJ_ADJOINT', 'ADJ_SOA']:
-        dirichlet_bcs = [backend.homogenize(bc) for bc in self.bcs if isinstance(bc, backend.DirichletBC)]
+        dirichlet_bcs = [utils.homogenize(bc) for bc in self.bcs if isinstance(bc, backend.DirichletBC)]
         other_bcs  = [bc for bc in self.bcs if not isinstance(bc, backend.DirichletBC)]
         bcs = dirichlet_bcs + other_bcs
       else:
@@ -293,7 +293,11 @@ class Matrix(libadjoint.Matrix):
           x = compatibility.assign_function_to_vector(x, b.nonlinear_u, function_space = test.function_space())            
           F = backend.replace(b.nonlinear_form, {b.nonlinear_u: x.data})
           J = backend.replace(b.nonlinear_J, {b.nonlinear_u: x.data})
-          compatibility.solve(F == 0, x.data, b.nonlinear_bcs, J=J, solver_parameters=self.solver_parameters)
+          try:
+            compatibility.solve(F == 0, x.data, b.nonlinear_bcs, J=J, solver_parameters=self.solver_parameters)
+      	  except RuntimeError as rte:
+ 	    x.data.vector()[:] = float("nan")
+  
         else:
           assembled_lhs = self.assemble_data()
           [bc.apply(assembled_lhs) for bc in bcs]
@@ -317,7 +321,7 @@ class Matrix(libadjoint.Matrix):
         backend.info_red("Warning: got zero RHS for the solve associated with variable %s" % var)
         output = Vector(backend.Function(self.test_function().function_space()))
     else:
-        dirichlet_bcs = [backend.homogenize(bc) for bc in self.bcs if isinstance(bc, backend.DirichletBC)]
+        dirichlet_bcs = [utils.homogenize(bc) for bc in self.bcs if isinstance(bc, backend.DirichletBC)]
         other_bcs  = [bc for bc in self.bcs if not isinstance(bc, backend.DirichletBC)]
         bcs = dirichlet_bcs + other_bcs
 

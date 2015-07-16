@@ -18,7 +18,7 @@ def make_LUSolverMatrix(idx, reuse_factorization):
         return adjlinalg.Matrix.solve(self, var, b)
 
       if var.type in ['ADJ_TLM', 'ADJ_ADJOINT']:
-        bcs = [dolfin.homogenize(bc) for bc in self.bcs if isinstance(bc, dolfin.DirichletBC)] + [bc for bc in self.bcs if not isinstance(bc, dolfin.DirichletBC)]
+        bcs = [utils.homogenize(bc) for bc in self.bcs if isinstance(bc, dolfin.DirichletBC)] + [bc for bc in self.bcs if not isinstance(bc, dolfin.DirichletBC)]
       else:
         bcs = self.bcs
 
