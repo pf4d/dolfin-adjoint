@@ -33,7 +33,7 @@ def scale(obj, factor):
     return scaled_obj
 
 def homogenize(bc):
-    bc_copy = backend.DirichletBC(bc)
+    bc_copy = compatibility.bc(bc)
     bc_copy.homogenize()
     return bc_copy
 

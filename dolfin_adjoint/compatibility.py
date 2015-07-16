@@ -25,6 +25,14 @@ def to_dict(d):
     else:
         return d.to_dict()
 
+
+def bc(bc):
+    if backend.__name__ == "dolfin":
+        return backend.DirichletBC(bc)
+    else:
+        return backend.DirichletBC(bc.function_space(), bc.function_arg, bc.sub_domain, method=bc.method)
+
+
 def randomise(x):
     """ Randomises the content of x, where x can be a Function or a numpy.array.
     """
@@ -95,5 +103,5 @@ else:
     function_space_type = (backend.FunctionSpace, backend.MixedFunctionSpace)
 
     def _extract_args(*args, **kwargs):
-        eq, u, bcs, _, _, _, _, solver_parameters, _ = backend.solving._extract_args(*args, **kwargs)
+        eq, u, bcs, _, _, _, _, solver_parameters, _, _, _ = backend.solving._extract_args(*args, **kwargs)
         return eq, u, bcs, None, None, None, None, solver_parameters
