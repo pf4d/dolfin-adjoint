@@ -38,6 +38,11 @@ class TAOSolver(OptimizationSolver):
 
         # Use PETSc forms
         if riesz_map is not None:
+
+            # Handle the case where the user supplied riesz_maps.L2(V)
+            if hasattr(riesz_map, "assemble"):
+                riesz_map = riesz_map.assemble()
+
             self.riesz_map = as_backend_type(riesz_map).mat()
         else:
             self.riesz_map = None

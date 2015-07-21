@@ -78,13 +78,6 @@ J = Functional((0.5*inner(u-d, u-d))*dx + alpha/2*f**2*dx)
 control = Control(f)
 rf = ReducedFunctional(J, control)
 
-# Calculate Riesz map for L2 (if we had a H1 regularisation term,
-# this would be a Helmholtz operator)
-riesz_V = f.function_space()
-riesz_u = TrialFunction(riesz_V)
-riesz_v = TestFunction(riesz_V)
-riesz_map = assemble(inner(riesz_u, riesz_v)*dx)
-
 problem = MinimizationProblem(rf, bounds=(0.0,0.9))
 
 # For the problem without bound constraints, uncomment:
@@ -99,7 +92,7 @@ parameters = { "type": "blmvm",
              }
 
 # Now construct the TAO solver and pass the Riesz map.
-solver = TAOSolver(problem, parameters=parameters, riesz_map=riesz_map)
+solver = TAOSolver(problem, parameters=parameters, riesz_map=L2(W))
 
 # To see what happens when you disable the Riesz map, uncomment
 # this line:
