@@ -73,7 +73,7 @@ j_analytic = assemble((1./2*(u_analytic-d)**2 + alpha*f_analytic**2)*dx(mesh))
 
 # Define functional of interest and the reduced functional
 
-J = Functional((0.5*inner(u-d, u-d))*dx + alpha/2*f**2*dx)
+J = Functional((0.5*inner(u-d, u-d))*dx + 0.5*alpha*f**2*dx)
 
 control = Control(f)
 rf = ReducedFunctional(J, control)

@@ -205,6 +205,15 @@ class TAOSolver(OptimizationSolver):
 
         OptDB = self.PETSc.Options(prefix=self.prefix + "tao_")
 
+        # Some defaults, these will be overridden by user parameters
+        if self.problem.bounds is not None:
+            OptDB.setValue("type", "blmvm")
+        else:
+            OptDB.setValue("type", "lmvm")
+        OptDB.setValue("fatol", 0.0)
+        OptDB.setValue("frtol", 0.0)
+        OptDB.setValue("gatol", 1.0e-9)
+
         if self.parameters is not None:
             for param in self.parameters:
 
@@ -222,11 +231,19 @@ class TAOSolver(OptimizationSolver):
                 OptDB.setValue(param,self.parameters[param])
 
     def __build_tao_problem(self):
+        if "PETScOptions" in globals():
+            PETScOptions.set(self.prefix + "tao_converged_reason", True)
+
         self.tao_problem.setOptionsPrefix(self.prefix)
         self.tao_problem.setFromOptions()
 
+        def default_monitor(tao):
+            info_blue("Iteration: %3d\tFunctional value: %15.15e\tGradient norm: %15.15e" % (tao.its, tao.objective, tao.gnorm))
+        self.tao_problem.setMonitor(default_monitor)
+
         self.tao_problem.setObjectiveGradient(self.__user.objective_and_gradient)
         self.tao_problem.setInitial(self.initial_vec)
+        info_blue("self.riesz_map: %s" % self.riesz_map)
         self.tao_problem.setRieszMap(self.riesz_map)
         self.tao_problem.setHessian(self.__user.hessian, self.__user.H)
 
