@@ -42,17 +42,10 @@ def randomly_refine(initial_mesh, ratio_to_refine= .3):
     return refine(initial_mesh, cell_markers = cf)
 
 # To demonstrate mesh independence, try refining cells at random
-# (uncomment the lines below)
+# (increase the loop counter)
 
-#mesh = randomly_refine(mesh)
-#mesh = randomly_refine(mesh)
-#mesh = randomly_refine(mesh)
-#mesh = randomly_refine(mesh)
-#mesh = randomly_refine(mesh)
-#mesh = randomly_refine(mesh)
-
-#plot(mesh, interactive=True)
-#import sys; sys.exit()
+for i in range(2):
+    mesh = randomly_refine(mesh)
 
 # Define discrete function spaces and funcions
 V = FunctionSpace(mesh, "CG", 1) # state space
