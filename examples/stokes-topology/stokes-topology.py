@@ -115,7 +115,7 @@ N = 200
 delta = 1.5  # The aspect ratio of the domain, 1 high and \delta wide
 V = Constant(1.0/3) * delta  # want the fluid to occupy 1/3 of the domain
 
-mesh = RectangleMesh(0.0, 0.0, delta, 1.0, N, N)
+mesh = RectangleMesh(mpi_comm_world(), Point(0.0, 0.0), Point(delta, 1.0), N, N)
 A = FunctionSpace(mesh, "CG", 1)        # control function space
 U = VectorFunctionSpace(mesh, "CG", 2)  # velocity function space
 P = FunctionSpace(mesh, "CG", 1)        # pressure function space
