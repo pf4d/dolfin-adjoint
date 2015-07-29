@@ -23,13 +23,12 @@ if __name__ == "__main__":
 
   J = Functional(soln*soln*dx*dt[FINISH_TIME])
   Jic = assemble(soln*soln*dx)
-  dJdic = compute_gradient(J, InitialConditionParameter(ic), forget=False)
+  dJdic = compute_gradient(J, FunctionControl(ic), forget=False)
 
   def J(ic):
     soln = main(ic, annotate=False)
     return assemble(soln*soln*dx)
 
-  minconv = taylor_test(J, InitialConditionParameter(ic), Jic, dJdic)
-  if minconv < 1.9:
-    sys.exit(1)
-
+  minconv = taylor_test(J, FunctionControl(ic), Jic, dJdic)
+  assert minconv > 1.9
+  info_green("Test passed")

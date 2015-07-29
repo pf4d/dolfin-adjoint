@@ -284,13 +284,13 @@ class Matrix(libadjoint.Matrix):
 
         assembled_lhs = self.assemble_data()
         [bc.apply(assembled_lhs) for bc in bcs]
-        assembled_rhs = backend.Function(b.data).vector()
+        assembled_rhs = compatibility.assembled_rhs(b)
         [bc.apply(assembled_rhs) for bc in bcs]
 
         wrap_solve(assembled_lhs, x.data.vector(), assembled_rhs, self.solver_parameters)
       else:
         if hasattr(b, 'nonlinear_form'): # was a nonlinear solve
-          x.data.vector()[:] = b.nonlinear_u.vector()
+          x = compatibility.assign_function_to_vector(x, b.nonlinear_u, function_space = test.function_space())            
           F = backend.replace(b.nonlinear_form, {b.nonlinear_u: x.data})
           J = backend.replace(b.nonlinear_J, {b.nonlinear_u: x.data})
           try:
