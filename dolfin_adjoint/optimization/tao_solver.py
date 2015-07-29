@@ -243,8 +243,9 @@ class TAOSolver(OptimizationSolver):
 
         self.tao_problem.setObjectiveGradient(self.__user.objective_and_gradient)
         self.tao_problem.setInitial(self.initial_vec)
-        info_blue("self.riesz_map: %s" % self.riesz_map)
-        self.tao_problem.setRieszMap(self.riesz_map)
+        self.tao_problem.setGradientNormMat(self.riesz_map)
+        if self.tao_problem.getType() in ["lmvm", "blmvm"]:
+            self.tao_problem.setLMVMH0(self.riesz_map)
         self.tao_problem.setHessian(self.__user.hessian, self.__user.H)
 
         # Set bounds if we have any

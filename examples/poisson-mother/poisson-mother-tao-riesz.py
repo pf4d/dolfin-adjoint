@@ -19,10 +19,8 @@ parameters['std_out_all_processes'] = False
 
 tao_args = """
             --petsc.tao_view
-            --petsc.tao_monitor
             --petsc.tao_converged_reason
             --petsc.tao_lmm_vectors 20
-            --petsc.tao_lmm_scale_type riesz
             --petsc.tao_riesz_ksp_type cg
             --petsc.tao_riesz_pc_type gamg
             --petsc.tao_ls_type gpcg
@@ -44,7 +42,7 @@ def randomly_refine(initial_mesh, ratio_to_refine= .3):
 # To demonstrate mesh independence, try refining cells at random
 # (increase the loop counter)
 
-for i in range(2):
+for i in range(3):
     mesh = randomly_refine(mesh)
 
 # Define discrete function spaces and funcions
