@@ -92,6 +92,9 @@ class OptizelleBoundConstraint(constraints.InequalityConstraint):
 
 class DolfinVectorSpace(object):
     """Optizelle wants a VectorSpace object that tells it how to do the linear algebra."""
+
+    inner_product = None
+
     def __init__(self, parameters):
         self.parameters = parameters
 
@@ -172,10 +175,16 @@ class DolfinVectorSpace(object):
     def __inner_obj(x, y):
         if isinstance(x, GenericFunction):
             assert isinstance(y, GenericFunction)
-            # H1 Norm
-            #return assemble(inner(x, y)*dx + inner(grad(x), grad(y))*dx)
-            # L2 Norm
-            return assemble(inner(x, y)*dx)
+
+            if DolfinVectorSpace.inner_product == "H1":
+                return assemble((inner(x, y) + inner(grad(x), grad(y)))*dx)
+            elif DolfinVectorSpace.inner_product == "L2":
+                return assemble(inner(x, y)*dx)
+            elif DolfinVectorSpace.inner_product == "l2":
+                return x.vector().inner(y.vector())
+            else:
+                raise ValueError, "No inner product specified for DolfinVectorSpace"
+
         elif isinstance(x, Constant):
             return float(x)*float(y)
         elif isinstance(x, numpy.ndarray):
@@ -372,12 +381,33 @@ try:
             self.last_J = self.scale*self.rf(x)
             return self.last_J
 
+        def riesz_projection(self, funcs, inner_product):
+            projs = []
+            for func in funcs:
+                if isinstance(func, Function) and inner_product!="l2":
+                    V = func.function_space()
+                    u = TrialFunction(V)
+                    v = TestFunction(V)
+                    if inner_product=="L2":
+                        M = assemble(inner(u, v)*dx)
+                    elif inner_product=="H1":
+                        M = assemble((inner(u, v) + inner(grad(u), grad(v)))*dx)
+                    else:
+                        raise ValueError, "Unknown inner product %s".format(inner_product)
+                    proj = Function(V)
+                    solve(M, proj.vector(), func.vector())
+                    projs.append(proj)
+                else:
+                    projs.append(func)
+            return projs
+
         @optizelle_callback
-        def grad(self, x, grad):
+        def grad(self, x, gradient):
             self.eval(x)
-            out = self.rf.derivative(forget=False, project=True)
+            out = self.rf.derivative(forget=False, project=False)
+            out = self.riesz_projection(out, DolfinVectorSpace.inner_product)
             DolfinVectorSpace.scal(self.scale, out)
-            DolfinVectorSpace.copy(out, grad)
+            DolfinVectorSpace.copy(out, gradient)
 
         @optizelle_callback
         def hessvec(self, x, dx, H_dx):
@@ -469,9 +499,12 @@ class OptizelleSolver(OptimizationSolver):
     See dir(solver.state) for the parameters that can be set,
     and the optizelle manual for details.
     """
-    def __init__(self, problem, parameters=None):
+    def __init__(self, problem, inner_product="L2", parameters=None):
         """
         Create a new OptizelleSolver.
+
+        The argument inner_product specifies the inner product to be used for
+        the control space.
 
         To set optizelle-specific options, do e.g.
 
@@ -495,6 +528,8 @@ class OptizelleSolver(OptimizationSolver):
         except ImportError:
             print("Could not import Optizelle.")
             raise
+
+        DolfinVectorSpace.inner_product = inner_product
 
         OptimizationSolver.__init__(self, problem, parameters)
 
@@ -538,7 +573,8 @@ class OptizelleSolver(OptimizationSolver):
         if num_equality_constraints == 0 and num_inequality_constraints == 0:
             self.state = Optizelle.Unconstrained.State.t(DolfinVectorSpace, Optizelle.Messaging(), x)
             self.fns = Optizelle.Unconstrained.Functions.t()
-            self.fns.f = OptizelleObjective(self.problem.reduced_functional, scale=scale)
+            self.fns.f = OptizelleObjective(self.problem.reduced_functional,
+                    scale=scale)
 
             log(INFO, "Found no constraints.")
 
@@ -552,7 +588,8 @@ class OptizelleSolver(OptimizationSolver):
             self.state = Optizelle.EqualityConstrained.State.t(DolfinVectorSpace, DolfinVectorSpace, Optizelle.Messaging(), x, y)
             self.fns = Optizelle.Constrained.Functions.t()
 
-            self.fns.f = OptizelleObjective(self.problem.reduced_functional, scale=scale)
+            self.fns.f = OptizelleObjective(self.problem.reduced_functional,
+                    scale=scale)
             self.fns.g = OptizelleConstraints(self.problem, equality_constraints)
 
             log(INFO, "Found no equality and %i inequality constraints." % equality_constraints._get_constraint_dim())
@@ -571,7 +608,8 @@ class OptizelleSolver(OptimizationSolver):
             self.state = Optizelle.InequalityConstrained.State.t(DolfinVectorSpace, DolfinVectorSpace, Optizelle.Messaging(), x, z)
             self.fns = Optizelle.InequalityConstrained.Functions.t()
 
-            self.fns.f = OptizelleObjective(self.problem.reduced_functional, scale=scale)
+            self.fns.f = OptizelleObjective(self.problem.reduced_functional,
+                    scale=scale)
             self.fns.h = OptizelleConstraints(self.problem, all_inequality_constraints)
 
             log(INFO, "Found no equality and %i inequality constraints." % all_inequality_constraints._get_constraint_dim())
@@ -593,7 +631,8 @@ class OptizelleSolver(OptimizationSolver):
             self.state = Optizelle.Constrained.State.t(DolfinVectorSpace, DolfinVectorSpace, DolfinVectorSpace, Optizelle.Messaging(), x, y, z)
             self.fns = Optizelle.Constrained.Functions.t()
 
-            self.fns.f = OptizelleObjective(self.problem.reduced_functional, scale=scale)
+            self.fns.f = OptizelleObjective(self.problem.reduced_functional,
+                    scale=scale)
             self.fns.g = OptizelleConstraints(self.problem, equality_constraints)
             self.fns.h = OptizelleConstraints(self.problem, all_inequality_constraints)
 
