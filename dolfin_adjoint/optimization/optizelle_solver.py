@@ -39,11 +39,6 @@ class OptizelleBoundConstraint(constraints.InequalityConstraint):
         if isinstance(self.m, Constant):
             assert hasattr(bound, '__float__')
             self.bound = float(bound)
-        elif isinstance(self.m, GenericFunction):
-            V = self.m.function_space()
-            p = TestFunction(V)
-            q = TrialFunction(V)
-            self.mass = assemble(inner(p, q)*dx)
 
         if type is 'lower':
             self.scale = +1.0
@@ -177,6 +172,9 @@ class DolfinVectorSpace(object):
     def __inner_obj(x, y):
         if isinstance(x, GenericFunction):
             assert isinstance(y, GenericFunction)
+            # H1 Norm
+            #return assemble(inner(x, y)*dx + inner(grad(x), grad(y))*dx)
+            # L2 Norm
             return assemble(inner(x, y)*dx)
         elif isinstance(x, Constant):
             return float(x)*float(y)
