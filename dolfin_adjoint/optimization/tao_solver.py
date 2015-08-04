@@ -54,11 +54,11 @@ class TAOSolver(OptimizationSolver):
 
         OptimizationSolver.__init__(self, problem, parameters)
 
-        self.tao_problem = PETSc.TAO().create(PETSc.COMM_WORLD)
+        self.tao = PETSc.TAO().create(PETSc.COMM_WORLD)
 
         self.__build_app_context()
         self.__set_parameters()
-        self.__build_tao_problem()
+        self.__build_tao()
 
     def __build_app_context(self):
         PETSc = self.PETSc
@@ -230,31 +230,31 @@ class TAOSolver(OptimizationSolver):
                 # Presented as a "WARNING!" message following solve attempt.
                 OptDB.setValue(param,self.parameters[param])
 
-    def __build_tao_problem(self):
+    def __build_tao(self):
         if "PETScOptions" in globals():
             PETScOptions.set(self.prefix + "tao_converged_reason", True)
 
-        self.tao_problem.setOptionsPrefix(self.prefix)
-        self.tao_problem.setFromOptions()
+        self.tao.setOptionsPrefix(self.prefix)
+        self.tao.setFromOptions()
 
         def default_monitor(tao):
             info_blue("Iteration: %3d\tFunctional value: %15.15e\tGradient norm: %15.15e" % (tao.its, tao.objective, tao.gnorm))
-        self.tao_problem.setMonitor(default_monitor)
+        self.tao.setMonitor(default_monitor)
 
-        self.tao_problem.setObjectiveGradient(self.__user.objective_and_gradient)
-        self.tao_problem.setInitial(self.initial_vec)
+        self.tao.setObjectiveGradient(self.__user.objective_and_gradient)
+        self.tao.setInitial(self.initial_vec)
 
         if self.riesz_map is not None:
-            self.tao_problem.setGradientNormMat(self.riesz_map)
-            if self.tao_problem.getType() in ["lmvm", "blmvm"]:
-                self.tao_problem.setLMVMH0(self.riesz_map)
+            self.tao.setGradientNormMat(self.riesz_map)
+            if self.tao.getType() in ["lmvm", "blmvm"]:
+                self.tao.setLMVMH0(self.riesz_map)
 
-        self.tao_problem.setHessian(self.__user.hessian, self.__user.H)
+        self.tao.setHessian(self.__user.hessian, self.__user.H)
 
         # Set bounds if we have any
         if self.problem.bounds is not None:
             (lb, ub) = self.__get_bounds()
-            self.tao_problem.setVariableBounds(lb, ub)
+            self.tao.setVariableBounds(lb, ub)
 
         # Similarly for constraints TODO
         if self.problem.constraints is not None:
@@ -373,11 +373,11 @@ class TAOSolver(OptimizationSolver):
 
     def get_tao(self):
         """Returns the PETSc TAO instance associated with the solver"""
-        return self.tao_problem
+        return self.tao
 
     def solve(self):
-        self.tao_problem.solve()
-        sol_vec = self.tao_problem.getSolution()
+        self.tao.solve()
+        sol_vec = self.tao.getSolution()
         self.__user.update(sol_vec)
 
         # TODO: Multiple controls support
