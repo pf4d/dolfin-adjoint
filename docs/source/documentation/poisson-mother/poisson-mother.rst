@@ -82,7 +82,7 @@ domain:
   mesh = UnitSquareMesh(n, n)
   
   cf = CellFunction("bool", mesh)
-  subdomain = CompiledSubDomain('std::abs(x[0]-0.5)<.25 && std::abs(x[1]-0.5)<0.25')
+  subdomain = CompiledSubDomain('std::abs(x[0]-0.5)<0.25 && std::abs(x[1]-0.5)<0.25')
   subdomain.mark(cf, True)
   mesh = refine(mesh, cf)
   
@@ -148,7 +148,7 @@ solve the Poisson equation to obtain the associated solution
 can write the original optimisation problem as a reduced problem:
 
 .. math::
-      \min_f \frac{1}{2} \int_{\Omega} (u(f) - d)^2 \textrm{d}x + \frac{\alpha}{2} \int_{\Omega} f^2 \textrm{d}s 
+      \min_f \frac{1}{2} \int_{\Omega} (u(f) - d)^2 \textrm{d}x + \frac{\alpha}{2} \int_{\Omega} f^2 \textrm{d}s
 
 Note that no PDE-constraint is required anymore, since it is
 implicitly contained in the solution function.
