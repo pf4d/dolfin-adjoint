@@ -260,7 +260,7 @@ class TAOSolver(OptimizationSolver):
                 self.tao.setLMVMH0(self.riesz_map)
 
         self.tao.setHessian(self.__user.hessian, self.__user.H, P=self.riesz_map)
-        if self.riesz_map is not None and self.tao.getType() in ["nls", "ntr"]:
+        if self.riesz_map is not None and self.tao.getType() in ["nls", "ntr", "tron"]:
             self.tao.ksp.pc.setType("python")
             self.tao.ksp.pc.setPythonContext(self.__user)
 
