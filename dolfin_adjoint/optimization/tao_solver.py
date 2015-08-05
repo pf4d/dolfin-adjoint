@@ -91,6 +91,7 @@ class TAOSolver(OptimizationSolver):
 
                 self.shift_ = 0.0 # the cumulative arguments to MatShift, used in TAO a lot
                 self.riesz_map = riesz_map
+                self.riesz_ksp = None
 
             def shift(self, mat, s):
                 self.shift_ += s
@@ -128,6 +129,15 @@ class TAOSolver(OptimizationSolver):
 
             def stats(self, x):
                 return "(min, max): (%s, %s)" % (x.min()[-1], x.max()[-1])
+
+            def apply(iself, pc, x, y):
+                if iself.riesz_ksp is None:
+                    iself.riesz_ksp = self.PETSc.KSP().create()
+                    iself.riesz_ksp.setOperators(iself.riesz_map)
+                    iself.riesz_ksp.setOptionsPrefix(self.prefix + "tao_h0_")
+                    iself.riesz_ksp.setFromOptions()
+
+                iself.riesz_ksp.solve(x, y)
 
             def mult(self, mat, x, y):
                 # TODO: Add multiple control support to Hessian stack and check for ConstantControl
@@ -250,6 +260,9 @@ class TAOSolver(OptimizationSolver):
                 self.tao.setLMVMH0(self.riesz_map)
 
         self.tao.setHessian(self.__user.hessian, self.__user.H, P=self.riesz_map)
+        if self.riesz_map is not None and self.tao.getType() in ["nls", "ntr"]:
+            self.tao.ksp.pc.setType("python")
+            self.tao.ksp.pc.setPythonContext(self.__user)
 
         # Set bounds if we have any
         if self.problem.bounds is not None:
