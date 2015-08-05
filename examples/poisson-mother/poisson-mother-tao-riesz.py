@@ -28,6 +28,7 @@ tao_args = """
             --petsc.opt_tao_nls_pc_type petsc
             --petsc.opt_tao_nls_ksp_type petsc
             --petsc.opt_tao_ntr_pc_type petsc
+            --petsc.opt_tao_trust0 10000
             --petsc.opt_ksp_monitor_true_residual
             --petsc.opt_ksp_converged_reason
             --petsc.opt_ksp_type stcg
@@ -84,17 +85,17 @@ J = Functional((0.5*inner(u-d, u-d))*dx + 0.5*alpha*f**2*dx)
 control = Control(f)
 rf = ReducedFunctional(J, control)
 
-#problem = MinimizationProblem(rf, bounds=(0.0,0.9))
-problem = MinimizationProblem(rf)
+problem = MinimizationProblem(rf, bounds=(0.0,0.9))
+#problem = MinimizationProblem(rf)
 
 # For the problem without bound constraints, uncomment:
 #problem = MinimizationProblem(rf)
 
-parameters = { "type": "ntr",
+parameters = { "type": "tron",
                "max_it": 2000,
                "fatol": 1e-100,
                "frtol": 0.0,
-               "gatol": 1e-9,
+               "gatol": 5e-9,
                "grtol": 0.0
              }
 
