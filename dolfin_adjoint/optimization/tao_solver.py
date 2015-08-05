@@ -249,7 +249,7 @@ class TAOSolver(OptimizationSolver):
             if self.tao.getType() in ["lmvm", "blmvm"]:
                 self.tao.setLMVMH0(self.riesz_map)
 
-        self.tao.setHessian(self.__user.hessian, self.__user.H)
+        self.tao.setHessian(self.__user.hessian, self.__user.H, P=self.riesz_map)
 
         # Set bounds if we have any
         if self.problem.bounds is not None:
