@@ -18,12 +18,20 @@ set_log_level(ERROR)
 parameters['std_out_all_processes'] = False
 
 tao_args = """
-            --petsc.tao_view
-            --petsc.tao_converged_reason
-            --petsc.tao_lmm_vectors 20
-            --petsc.tao_riesz_ksp_type cg
-            --petsc.tao_riesz_pc_type gamg
-            --petsc.tao_ls_type gpcg
+            --petsc.opt_tao_view
+            --petsc.opt_tao_converged_reason
+            --petsc.opt_tao_lmm_vectors 20
+            --petsc.opt_tao_h0_ksp_type cg
+            --petsc.opt_tao_h0_pc_type gamg
+            --petsc.opt_tao_ls_type gpcg
+            --petsc.opt_tao_subset_type matrixfree
+            --petsc.opt_tao_nls_pc_type petsc
+            --petsc.opt_tao_nls_ksp_type petsc
+            --petsc.opt_pc_type gamg
+            --petsc.opt_ksp_monitor_true_residual
+            --petsc.opt_ksp_converged_reason
+            --petsc.opt_ksp_type cg
+            --petsc.opt_ksp_view
            """.split()
 parameters.parse(tao_args)
 
@@ -42,7 +50,7 @@ def randomly_refine(initial_mesh, ratio_to_refine= .3):
 # To demonstrate mesh independence, try refining cells at random
 # (increase the loop counter)
 
-for i in range(3):
+for i in range(2):
     mesh = randomly_refine(mesh)
 
 # Define discrete function spaces and funcions
@@ -76,12 +84,13 @@ J = Functional((0.5*inner(u-d, u-d))*dx + 0.5*alpha*f**2*dx)
 control = Control(f)
 rf = ReducedFunctional(J, control)
 
-problem = MinimizationProblem(rf, bounds=(0.0,0.9))
+#problem = MinimizationProblem(rf, bounds=(0.0,0.9))
+problem = MinimizationProblem(rf)
 
 # For the problem without bound constraints, uncomment:
 #problem = MinimizationProblem(rf)
 
-parameters = { "type": "blmvm",
+parameters = { "type": "nls",
                "max_it": 2000,
                "fatol": 1e-100,
                "frtol": 0.0,
@@ -90,7 +99,7 @@ parameters = { "type": "blmvm",
              }
 
 # Now construct the TAO solver and pass the Riesz map.
-solver = TAOSolver(problem, parameters=parameters, riesz_map=L2(W))
+solver = TAOSolver(problem, parameters=parameters, riesz_map=L2(W), prefix="opt")
 
 # To see what happens when you disable the Riesz map, uncomment
 # this line:
