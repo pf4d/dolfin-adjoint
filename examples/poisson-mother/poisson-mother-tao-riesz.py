@@ -27,10 +27,10 @@ tao_args = """
             --petsc.opt_tao_subset_type matrixfree
             --petsc.opt_tao_nls_pc_type petsc
             --petsc.opt_tao_nls_ksp_type petsc
-            --petsc.opt_pc_type gamg
+            --petsc.opt_tao_ntr_pc_type petsc
             --petsc.opt_ksp_monitor_true_residual
             --petsc.opt_ksp_converged_reason
-            --petsc.opt_ksp_type cg
+            --petsc.opt_ksp_type stcg
             --petsc.opt_ksp_view
            """.split()
 parameters.parse(tao_args)
@@ -90,7 +90,7 @@ problem = MinimizationProblem(rf)
 # For the problem without bound constraints, uncomment:
 #problem = MinimizationProblem(rf)
 
-parameters = { "type": "nls",
+parameters = { "type": "ntr",
                "max_it": 2000,
                "fatol": 1e-100,
                "frtol": 0.0,
