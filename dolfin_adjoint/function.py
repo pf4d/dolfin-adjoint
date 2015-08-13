@@ -13,9 +13,6 @@ dolfin_split  = backend.Function.split
 dolfin_str    = backend.Function.__str__
 dolfin_interpolate = backend.Function.interpolate
 
-if hasattr(backend.Function, 'sub'):
-  dolfin_sub    = backend.Function.sub
-
 def dolfin_adjoint_assign(self, other, annotate=None, *args, **kwargs):
   '''We also need to monkeypatch the Function.assign method, as it is often used inside
   the main time loop, and not annotating it means you get the adjoint wrong for totally
@@ -112,11 +109,7 @@ def dolfin_adjoint_interpolate(self, other, annotate=None):
     return out
 
 if hasattr(backend.Function, 'sub'):
-  def dolfin_adjoint_sub(self, idx, deepcopy=False):
-      out = dolfin_sub(self, idx, deepcopy=deepcopy)
-      out.super_idx = idx
-      out.super_fn  = self
-      return out
+  dolfin_adjoint_sub = compatibility.dolfin_adjoint_sub
 
 class Function(backend.Function):
   '''The Function class is overloaded so that you can give :py:class:`Functions` *names*. For example,
@@ -150,7 +143,7 @@ class Function(backend.Function):
       if backend.__name__ == "dolfin":
         self.rename(self.adj_name, "a Function from dolfin-adjoint")
       else:
-        self.name = self.adj_name
+        self.name = self.__str__
 
     if to_annotate:
       if not isinstance(args[0], compatibility.function_space_type):
@@ -175,7 +168,7 @@ class Function(backend.Function):
 
   def __str__(self):
     return dolfin_adjoint_str(self)
-
+    
   def interpolate(self, other, annotate=None):
     if annotate is True and backend.parameters["adjoint"]["stop_annotating"]:
       raise AssertionError("The user insisted on annotation, but stop_annotating is True.")

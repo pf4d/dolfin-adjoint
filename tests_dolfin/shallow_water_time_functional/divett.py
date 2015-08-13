@@ -34,11 +34,7 @@ class InitialConditions(Expression):
         return (3,)
 
 
-try:
-  mesh = RectangleMesh(0, 0, basin_x, basin_y, nx, ny)
-except:
-  mesh = Rectangle(0, 0, basin_x, basin_y, nx, ny)
-
+mesh = RectangleMesh(mpi_comm_world(), Point(0, 0), Point(basin_x, basin_y), nx, ny)
 mesh.order()
 mesh.init()
 

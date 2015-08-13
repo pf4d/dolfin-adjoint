@@ -4,7 +4,7 @@
 Time-dependent optimal control of Stokes flow
 =============================================
 
-.. sectionauthor:: Marie E. Rognes <meg@simula.no>
+.. sectionauthor:: Marie E. Rognes <meg@simula.no>,  Steven Vandekerckhove <Steven.Vandekerckhove@kuleuven.be>
 
 ******************
 Problem definition

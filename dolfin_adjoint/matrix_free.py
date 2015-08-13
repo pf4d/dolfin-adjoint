@@ -61,7 +61,7 @@ class MatrixFree(adjlinalg.Matrix):
       rhs = backend.assemble(b.data)
 
     if var.type in ['ADJ_TLM', 'ADJ_ADJOINT']:
-      self.bcs = [backend.homogenize(bc) for bc in self.bcs if isinstance(bc, backend.cpp.DirichletBC)] + [bc for bc in self.bcs if not isinstance(bc, backend.DirichletBC)]
+      self.bcs = [utils.homogenize(bc) for bc in self.bcs if isinstance(bc, backend.cpp.DirichletBC)] + [bc for bc in self.bcs if not isinstance(bc, backend.DirichletBC)]
 
     for bc in self.bcs:
       bc.apply(rhs)
@@ -260,7 +260,7 @@ class AdjointKrylovMatrix(backend.PETScKrylovMatrix):
     self.current_form = backend.replace(self.original_form, replace_dict)
 
   def hermitian(self):
-    adjoint_bcs = [backend.homogenize(bc) for bc in self.bcs if isinstance(bc, backend.cpp.DirichletBC)] + [bc for bc in self.bcs if not isinstance(bc, backend.DirichletBC)]
+    adjoint_bcs = [utils.homogenize(bc) for bc in self.bcs if isinstance(bc, backend.cpp.DirichletBC)] + [bc for bc in self.bcs if not isinstance(bc, backend.DirichletBC)]
     return AdjointKrylovMatrix(backend.adjoint(self.original_form), bcs=adjoint_bcs)
 
   def derivative_action(self, variable, contraction_vector, hermitian, input, coefficient):
@@ -288,14 +288,14 @@ def transpose_operators(operators):
       backend.assemble(backend.adjoint(op.form), tensor=out[i])
 
       if hasattr(op, 'bcs'):
-        adjoint_bcs = [backend.homogenize(bc) for bc in op.bcs if isinstance(bc, backend.cpp.DirichletBC)] + [bc for bc in op.bcs if not isinstance(bc, backend.DirichletBC)]
+        adjoint_bcs = [utils.homogenize(bc) for bc in op.bcs if isinstance(bc, backend.cpp.DirichletBC)] + [bc for bc in op.bcs if not isinstance(bc, backend.DirichletBC)]
         [bc.apply(out[i]) for bc in adjoint_bcs]
 
     elif isinstance(op, backend.Form) or isinstance(op, ufl.form.Form):
       out[i] = backend.adjoint(op)
 
       if hasattr(op, 'bcs'):
-        out[i].bcs = [backend.homogenize(bc) for bc in op.bcs if isinstance(bc, backend.cpp.DirichletBC)] + [bc for bc in op.bcs if not isinstance(bc, backend.DirichletBC)]
+        out[i].bcs = [utils.homogenize(bc) for bc in op.bcs if isinstance(bc, backend.cpp.DirichletBC)] + [bc for bc in op.bcs if not isinstance(bc, backend.DirichletBC)]
 
     elif isinstance(op, AdjointKrylovMatrix):
       pass

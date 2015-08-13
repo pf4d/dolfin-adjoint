@@ -235,7 +235,14 @@ class ReducedFunctional(object):
         scaled_dfunc_value = [utils.scale(df, self.scale) for df in list(dfunc_value)]
 
         # Call callback
-        values = [p.data() for p in self.controls]
+        # We might have forgotten the control values already,
+        # in which case we can only return Nones
+        values = []
+        for c in self.controls:
+            try:
+                values.append(p.data())
+            except libadjoint.exceptions.LibadjointErrorNeedValue:
+                values.append(None)
         if self.current_func_value is not None:
             self.derivative_cb_post(self.scale * self.current_func_value,
                     delist(scaled_dfunc_value, list_type=self.controls),
@@ -278,7 +285,12 @@ class ReducedFunctional(object):
 
         # Call callback
         control_data = [p.data() for p in self.controls]
-        self.hessian_cb(self.scale * self.current_func_value,
+        if self.current_func_value is not None:
+            current_func_value = self.scale * self.current_func_value
+        else:
+            current_func_value = None
+
+        self.hessian_cb(current_func_value,
                         delist(control_data, list_type=self.controls),
                         m_dot, scaled_Hm[0])
 

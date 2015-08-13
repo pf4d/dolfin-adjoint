@@ -76,22 +76,11 @@
 
 from dolfin import *
 from dolfin_adjoint import *
-
-# Next we import the Python interface to IPOPT. If IPOPT is
-# unavailable on your system, we strongly :doc:`suggest you install it
-# <../../download/index>`; IPOPT is a well-established open-source
-# optimisation algorithm.
-
-try:
-  import pyipopt
-except ImportError:
-  info_red("""This example depends on IPOPT and pyipopt. \
-When compiling IPOPT, make sure to link against HSL, as it \
-is a necessity for practical problems.""")
-  raise
+import Optizelle
 
 # turn off redundant output in parallel
 parameters["std_out_all_processes"] = False
+set_log_level(ERROR)
 
 # Next we define some constants, and define the inverse permeability as
 # a function of :math:`\rho`.
@@ -111,7 +100,7 @@ def alpha(rho):
 # Taylor-Hood finite element to discretise the Stokes equations
 # :cite:`taylor1973`.
 
-N = 200
+N = 50
 delta = 1.5  # The aspect ratio of the domain, 1 high and \delta wide
 V = Constant(1.0/3) * delta  # want the fluid to occupy 1/3 of the domain
 
@@ -184,8 +173,8 @@ if __name__ == "__main__":
 # an initial guess for the main task (:math:`q=0.1`), we shall save
 # these iterates in ``output/control_iterations_guess.pvd``.
 
-  controls = File("output/control_iterations_guess.pvd")
-  allctrls = File("output/allcontrols.pvd")
+  controls = File("output/control_iterations_guess-optizelle.pvd")
+  allctrls = File("output/allcontrols-optizelle.pvd")
   rho_viz = Function(A, name="ControlVisualisation")
   def eval_cb(j, rho):
     rho_viz.assign(rho)
@@ -207,36 +196,44 @@ if __name__ == "__main__":
   lb = 0.0
   ub = 1.0
 
-  # Volume constraints
+  out = File("output/iterations-optizelle.pvd")
   class VolumeConstraint(InequalityConstraint):
     """A class that enforces the volume constraint g(a) = V - a*dx >= 0."""
     def __init__(self, V):
-      self.V = float(V)
+      self.V  = float(V)
+      self.scale = 1.
 
-# The derivative of the constraint g(x) is constant
-# (it is the negative of the diagonal of the lumped mass matrix for the
-# control function space), so let's assemble it here once.
-# This is also useful in rapidly calculating the integral each time
-# without re-assembling.
+# The derivative of the constraint g(x) is constant (it is the
+# diagonal of the lumped mass matrix for the control function space),
+# so let's assemble it here once.  This is also useful in rapidly
+# calculating the integral each time without re-assembling.
 
-      self.smass = assemble(TestFunction(A) * Constant(1) * dx)
+      self.smass  = assemble(TestFunction(A) * Constant(1) * dx)
       self.tmpvec = Function(A)
 
     def function(self, m):
-      print "Evaluting constraint residual"
-      self.tmpvec.vector()[:] = m
+      self.tmpvec.assign(m)
+      out << self.tmpvec
 
       # Compute the integral of the control over the domain
       integral = self.smass.inner(self.tmpvec.vector())
-      print "Current control integral: ", integral
-      return [self.V - integral]
+      return [self.scale * (self.V - integral)]
 
-    def jacobian(self, m):
-      print "Computing constraint Jacobian"
-      return [-self.smass]
+    def jacobian_action(self, m, dm, result):
+      result[:] = - self.scale * self.smass.inner(dm.vector())
+
+    def jacobian_adjoint_action(self, m, dp, result):
+      result.vector()[:] = interpolate(Constant(-self.scale * dp[0]), A).vector()
+
+    def hessian_action(self, m, dm, dp, result):
+      result.vector().zero()
 
     def output_workspace(self):
       return [0.0]
+
+    def length(self):
+      """Return the number of components in the constraint vector (here, one)."""
+      return 1
 
 # Now that all the ingredients are in place, we can perform the initial
 # optimisation. We set the maximum number of iterations for this initial
@@ -245,97 +242,95 @@ if __name__ == "__main__":
 
   # Solve the optimisation problem with q = 0.01
   problem = MinimizationProblem(Jhat, bounds=(lb, ub), constraints=VolumeConstraint(V))
-  parameters = {'maximum_iterations': 20}
+  parameters = {
+               "maximum_iterations": 200,
+               "optizelle_parameters":
+                   {
+                   "msg_level" : 10,
+                   "algorithm_class" : Optizelle.AlgorithmClass.TrustRegion,
+                   #"H_type" : Optizelle.Operators.ScaledIdentity,
+                   "H_type" : Optizelle.Operators.UserDefined,
+                   "dir" : Optizelle.LineSearchDirection.BFGS,
+                   "eps_dx": 1.0e-15,
+                   "linesearch_iter_max" : 5,
+                   #"ipm": Optizelle.InteriorPointMethod.LogBarrier,
+                   "ipm": Optizelle.InteriorPointMethod.PrimalDual,
+                   "mu": 1e-5,
+                   "eps_mu": 1e-3,
+                   "sigma" : 0.5,
+                   "delta" : 100.,
+                   #"xi_qn" : 1e-12,
+                   #"xi_pg" : 1e-12,
+                   #"xi_proj" : 1e-12,
+                   #"xi_tang" : 1e-12,
+                   #"xi_lmh" : 1e-12,
+                   "rho" : 100.,
+                   #"augsys_iter_max" : 1000,
+                   "krylov_iter_max" : 20,
+                   "eps_krylov" : 1e-8,
+                   #"dscheme": Optizelle.DiagnosticScheme.DiagnosticsOnly,
+                   "h_diag" : Optizelle.FunctionDiagnostics.SecondOrder,
+                   "x_diag" : Optizelle.VectorSpaceDiagnostics.Basic,
+                   "y_diag" : Optizelle.VectorSpaceDiagnostics.Basic,
+                   "z_diag" : Optizelle.VectorSpaceDiagnostics.EuclideanJordan,
+                   #"f_diag" : Optizelle.FunctionDiagnostics.FirstOrder,
+                   "g_diag" : Optizelle.FunctionDiagnostics.SecondOrder,
+                   "L_diag" : Optizelle.FunctionDiagnostics.SecondOrder,
+                   "stored_history": 25,
+                   }
+               }
 
-  solver = IPOPTSolver(problem, parameters=parameters)
+  solver  = OptizelleSolver(problem, inner_product="L2", parameters=parameters)
   rho_opt = solver.solve()
 
-  File("output/control_solution_guess.xdmf") << rho_opt
+  File("output/control_solution_guess-optizelle.xdmf") << rho_opt
 
-# With the optimised value for :math:`q=0.01` in hand, we *reset* the
-# dolfin-adjoint state, clearing its tape, and configure the new problem
-# we want to solve. We need to update the values of :math:`q` and
-# :math:`\rho`:
-
-  q.assign(0.1)
-  rho.assign(rho_opt)
-  adj_reset()
-
-# Since we have cleared the tape, we need to execute the forward model
-# once again to redefine the problem. (It is also possible to modify the
-# tape, but this way is easier to understand.) We will also redefine the
-# functionals and parameters; this time, the evaluation callback will
-# save the optimisation iterations to
-# ``output/control_iterations_final.pvd``.
-
-  File("intermediate-guess-%s.xdmf" % N) << rho
-
-  w = forward(rho)
-  (u, p) = split(w)
-
-  # Define the reduced functionals
-  controls = File("output/control_iterations_final.pvd")
-  rho_viz = Function(A, name="ControlVisualisation")
-  def eval_cb(j, rho):
-    rho_viz.assign(rho)
-    controls << rho_viz
-    allctrls << rho_viz
-
-  J = Functional(0.5 * inner(alpha(rho) * u, u) * dx + mu * inner(grad(u), grad(u)) * dx)
-  m = Control(rho)
-  Jhat = ReducedFunctional(J, m, eval_cb_post=eval_cb)
-
-# We can now solve the optimisation problem with :math:`q=0.1`, starting
-# from the solution of :math:`q=0.01`:
-
-  problem = MinimizationProblem(Jhat, bounds=(lb, ub), constraints=VolumeConstraint(V))
-  parameters = {'maximum_iterations': 100}
-
-  solver = IPOPTSolver(problem, parameters=parameters)
-  rho_opt = solver.solve()
-
-  File("output/control_solution_final.xdmf") << rho_opt
-
-# The example code can be found in ``examples/stokes-topology/`` in the
-# ``dolfin-adjoint`` source tree, and executed as follows:
+## With the optimised value for :math:`q=0.01` in hand, we *reset* the
+## dolfin-adjoint state, clearing its tape, and configure the new problem
+## we want to solve. We need to update the values of :math:`q` and
+## :math:`\rho`:
 #
-# .. code-block:: bash
+#  q.assign(0.1)
+#  rho.assign(rho_opt)
+#  adj_reset()
 #
-#   $ mpiexec -n 4 python stokes-topology.py
-#   ...
-#   Number of Iterations....: 100
+## Since we have cleared the tape, we need to execute the forward model
+## once again to redefine the problem. (It is also possible to modify the
+## tape, but this way is easier to understand.) We will also redefine the
+## functionals and parameters; this time, the evaluation callback will
+## save the optimisation iterations to
+## ``output/control_iterations_final.pvd``.
 #
-#                                      (scaled)                 (unscaled)
-#   Objective...............:   4.5944633030224409e+01    4.5944633030224409e+01
-#   Dual infeasibility......:   1.8048641504211900e-03    1.8048641504211900e-03
-#   Constraint violation....:   0.0000000000000000e+00    0.0000000000000000e+00
-#   Complementarity.........:   9.6698653740681504e-05    9.6698653740681504e-05
-#   Overall NLP error.......:   1.8048641504211900e-03    1.8048641504211900e-03
+#  File("intermediate-guess-%s.xdmf" % N) << rho
 #
+#  w = forward(rho)
+#  (u, p) = split(w)
 #
-#   Number of objective function evaluations             = 105
-#   Number of objective gradient evaluations             = 101
-#   Number of equality constraint evaluations            = 0
-#   Number of inequality constraint evaluations          = 105
-#   Number of equality constraint Jacobian evaluations   = 0
-#   Number of inequality constraint Jacobian evaluations = 101
-#   Number of Lagrangian Hessian evaluations             = 0
-#   Total CPU secs in IPOPT (w/o function evaluations)   =     11.585
-#   Total CPU secs in NLP function evaluations           =    556.795
+#  # Define the reduced functionals
+#  controls = File("output/control_iterations_final-optizelle.pvd")
+#  rho_viz = Function(A, name="ControlVisualisation")
+#  def eval_cb(j, rho):
+#    rho_viz.assign(rho)
+#    controls << rho_viz
+#    allctrls << rho_viz
 #
-#   EXIT: Maximum Number of Iterations Exceeded.
+#  J = Functional(0.5 * inner(alpha(rho) * u, u) * dx + mu * inner(grad(u), grad(u)) * dx)
+#  m = Control(rho)
+#  Jhat = ReducedFunctional(J, m, eval_cb_post=eval_cb)
 #
-# The optimisation iterations can be visualised by opening
-# ``output/control_iterations_final.pvd`` in paraview. The resulting
-# solution appears very similar to the solution proposed in
-# :cite:`borrvall2003`.
+## We can now solve the optimisation problem with :math:`q=0.1`, starting
+## from the solution of :math:`q=0.01`:
 #
-# .. image:: stokes-topology.png
-#     :scale: 25
-#     :align: center
+#  problem = MinimizationProblem(Jhat, bounds=(lb, ub), constraints=VolumeConstraint(V))
 #
-# .. rubric:: References
+#  solver  = OptizelleSolver(problem, parameters=parameters)
+#  rho_opt = solver.solve()
 #
-# .. bibliography:: /documentation/stokes-topology/stokes-topology.bib
-#    :cited:
-#    :labelprefix: 4E-
+#  File("output/control_solution_final-optizelle.xdmf") << rho_opt
+#
+## The example code can be found in ``examples/stokes-topology/`` in the
+## ``dolfin-adjoint`` source tree, and executed as follows:
+##
+## .. code-block:: bash
+##
+##   $ mpiexec -n 4 python stokes-topology-optizelle.py

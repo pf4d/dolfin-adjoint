@@ -123,7 +123,7 @@ Taylor-Hood finite element to discretise the Stokes equations
   delta = 1.5  # The aspect ratio of the domain, 1 high and \delta wide
   V = Constant(1.0/3) * delta  # want the fluid to occupy 1/3 of the domain
   
-  mesh = RectangleMesh(0.0, 0.0, delta, 1.0, N, N)
+  mesh = RectangleMesh(mpi_comm_world(), Point(0.0, 0.0), Point(delta, 1.0), N, N)
   A = FunctionSpace(mesh, "CG", 1)        # control function space
   U = VectorFunctionSpace(mesh, "CG", 2)  # velocity function space
   P = FunctionSpace(mesh, "CG", 1)        # pressure function space
@@ -311,7 +311,7 @@ save the optimisation iterations to
   
     J = Functional(0.5 * inner(alpha(rho) * u, u) * dx + mu * inner(grad(u), grad(u)) * dx)
     m = Control(rho)
-    Jhat = ReducedFunctional(J, m, eval_cb=eval_cb)
+    Jhat = ReducedFunctional(J, m, eval_cb_post=eval_cb)
   
 We can now solve the optimisation problem with :math:`q=0.1`, starting
 from the solution of :math:`q=0.01`:

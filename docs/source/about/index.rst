@@ -28,6 +28,14 @@ where the model is implemented in the Python interface to DOLFIN.
 
 .. _his recent book: http://dx.doi.org/10.1137/1.9781611972078
 
+
+News
+====
+**11.6.2015**: P. E. Farrell, S. W. Funke, D. A. Ham and M. E. Rognes were awarded the 2015 `Wilkinson prize for numerical software`_ for dolfin-adjoint.
+
+
+.. _Wilkinson prize for numerical software: http://www.nag.co.uk/other/WilkinsonPrize.html
+
 Features
 ========
 
@@ -94,10 +102,10 @@ Contributors
 The dolfin-adjoint project is developed and maintained by the
 following authors:
 
-- `Patrick E. Farrell <https://www.maths.ox.ac.uk/contact/details/farrellp>`__ (Mathematical Institute, University of Oxford)
-- `Simon W. Funke <http://www3.imperial.ac.uk/people/s.funke09>`__ (Center for Biomedical Computing, Simula Research Laboratory / Applied Modelling and Computation Group, Imperial College London)
+- `Patrick E. Farrell <http://pefarrell.org>`__ (Mathematical Institute, University of Oxford)
+- `Simon W. Funke <http://simonfunke.com>`__ (Center for Biomedical Computing, Simula Research Laboratory / Applied Modelling and Computation Group, Imperial College London)
 - `David A. Ham <http://www.ic.ac.uk/people/david.ham>`__ (Department of Mathematics and Department of Computing, Imperial College London)
-- `Marie E. Rognes <http://simula.no/people/meg/>`__ (Center for Biomedical Computing, Simula Research Laboratory)
+- `Marie E. Rognes <http://home.simula.no/~meg/>`__ (Center for Biomedical Computing, Simula Research Laboratory)
 - `James R. Maddison <http://www.maths.ed.ac.uk/people/show?person-364>`__ (School of Mathematics, University of Edinburgh)
 
 License

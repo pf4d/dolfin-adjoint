@@ -11,6 +11,7 @@ import projection
 import functional
 import drivers
 import math
+import compatibility
 from controls import ListControl, Control
 if backend.__name__  == "dolfin":
   from backend import cpp
@@ -31,6 +32,10 @@ def scale(obj, factor):
         scaled_obj = factor * obj
     return scaled_obj
 
+def homogenize(bc):
+    bc_copy = compatibility.bc(bc)
+    bc_copy.homogenize()
+    return bc_copy
 
 def constant_to_array(c):
     """ Converts a Constant to a numpy.array. """
@@ -64,20 +69,6 @@ def gather(vec):
       arr = vec # Assume it's a gathered numpy array already
 
   return arr
-
-def randomise(x):
-    """ Randomises the content of x, where x can be a Function or a numpy.array.
-    """
-
-    if hasattr(x, "vector"):
-        vec = x.vector()
-        vec_size = vec.local_size()
-        vec.set_local(numpy.random.random(vec_size))
-        vec.apply("")
-    else:
-        # Make sure we get consistent values in MPI environments
-        numpy.random.seed(seed=21)
-        x[:] = numpy.random.random(len(x))
 
 def convergence_order(errors, base = 2):
   import math
@@ -115,7 +106,7 @@ def test_initial_condition_adjoint(J, ic, final_adjoint, seed=0.01, perturbation
   # Randomise the perturbation direction:
   if perturbation_direction is None:
     perturbation_direction = backend.Function(ic.function_space())
-    randomise(perturbation_direction)
+    compatibility.randomise(perturbation_direction)
 
   # Run the forward problem for various perturbed initial conditions
   functional_values = []
@@ -207,7 +198,7 @@ def test_initial_condition_tlm(J, dJ, ic, seed=0.01, perturbation_direction=None
   # Randomise the perturbation direction:
   if perturbation_direction is None:
     perturbation_direction = backend.Function(ic.function_space())
-    randomise(perturbation_direction)
+    compatibility.randomise(perturbation_direction)
 
   # Run the forward problem for various perturbed initial conditions
   functional_values = []
@@ -266,7 +257,7 @@ def test_initial_condition_adjoint_cdiff(J, ic, final_adjoint, seed=0.01, pertur
   # Randomise the perturbation direction:
   if perturbation_direction is None:
     perturbation_direction = backend.Function(ic.function_space())
-    randomise(perturbation_direction)
+    compatibility.randomise(perturbation_direction)
 
   # Run the forward problem for various perturbed initial conditions
   functional_values_plus = []
@@ -387,7 +378,7 @@ def test_scalar_parameters_adjoint(J, a, dJda, seed=0.1):
 
   return min(convergence_order(with_gradient))
 
-def test_gradient_array(J, dJdx, x, seed = 0.01, perturbation_direction = None, random_seed = 118):
+def test_gradient_array(J, dJdx, x, seed = 0.01, perturbation_direction = None):
   '''Checks the correctness of the derivative dJ.
      x must be an array that specifies at which point in the parameter space
      the gradient is to be checked, and dJdx must be an array containing the gradient.
@@ -406,7 +397,7 @@ def test_gradient_array(J, dJdx, x, seed = 0.01, perturbation_direction = None, 
   # Randomise the perturbation direction:
   if perturbation_direction is None:
     perturbation_direction = x.copy()
-    randomise(perturbation_direction)
+    compatibility.randomise(perturbation_direction)
 
   # Run the forward problem for various perturbed initial conditions
   functional_values = []
@@ -437,6 +428,18 @@ def test_gradient_array(J, dJdx, x, seed = 0.01, perturbation_direction = None, 
   info("Convergence orders for Taylor remainder with adjoint information (should all be 2): %s" % str(convergence_order(with_gradient)))
 
   return min(convergence_order(with_gradient))
+
+def taylor_remainder_with_gradient(m, Jm, dJdm, functional_value, perturbation, ic=None):
+   """ Compute the Taylor remainder with the provided gradient information. Note that this
+   computes the remainder for just one functional value. """
+   import controls
+   if isinstance(m, controls.ConstantControl):
+      remainder = abs(functional_value - Jm - float(dJdm)*perturbation)
+   elif isinstance(m, controls.ConstantControls):
+      remainder = abs(functional_value - Jm - numpy.dot(dJdm, perturbation))
+   elif isinstance(m, controls.FunctionControl):
+      remainder = abs(functional_value - Jm - dJdm.vector().inner(perturbation.vector()))
+   return remainder
 
 def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None, value=None):
   '''J must be a function that takes in a parameter value m and returns the value
@@ -515,8 +518,8 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
       perturbation_direction = numpy.array([get_const(x)/5.0 for x in m.v])
     elif isinstance(m, controls.FunctionControl):
       ic = get_value(m, value)
-      perturbation_direction = backend.Function(ic)
-      randomise(perturbation_direction)
+      perturbation_direction = backend.Function(ic.function_space())
+      compatibility.randomise(perturbation_direction)
     else:
       raise libadjoint.exceptions.LibadjointErrorNotImplemented("Don't know how to compute a perturbation direction")
   else:
@@ -530,13 +533,8 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
     perturbations = []
     for x in perturbation_sizes:
       perturbation = backend.Function(perturbation_direction)
-      if backend.__name__  == "dolfin":
-        vec = perturbation.vector()
-        vec *= x
-      else:
-        with perturbation.dat.vec as vec:
-          vec *= x
-
+      vec = perturbation.vector()
+      vec *= x
       perturbations.append(perturbation)
 
   # And now the perturbed inputs:
@@ -553,11 +551,8 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
     pinputs = []
     for x in perturbations:
       pinput = backend.Function(x)
-      if backend.__name__  == "dolfin":
-        pinput.vector()[:] += ic.vector()
-      else:
-        pinput += ic
-
+      vec = pinput.vector()
+      vec += ic.vector()
       pinputs.append(pinput)
 
   # Issue 34: We must evaluate HJm before we evaluate the tape at the
@@ -581,22 +576,13 @@ def taylor_test(J, m, Jm, dJdm, HJm=None, seed=None, perturbation_direction=None
   info("Convergence orders for Taylor remainder without gradient information (should all be 1): " + str(convergence_order(no_gradient)))
 
   with_gradient = []
-  if isinstance(m, controls.ConstantControl):
-    for i in range(len(perturbations)):
-      remainder = abs(functional_values[i] - Jm - float(dJdm)*perturbations[i])
-      with_gradient.append(remainder)
-  elif isinstance(m, controls.ConstantControls):
-    for i in range(len(perturbations)):
-      remainder = abs(functional_values[i] - Jm - numpy.dot(dJdm, perturbations[i]))
-      with_gradient.append(remainder)
-  elif isinstance(m, controls.FunctionControl):
-    for i in range(len(perturbations)):
-      if backend.__name__  == "dolfin":
-        remainder = abs(functional_values[i] - Jm - dJdm.vector().inner(perturbations[i].vector()))
-      else:
-        remainder = abs(functional_values[i] - Jm - numpy.dot(dJdm.vector().array(), perturbations[i].vector().array()))
-      with_gradient.append(remainder)
-
+  for i in range(len(perturbations)):
+     if isinstance(m, controls.ConstantControl) or isinstance(m, controls.ConstantControls):
+        remainder = taylor_remainder_with_gradient(m, Jm, dJdm, functional_values[i], perturbations[i])
+     else:
+        remainder = taylor_remainder_with_gradient(m, Jm, dJdm, functional_values[i], perturbations[i], ic=ic)
+     with_gradient.append(remainder)
+      
   if min(with_gradient + no_gradient) < 1e-16:
     warning("Warning: The Taylor remainders are close to machine precision (< %s). Try increasing the seed value in case the Taylor remainder test fails." % min(with_gradient + no_gradient))
 
