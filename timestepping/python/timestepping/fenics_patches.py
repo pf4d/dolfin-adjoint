@@ -54,14 +54,14 @@ from versions import *
 
 __all__ = []
 
-# Only versions 1.3.x, 1.4.x, and 1.5.x have been tested.
-if dolfin_version() < (1, 3, 0) or dolfin_version() >= (1, 6, 0):
+# Only versions 1.5.x and 1.6.x have been tested.
+if dolfin_version() < (1, 5, 0) or dolfin_version() >= (1, 7, 0):
   dolfin.warning("DOLFIN version %s not supported" % dolfin.__version__)
-if ufl_version() < (1, 3, 0) or ufl_version() >= (1, 6, 0):
+if ufl_version() < (1, 5, 0) or ufl_version() >= (1, 7, 0):
   dolfin.warning("UFL version %s not supported" % ufl.__version__)
-if ffc_version() < (1, 3, 0) or ffc_version() >= (1, 6, 0):
+if ffc_version() < (1, 5, 0) or ffc_version() >= (1, 7, 0):
   dolfin.warning("FFC version %s not supported" % ffc.__version__)
-if instant_version() < (1, 3, 0) or instant_version() >= (1, 6, 0):
+if instant_version() < (1, 5, 0) or instant_version() >= (1, 7, 0):
   dolfin.warning("Instant version %s not supported" % instant.__version__)
 
 # DOLFIN patches.
@@ -545,7 +545,7 @@ if dolfin_version() >= (1, 4, 0) and dolfin_version() < (1, 5, 0):
     return
   dolfin.GenericVector.resize = GenericVector_resize
   del(GenericVector_resize)
-if dolfin_version() >= (1, 4, 0) and dolfin_version() < (1, 6, 0):
+if dolfin_version() >= (1, 4, 0) and dolfin_version() < (1, 7, 0):
   __all__ += \
     [
       "info_blue",
@@ -556,35 +556,19 @@ if dolfin_version() >= (1, 4, 0) and dolfin_version() < (1, 6, 0):
   info_blue = dolfin.info_blue = lambda message : dolfin.info(ufl.log.BLUE % message)
   info_green = dolfin.info_green = lambda message : dolfin.info(ufl.log.GREEN % message)
   info_red = dolfin.info_red = lambda message : dolfin.info(ufl.log.RED % message)
-  
-  def MPI_num_processes(self):
-    return dolfin.MPI.size(dolfin.mpi_comm_world())
-  dolfin.MPI.num_processes = types.MethodType(MPI_num_processes, dolfin.MPI)
-  del(MPI_num_processes)
+if dolfin_version() < (1, 6, 0):
+  __all__ += \
+    [
+      "RectangleMesh"
+    ]
 
-  def MPI_process_number(self):
-    return dolfin.MPI.rank(dolfin.mpi_comm_world())
-  dolfin.MPI.process_number = types.MethodType(MPI_process_number, dolfin.MPI)
-  del(MPI_process_number)
-
-  __MPI_sum_orig = dolfin.MPI.sum
-  def MPI_sum(self, *args):
-    if len(args) == 1:
-      return __MPI_sum_orig(dolfin.mpi_comm_world(), args[0])
+  def RectangleMesh(*args, **kwargs):
+    if len(args) >= 2 and isinstance(args[0], dolfin.Point) and isinstance(args[1], dolfin.Point):
+      return dolfin.RectangleMesh(args[0].x(), args[0].y(), args[1].x(), args[1].y(), *args[2:], **kwargs)
+    elif len(args) >= 3 and isinstance(args[1], dolfin.Point) and isinstance(args[2], dolfin.Point):
+      return dolfin.RectangleMesh(args[0], args[1].x(), args[1].y(), args[2].x(), args[2].y(), *args[3:], **kwargs)
     else:
-      return __MPI_sum_orig(*args)
-  dolfin.MPI.sum = types.MethodType(MPI_sum, dolfin.MPI)
-  del(MPI_sum)
-  
-  __MPI_barrier_orig = dolfin.MPI.barrier
-  def MPI_barrier(self, *args):
-    if len(args) == 0:
-      __MPI_barrier_orig(dolfin.mpi_comm_world())
-    else:
-      __MPI_barrier_orig(*args)
-    return
-  dolfin.MPI.barrier = types.MethodType(MPI_barrier, dolfin.MPI)
-  del(MPI_barrier)
+      return dolfin.RectangleMesh(*args, **kwargs)      
 
 # UFL patches.
 if ufl_version() < (1, 1, 0):

@@ -106,7 +106,7 @@ class AssemblyCache(object):
     return
 
   def assemble(self, form, form_compiler_parameters = {}, bcs = [],
-    symmetric_bcs = False, compress = False):
+    symmetric_bcs = False):
     """
     Return the result of assembling the supplied Form.
 
@@ -116,7 +116,6 @@ class AssemblyCache(object):
       bcs: Dirichlet BCs applied to a matrix.
       symmetric_bcs: Whether Dirichlet BCs should be applied so as to yield a
         symmetric matrix.
-      compress: Whether a matrix should be compressed.
     """
     
     if not isinstance(form, ufl.form.Form):
@@ -135,36 +134,22 @@ class AssemblyCache(object):
 
     rank = form_rank(form)
     if len(bcs) == 0:
-      if not rank == 2:
-        compress = None
-      key = (form_key(form), parameters_key(form_compiler_parameters), bc_key(bcs, symmetric_bcs), compress)
+      key = (form_key(form), parameters_key(form_compiler_parameters), bc_key(bcs, symmetric_bcs))
       if not key in self.__cache:
         cache_info("Assembling form with rank %i" % rank, dolfin.info_red)
         self.__cache[key] = assemble(form, form_compiler_parameters = form_compiler_parameters)
-        if rank == 2 and compress:
-          dolfin.warning("Matrix compression deprecated")
-          if dolfin_version() < (1, 4, 0):
-            self.__cache[key].compress()
-          elif dolfin_version() < (1, 5, 0):
-            self.__cache[key].compressed(self.__cache[key])
       else:
         cache_info("Using cached assembled form with rank %i" % rank, dolfin.info_green)
     else:
       if not rank == 2:
         raise InvalidArgumentException("form must be rank 2 when applying boundary conditions")
 
-      key = (form_key(form), parameters_key(form_compiler_parameters), bc_key(bcs, symmetric_bcs), compress)
+      key = (form_key(form), parameters_key(form_compiler_parameters), bc_key(bcs, symmetric_bcs))
       if not key in self.__cache:
         cache_info("Assembling form with rank 2, with boundary conditions", dolfin.info_red)
         mat = assemble(form, form_compiler_parameters = form_compiler_parameters)
         apply_bcs(mat, bcs, symmetric_bcs = symmetric_bcs)
         self.__cache[key] = mat
-        if compress:
-          dolfin.warning("Matrix compression deprecated")
-          if dolfin_version() < (1, 4, 0):
-            mat.compress()
-          elif dolfin_version() < (1, 5, 0):
-            mat.compressed(mat)
       else:
         cache_info("Using cached assembled form with rank 2, with boundary conditions", dolfin.info_green)
 

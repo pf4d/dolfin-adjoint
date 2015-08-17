@@ -382,13 +382,11 @@ def da_annotate_equation_solve(solve):
             if not self.parameters["equations"]["symmetric_boundary_conditions"] and len(bcs) > 0 and static_bcs:
               # Cache with boundary conditions
               a = assembly_cache.assemble(self.data,
-                bcs = bcs, symmetric_bcs = False,
-                compress = self.parameters["bilinear_forms"]["compress_matrices"])
+                bcs = bcs, symmetric_bcs = False)
               apply_a_bcs = False
             elif len(bcs) == 0:
               # Cache, no boundary conditions
-              a = assembly_cache.assemble(self.data,
-                compress = self.parameters["bilinear_forms"]["compress_matrices"])
+              a = assembly_cache.assemble(self.data)
               apply_a_bcs = False              
             else:
               # Cache without boundary conditions

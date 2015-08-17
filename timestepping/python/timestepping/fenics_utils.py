@@ -73,12 +73,7 @@ def form_quadrature_degree(form):
     # This is based upon code from _analyze_form and
     # _attach_integral_metadata in analysis.py, FFC bzr trunk revision 1761
     form = copy.copy(form)
-    if ufl_version() < (1, 5, 0):
-      form_data = form.form_data()
-      if form_data is None:
-        form_data = form.compute_form_data()
-    else:
-      form_data = ffc.analysis._analyze_form(form, dolfin.parameters["form_compiler"])
+    form_data = ffc.analysis._analyze_form(form, dolfin.parameters["form_compiler"])
     quadrature_degree = -1
     for integral in form.integrals():
       rep = dolfin.parameters["form_compiler"]["representation"]
@@ -315,42 +310,23 @@ def expand(form, dim = None):
 
   return ufl.algorithms.expand_indices(ufl.algorithms.expand_compounds(ufl.algorithms.expand_derivatives(form, dim = dim)))
 
-if dolfin_version() < (1, 4, 0):
-  def extract_test_and_trial(form):
-    """
-    Extract the test and trial function from a bi-linear form.
-    """
+def extract_test_and_trial(form):
+  """
+  Extract the test and trial function from a bi-linear form.
+  """
 
-    if not isinstance(form, ufl.form.Form):
-      raise InvalidArgumentException("form must be a Form")
+  if not isinstance(form, ufl.form.Form):
+    raise InvalidArgumentException("form must be a Form")
 
-    args = ufl.algorithms.extract_arguments(form)
-    if not len(args) == 2:
-      raise InvalidArgumentException("form must be a bi-linear Form")
-    test, trial = args
-    if test.count() > trial.count():
-      test, trial = trial, test
-    assert(test.count() == trial.count() - 1)
+  args = ufl.algorithms.extract_arguments(form)
+  if not len(args) == 2:
+    raise InvalidArgumentException("form must be a bi-linear Form")
+  test, trial = args
+  if test.number() > trial.number():
+    test, trial = trial, test
+  assert(test.number() == trial.number() - 1)
 
-    return test, trial
-else:
-  def extract_test_and_trial(form):
-    """
-    Extract the test and trial function from a bi-linear form.
-    """
-
-    if not isinstance(form, ufl.form.Form):
-      raise InvalidArgumentException("form must be a Form")
-
-    args = ufl.algorithms.extract_arguments(form)
-    if not len(args) == 2:
-      raise InvalidArgumentException("form must be a bi-linear Form")
-    test, trial = args
-    if test.number() > trial.number():
-      test, trial = trial, test
-    assert(test.number() == trial.number() - 1)
-
-    return test, trial
+  return test, trial
 
 def is_self_adjoint_form(form):
   """

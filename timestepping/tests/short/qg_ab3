@@ -114,7 +114,7 @@ for i in xrange(1, len(ss)):
 assert(mss < 6.0e-13)
 ss = [Constant(ss[i]) for i in xrange(layers)]
 
-mesh   = RectangleMesh(0.0, 0.0, L, L, ngrid, ngrid)
+mesh   = RectangleMesh(Point(0.0, 0.0), Point(L, L), ngrid, ngrid)
 nm     = FacetNormal(mesh)
 space  = FunctionSpace(mesh, "CG", 1)
 cspace = FunctionSpace(mesh, "R",  0)
@@ -257,7 +257,7 @@ def check(f, ref, tol, scale = None):
   if not scale is None:
     v *= scale
   err = abs(v - ref)
-  if MPI.process_number() == 0:
+  if MPI.rank(mpi_comm_world()) == 0:
     print("%.16e %.16e %.16e" % (v, ref, err))
   assert(err < tol)
   return

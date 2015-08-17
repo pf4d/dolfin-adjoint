@@ -35,7 +35,7 @@ parameters["std_out_all_processes"] = False;
 
 # Load mesh from file
 #mesh = Mesh("lshape.xml.gz")
-mesh = UnitSquareMesh(2, 2)
+mesh = UnitSquareMesh(192, 192)
 
 # Define function spaces (P2-P1)
 V = VectorFunctionSpace(mesh, "CG", 2)
@@ -147,6 +147,7 @@ if __name__ == "__main__":
 
   ic = Function(V)
   soln = main(ic)
+  print("%.16e" % soln.vector().norm("l2"))
   parameters["adjoint"]["stop_annotating"] = True
 
   adj_html("forward.html", "forward")
@@ -157,6 +158,7 @@ if __name__ == "__main__":
   Jm = assemble(inner(soln, soln)**1*dx + inner(ic, ic)*dx)
   rf = ReducedFunctional(J, m)
   dJdm = rf.derivative(forget=None)[0]
+  print("%.16e" % dJdm.vector().norm("l2"))
   HJm  = lambda m_dot: rf.hessian(m_dot)[0]
 
   def J(ic):

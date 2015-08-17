@@ -313,16 +313,14 @@ class PAAdjointSolvers(object):
           static_form = is_static_form(self.__a_a_forms[i])
           if len(self.__a_bcs[i]) > 0 and static_bcs and static_form:
             a_a = assembly_cache.assemble(self.__a_a_forms[i],
-              bcs = self.__a_bcs[i], symmetric_bcs = self.__a_pre_assembly_parameters[i]["equations"]["symmetric_boundary_conditions"],
-              compress = self.__a_pre_assembly_parameters[i]["bilinear_forms"]["compress_matrices"])
+              bcs = self.__a_bcs[i], symmetric_bcs = self.__a_pre_assembly_parameters[i]["equations"]["symmetric_boundary_conditions"])
             a_solver = linear_solver_cache.linear_solver(self.__a_a_forms[i],
               self.__a_solver_parameters[i],
               bcs = self.__a_bcs[i], symmetric_bcs = self.__a_pre_assembly_parameters[i]["equations"]["symmetric_boundary_conditions"],
               a = a_a)
             a_solver.set_operator(a_a)
           elif len(self.__a_bcs[i]) == 0 and static_form:
-            a_a = assembly_cache.assemble(self.__a_a_forms[i],
-              compress = self.__a_pre_assembly_parameters[i]["bilinear_forms"]["compress_matrices"])
+            a_a = assembly_cache.assemble(self.__a_a_forms[i])
             a_solver = linear_solver_cache.linear_solver(self.__a_a_forms[i],
               self.__a_solver_parameters[i],
               a = a_a)

@@ -39,30 +39,17 @@ __all__ = \
     "PAStaticFilter"
   ]
 
-if dolfin_version() < (1, 4, 0):
-  def preprocess_integral(integral):
-    """
-    Given an Integral associated with the given Form, return the integrand and
-    a list of arguments which can be used to construct an Integral from the
-    integrand.
-    """
-    
-    integrand = integral.integrand()
-    domain_type, domain_description, compiler_data, domain_data = \
-      integral.domain_type(), integral.domain_description(), integral.compiler_data(), integral.domain_data()
-    return integrand, [domain_type, domain_description, compiler_data, domain_data]
-else:
-  def preprocess_integral(integral):
-    """
-    Given an Integral associated with the given Form, return the integrand and
-    a list of arguments which can be used to construct an Integral from the
-    integrand.
-    """
-    
-    integrand = integral.integrand()
-    integral_type, domain, subdomain_id, metadata, subdomain_data = \
-      integral.integral_type(), integral.domain(), integral.subdomain_id(), integral.metadata(), integral.subdomain_data()
-    return integrand, [integral_type, domain, subdomain_id, metadata, subdomain_data]
+def preprocess_integral(integral):
+  """
+  Given an Integral associated with the given Form, return the integrand and
+  a list of arguments which can be used to construct an Integral from the
+  integrand.
+  """
+
+  integrand = integral.integrand()
+  integral_type, domain, subdomain_id, metadata, subdomain_data = \
+    integral.integral_type(), integral.domain(), integral.subdomain_id(), integral.metadata(), integral.subdomain_data()
+  return integrand, [integral_type, domain, subdomain_id, metadata, subdomain_data]
 
 def matrix_optimisation(form):
   """
@@ -94,7 +81,7 @@ def matrix_optimisation(form):
   # the linear form
   mat_form = derivative(form, fn,
     # Hack to work around an obscure FEniCS bug
-    expand = dolfin.MPI.num_processes() == 1 or
+    expand = dolfin.MPI.size(dolfin.mpi_comm_world()) == 1 or
       (not is_r0_function_space(args[0].function_space()) and not is_r0_function(fn)))
   if n_non_static_coefficients(mat_form) > 0:
     # The form is non-linear
@@ -161,23 +148,13 @@ class PAFilter(object):
       
     return
   
-  def _cache_assemble(self, form, compress = False):
+  def _cache_assemble(self, form):
     return assembly_cache.assemble(form,
-      form_compiler_parameters = {"quadrature_degree":self._quadrature_degree},
-      compress = compress)
+      form_compiler_parameters = {"quadrature_degree":self._quadrature_degree})
  
-  if dolfin_version() < (1, 4, 0):
-    def _assemble(self, form, tensor = None):
-      if tensor is None:
-        return assemble(form,
-          form_compiler_parameters = {"quadrature_degree":self._quadrature_degree})
-      else:
-        return assemble(form, tensor = tensor, reset_sparsity = False,
-          form_compiler_parameters = {"quadrature_degree":self._quadrature_degree})
-  else:
-    def _assemble(self, form, tensor = None):
-      return assemble(form, tensor = tensor,
-        form_compiler_parameters = {"quadrature_degree":self._quadrature_degree})
+  def _assemble(self, form, tensor = None):
+    return assemble(form, tensor = tensor,
+      form_compiler_parameters = {"quadrature_degree":self._quadrature_degree})
   
   def add(self, form):
     """
@@ -287,7 +264,7 @@ class PAStaticFilter(PAFilter):
     if self._n == 0:
       return
     
-    self.__pre_assembled = self._cache_assemble(self._form, compress = self.pre_assembly_parameters["compress_matrices"])
+    self.__pre_assembled = self._cache_assemble(self._form)
     
     return
   
@@ -407,7 +384,7 @@ class PAMatrixFilter(PAFilter):
     
     self.__pre_assembled = OrderedDict()
     for fn in self.__L:
-      self.__pre_assembled[fn] = self._cache_assemble(self.__L[fn], compress = self.pre_assembly_parameters["compress_matrices"])
+      self.__pre_assembled[fn] = self._cache_assemble(self.__L[fn])
  
     return
   

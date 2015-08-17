@@ -29,7 +29,7 @@ numpy.random.seed(0)
 if "reorder_dofs_serial" in parameters:
   parameters["reorder_dofs_serial"] = False
 
-solver = {"linear_solver":"bicgstab", "preconditioner":"bjacobi", "krylov_solver":{"relative_tolerance":1.0e-16, "absolute_tolerance":1.0e-16}}
+solver = {"linear_solver":"bicgstab", "preconditioner":"ilu", "krylov_solver":{"relative_tolerance":1.0e-16, "absolute_tolerance":1.0e-16}}
 
 Constant = StaticConstant
 

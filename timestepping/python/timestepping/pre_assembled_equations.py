@@ -189,8 +189,7 @@ class PAEquationSolver(EquationSolver):
           static_form = is_static_form(eq.lhs)
           if not pre_assembly_parameters["equations"]["symmetric_boundary_conditions"] and len(bcs) > 0 and static_bcs and static_form:
             a = assembly_cache.assemble(eq.lhs,
-              bcs = bcs, symmetric_bcs = False,
-              compress = pre_assembly_parameters["bilinear_forms"]["compress_matrices"])
+              bcs = bcs, symmetric_bcs = False)
             cache_info("Pre-assembled LHS terms in solve for %s    : 1" % x.name())
             cache_info("Non-pre-assembled LHS terms in solve for %s: 0" % x.name())
             linear_solver = linear_solver_cache.linear_solver(eq.lhs,
@@ -199,8 +198,7 @@ class PAEquationSolver(EquationSolver):
               a = a)
             linear_solver.set_operator(a)
           elif len(bcs) == 0 and static_form:
-            a = assembly_cache.assemble(eq.lhs,
-              compress = pre_assembly_parameters["bilinear_forms"]["compress_matrices"])
+            a = assembly_cache.assemble(eq.lhs)
             cache_info("Pre-assembled LHS terms in solve for %s    : 1" % x.name())
             cache_info("Non-pre-assembled LHS terms in solve for %s: 0" % x.name())
             linear_solver = linear_solver_cache.linear_solver(eq.lhs,

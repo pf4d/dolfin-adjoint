@@ -2,7 +2,7 @@
 
 # Copyright (C) 2011-2012 by Imperial College London
 # Copyright (C) 2013 University of Oxford
-# Copyright (C) 2014 University of Edinburgh
+# Copyright (C) 2014-2015 University of Edinburgh
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -47,7 +47,7 @@ def read_vtu(filename, space):
     raise InvalidArgumentException("filename must be a string")
   if not isinstance(space, dolfin.FunctionSpaceBase):
     raise InvalidArgumentException("space must be a FunctionSpace")
-  if dolfin.MPI.num_processes() > 1:
+  if dolfin.MPI.size(dolfin.mpi_comm_world()) > 1:
     raise NotImplementedException("read_vtu cannot be used with more than one MPI process")
 
   mesh = space.mesh()
@@ -412,11 +412,11 @@ def write_vtu(filename, fns, index = None, t = None):
         vtu.GetPointData().AddArray(point_data)
       vtu.GetPointData().SetActiveScalars(names[e][0])
 
-    if dolfin.MPI.num_processes() > 1:
+    if dolfin.MPI.size(dolfin.mpi_comm_world()) > 1:
       writer = vtk.vtkXMLPUnstructuredGridWriter()
-      writer.SetNumberOfPieces(dolfin.MPI.num_processes())
-      writer.SetStartPiece(dolfin.MPI.process_number())
-      writer.SetEndPiece(dolfin.MPI.process_number())
+      writer.SetNumberOfPieces(dolfin.MPI.size(dolfin.mpi_comm_world()))
+      writer.SetStartPiece(dolfin.MPI.rank(dolfin.mpi_comm_world()))
+      writer.SetEndPiece(dolfin.MPI.rank(dolfin.mpi_comm_world()))
       ext = ".pvtu"
     else:
       writer = vtk.vtkXMLUnstructuredGridWriter()

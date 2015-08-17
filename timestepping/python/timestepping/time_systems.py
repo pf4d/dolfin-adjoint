@@ -1839,7 +1839,7 @@ class ManagedModel(object):
 
     class Packer(object):
       def __init__(self, parameters):
-        p = dolfin.MPI.process_number()
+        p = dolfin.MPI.rank(dolfin.mpi_comm_world())
 
         l_N = 0
         l_indices = []
@@ -1854,7 +1854,7 @@ class ManagedModel(object):
           l_indices.append((l_N, l_N + n))
           l_N += n
 
-        n_p = dolfin.MPI.num_processes()
+        n_p = dolfin.MPI.size(dolfin.mpi_comm_world())
         if n_p > 1:
           import mpi4py.MPI as MPI
           
@@ -1973,7 +1973,7 @@ class ManagedModel(object):
               val = arr[start]
             else:
               val = 0.0
-            parameter.assign(dolfin.MPI.sum(val))
+            parameter.assign(dolfin.MPI.sum(dolfin.mpi_comm_world(), val))
           else:
             assert(isinstance(parameter, dolfin.Function))
             parameter.vector().set_local(arr[start:end])
