@@ -58,7 +58,12 @@ def annotate(*args, **kwargs):
     u  = unpacked_args[1]
     bcs = unpacked_args[2]
     J = unpacked_args[3]
-    solver_parameters = copy.deepcopy(unpacked_args[7])
+    # create a deep copy of the parameters. They can be of type
+    # backend.Parameters or just a list
+    if type(unpacked_args[7]) == backend.Parameters:
+        solver_parameters = backend.Parameters(unpacked_args[7])
+    else:
+        solver_parameters = copy.deepcopy(unpacked_args[7])
 
     if isinstance(eq.lhs, ufl.Form) and isinstance(eq.rhs, ufl.Form):
       eq_lhs = eq.lhs
