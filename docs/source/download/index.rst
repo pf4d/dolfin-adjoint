@@ -10,7 +10,7 @@ Dependencies
 Mandatory dependencies:
 -----------------------
 
-- `FEniCS`_, version 1.5. For installation instructions for FEniCS/dolfin, see `their installation instructions`_.
+- `FEniCS`_, version 1.6. For installation instructions for FEniCS/dolfin, see `their installation instructions`_.
 
 - `libadjoint`_. This is a library written in C that manipulates the tape of the forward model to derive the associated adjoint equations.
 
@@ -36,18 +36,18 @@ Virtual machine
 ===============
 
 If you'd like to try dolfin-adjoint out without any installation headaches,
-try out `our VirtualBox virtual machine with dolfin-adjoint 1.4 installed
-<http://amcg.ese.ic.ac.uk/~pef/vm/dolfin-adjoint-1.4.ova>`_. Here are
+try out `the FENICS VirtualBox virtual machine with FEniCS and dolfin-adjoint pre-installed
+<http://fenicsproject.org/pub/virtual/fenics-latest.ova>`_. Here are
 the instructions:
 
 * Download and install VirtualBox from https://www.virtualbox.org, or from your operating system.
-* Download the `virtual machine <http://amcg.ese.ic.ac.uk/~pef/vm/dolfin-adjoint-1.4.ova>`_.
+* Download the `virtual machine <http://fenicsproject.org/pub/virtual/fenics-latest.ova>`_.
 * Start VirtualBox, click on "File -> Import Appliance", select the virtual machine image and click on "Import".
 * Select the "dolfin-adjoint VM" and click on "Start" to boot the machine.
 * For installing new software you need the login credentials:
 
   * Username: fenics
-  * Password: dolfinadjoint
+  * Password: fenics
 
 Binary packages
 ===============
@@ -69,27 +69,27 @@ Once that's done, why not try out the :doc:`tutorial <../documentation/tutorial>
 From source
 ===========
 
-The latest stable release of dolfin-adjoint and libadjoint is **version 1.5** which is compatible with FEniCS 1.5. Download links:
+The latest stable release of dolfin-adjoint and libadjoint is **version 1.6** which is compatible with FEniCS 1.6. Download links:
 
-* libadjoint: `https://bitbucket.org/dolfin-adjoint/libadjoint/get/libadjoint-1.5.zip`_
-* dolfin-adjoint: `https://bitbucket.org/dolfin-adjoint/dolfin-adjoint/get/dolfin-adjoint-1.5.zip`_
+* libadjoint: `https://bitbucket.org/dolfin-adjoint/libadjoint/get/libadjoint-1.6.zip`_
+* dolfin-adjoint: `https://bitbucket.org/dolfin-adjoint/dolfin-adjoint/get/dolfin-adjoint-1.6.zip`_
 
-.. _https://bitbucket.org/dolfin-adjoint/libadjoint/get/libadjoint-1.5.zip: https://bitbucket.org/dolfin-adjoint/libadjoint/get/libadjoint-1.5.zip
-.. _https://bitbucket.org/dolfin-adjoint/dolfin-adjoint/get/dolfin-adjoint-1.5.zip: https://bitbucket.org/dolfin-adjoint/dolfin-adjoint/get/dolfin-adjoint-1.5.zip
+.. _https://bitbucket.org/dolfin-adjoint/libadjoint/get/libadjoint-1.6.zip: https://bitbucket.org/dolfin-adjoint/libadjoint/get/libadjoint-1.6.zip
+.. _https://bitbucket.org/dolfin-adjoint/dolfin-adjoint/get/dolfin-adjoint-1.6.zip: https://bitbucket.org/dolfin-adjoint/dolfin-adjoint/get/dolfin-adjoint-1.6.zip
 
 The development version is available from `bitbucket`_ with the following
 command:
 
 .. code-block:: bash
 
-   hg clone https://bitbucket.org/dolfin-adjoint/dolfin-adjoint#dolfin-adjoint-1.5
+   git clone https://bitbucket.org/dolfin-adjoint/dolfin-adjoint
 
 The development version of libadjoint is also available from bitbucket with the
 following command:
 
 .. code-block:: bash
 
-   hg clone https://bitbucket.org/dolfin-adjoint/libadjoint#libadjoint-1.5
+   hg clone https://bitbucket.org/dolfin-adjoint/libadjoint
 
 As dolfin-adjoint is a pure Python module, once its dependencies are
 installed the development version can be used without system-wide
@@ -106,6 +106,11 @@ cases or examples) are very welcome.
 
 Older versions
 ==============
+
+An older version, that is compatible with FEniCS 1.5 can be downloaded with:
+
+* libadjoint: `https://bitbucket.org/dolfin-adjoint/libadjoint/downloads/libadjoint-1.5.tar.gz`_
+* dolfin-adjoint: `https://bitbucket.org/dolfin-adjoint/dolfin-adjoint/downloads/dolfin-adjoint-1.5.tar.gz`_
 
 An older version, that is compatible with FEniCS 1.4 can be downloaded with:
 
