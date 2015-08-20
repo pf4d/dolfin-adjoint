@@ -188,30 +188,40 @@ class Vector(libadjoint.Vector):
 
   def write(self, var):
     filename = str(var)
-    suffix = "xml"
+    suffix = "h5"
+
+    # Change naming scheme for compatibility with HDF5File routines
+    filename = filename.replace(":","-")
+
     #if not os.path.isfile(filename+".%s" % suffix):
     #  backend.info_red("Warning: Overwriting checkpoint file "+filename+"."+suffix)
-    file = backend.File(filename+".%s" % suffix)
-    file << self.data
+    file = backend.HDF5File(backend.mpi_comm_world(), filename+".%s" % suffix, "w")
+    file.write(self.data, filename)
+    file.close()
 
     # Save the function space into adjglobals.checkpoint_fs. It will be needed when reading the variable back in.
     adjglobals.checkpoint_fs[filename] = self.data.function_space()
 
   @staticmethod
   def read(var):
-
     filename = str(var)
-    suffix = "xml"
+    filename = filename.replace(":","-")
+    suffix = "h5"
 
     V = adjglobals.checkpoint_fs[filename]
-    v = backend.Function(V, filename+".%s" % suffix)
+    v = backend.Function(V)
+    file = backend.HDF5File(backend.mpi_comm_world(), filename+".%s" % suffix, "r")
+    file.read(v, filename)
+    file.close()
+
     return Vector(v)
 
   @staticmethod
   def delete(var):
     try:
       filename = str(var)
-      suffix = "xml"
+      filename = filename.replace(":","-")
+      suffix = "h5"
 
       import os
       os.remove(filename+".%s" % suffix)

@@ -1,8 +1,8 @@
 """ Solves a optimal control problem constrained by the Poisson equation:
 
     min_(u, m) \int_\Omega 1/2 || u - d ||^2 + 1/2 || f ||^2
-
-    subject to
+    
+    subjecct to 
 
     grad \cdot \grad u = f    in \Omega
     u = 0                     on \partial \Omega
@@ -11,7 +11,6 @@
 """
 from dolfin import *
 from dolfin_adjoint import *
-
 
 set_log_level(ERROR)
 
@@ -28,12 +27,12 @@ mesh = refine(mesh, cf)
 V = FunctionSpace(mesh, "CG", 1)
 W = FunctionSpace(mesh, "DG", 0)
 
-f = interpolate(Expression("x[0]+x[1]"), W, name='Control')
+f = interpolate(Expression("0.11"), W, name='Control')
 u = Function(V, name='State')
 v = TestFunction(V)
 
 # Define and solve the Poisson equation to generate the dolfin-adjoint annotation
-F = (inner(grad(u), grad(v)) - f*v)*dx
+F = (inner(grad(u), grad(v)) - f*v)*dx 
 bc = DirichletBC(V, 0.0, "on_boundary")
 solve(F == 0, u, bc)
 
@@ -47,8 +46,33 @@ control = Control(f)
 rf = ReducedFunctional(J, control)
 
 problem = MinimizationProblem(rf)
-parameters = None
+#parameters = None
+parameters = { "monitor": None,
+               "type": "lmvm",
+               "max_it": 100,
+               "subset_type": "matrixfree",
+               "fatol": 0.0,
+               "frtol": 1e-9,
+               "gatol": 0.0,
+               "grtol": 0.0,
+             }
 
-solver = IPOPTSolver(problem, parameters=parameters)
+solver = TAOSolver(problem, parameters=parameters)
 f_opt = solver.solve()
 plot(f_opt, interactive=True)
+
+# Define the expressions of the analytical solution
+
+f_analytic = Expression("sin(pi*x[0])*sin(pi*x[1])")
+u_analytic = Expression("1/(2*pi*pi)*sin(pi*x[0])*sin(pi*x[1])")
+
+# We can then compute the errors between numerical and analytical
+# solutions.
+
+f.assign(f_opt)
+solve(F == 0, u, bc)
+control_error = errornorm(f_analytic, f_opt)
+state_error = errornorm(u_analytic, u)
+print "h(min):           %e." % mesh.hmin()
+print "Error in state:   %e." % state_error
+print "Error in control: %e." % control_error
