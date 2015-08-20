@@ -36,16 +36,16 @@ import functional
 import split_annotation
 
 if backend.__name__ == "dolfin":
-  import lusolver
+    import lusolver
 
 import gst
 import function
 
 if backend.__name__ == "dolfin":
-  import genericmatrix
-  import genericvector
-  import optimization
-  import reduced_functional
-  from optimization import optimization
+    import genericmatrix
+    import genericvector
+    import optimization
+    import reduced_functional
+    from optimization import optimization
 
 from ui import *

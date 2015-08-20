@@ -2,12 +2,12 @@
 from dolfin import *
 from dolfin_adjoint import *
 try:
-  from petsc4py import PETSc
-  PETSc.TAO
+    from petsc4py import PETSc
+    PETSc.TAO
 except Exception:
-  import sys
-  info_blue("PETSc bindings with TAO support unavailable, skipping test")
-  sys.exit(0)
+    import sys
+    info_blue("PETSc bindings with TAO support unavailable, skipping test")
+    sys.exit(0)
 
 
 # Set options
@@ -20,12 +20,12 @@ tao_args = """--petsc.tao_monitor
             --petsc.tao_nls_pc_type none
             --petsc.tao_ntr_pc_type none
            """.split()
-print "Tao arguments:", tao_args           
+print "Tao arguments:", tao_args
 parameters.parse(tao_args)
 
 def solve_pde(u, V, m):
     v = TestFunction(V)
-    F = (inner(grad(u), grad(v)) - m*v)*dx 
+    F = (inner(grad(u), grad(v)) - m*v)*dx
     bc = DirichletBC(V, 0.0, "on_boundary")
     solve(F == 0, u, bc)
 
@@ -40,14 +40,14 @@ if __name__ == "__main__":
 
     x = SpatialCoordinate(mesh)
 
-    u_d = 1/(2*pi**2)*sin(pi*x[0])*sin(pi*x[1]) 
+    u_d = 1/(2*pi**2)*sin(pi*x[0])*sin(pi*x[1])
 
     J = Functional((inner(u-u_d, u-u_d))*dx*dt[FINISH_TIME])
 
     # Run the forward model once to create the annotation
     solve_pde(u, V, m)
 
-    # Run the optimisation 
+    # Run the optimisation
     rf = ReducedFunctional(J, FunctionControl(m, value=m))
     problem = MinimizationProblem(rf)
     parameters = { 'method': 'nls',
@@ -80,4 +80,3 @@ if __name__ == "__main__":
     tao_p = solver.get_tao()
     assert tao_p.getGradientNorm() < 1e-9
     assert tao_p.getIterationNumber() <= 20
-

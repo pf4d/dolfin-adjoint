@@ -1,8 +1,8 @@
 """ Solves a optimal control problem constrained by the Poisson equation:
 
     min_(u, m) \int_\Omega 1/2 || u - d ||^2 + 1/2 || f ||^2
-    
-    subjecct to 
+
+    subjecct to
 
     grad \cdot \grad u = f    in \Omega
     u = 0                     on \partial \Omega
@@ -33,7 +33,7 @@ u = Function(V, name='State')
 v = TestFunction(V)
 
 # Define and solve the Poisson equation to generate the dolfin-adjoint annotation
-F = (inner(grad(u), grad(v)) - f*v)*dx 
+F = (inner(grad(u), grad(v)) - f*v)*dx
 bc = DirichletBC(V, 0.0, "on_boundary")
 solve(F == 0, u, bc)
 

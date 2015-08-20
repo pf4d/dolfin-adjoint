@@ -149,8 +149,8 @@ class DolfinVectorSpace(object):
     @staticmethod
     def __rand(x):
         if isinstance(x, GenericFunction):
-           xvec = x.vector()
-           xvec.set_local( numpy.random.random(xvec.local_size()) )
+            xvec = x.vector()
+            xvec.set_local( numpy.random.random(xvec.local_size()) )
         elif isinstance(x, Constant):
             raise NotImplementedError
         elif isinstance(x, numpy.ndarray):

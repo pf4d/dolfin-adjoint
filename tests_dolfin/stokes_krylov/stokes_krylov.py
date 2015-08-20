@@ -100,4 +100,4 @@ solver.solve(U.vector(), bb)
 
 success = replay_dolfin(tol=1.0e-10)
 if not success:
-  sys.exit(1)
+    sys.exit(1)

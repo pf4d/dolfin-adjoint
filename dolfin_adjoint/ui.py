@@ -34,16 +34,16 @@ from optimization.tao_solver import TAOSolver
 from optimization.riesz_maps import *
 
 if backend.__name__ == "dolfin":
-  from newton_solver import NewtonSolver
-  from krylov_solver import KrylovSolver
-  from linear_solver import LinearSolver
-  from lusolver import LUSolver
-  from localsolver import LocalSolver
-  from reduced_functional import ReducedFunctional
-  from reduced_functional_numpy import ReducedFunctionalNumPy, ReducedFunctionalNumpy
-  from optimization.optimization import minimize, maximize, print_optimization_methods, minimise, maximise
-  from optimization.multistage_optimization import minimize_multistage
-  from optimization.constraints import InequalityConstraint, EqualityConstraint
-  from pointintegralsolver import *
-  if hasattr(backend, 'FunctionAssigner'):
-    from functionassigner import FunctionAssigner
+    from newton_solver import NewtonSolver
+    from krylov_solver import KrylovSolver
+    from linear_solver import LinearSolver
+    from lusolver import LUSolver
+    from localsolver import LocalSolver
+    from reduced_functional import ReducedFunctional
+    from reduced_functional_numpy import ReducedFunctionalNumPy, ReducedFunctionalNumpy
+    from optimization.optimization import minimize, maximize, print_optimization_methods, minimise, maximise
+    from optimization.multistage_optimization import minimize_multistage
+    from optimization.constraints import InequalityConstraint, EqualityConstraint
+    from pointintegralsolver import *
+    if hasattr(backend, 'FunctionAssigner'):
+        from functionassigner import FunctionAssigner
