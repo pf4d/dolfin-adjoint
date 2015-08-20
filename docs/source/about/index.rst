@@ -31,6 +31,7 @@ where the model is implemented in the Python interface to DOLFIN.
 
 News
 ====
+**20.8.2015**: dolfin-adjoint 1.6 release (compatible to FEniCS 1.6)
 **11.6.2015**: P. E. Farrell, S. W. Funke, D. A. Ham and M. E. Rognes were awarded the 2015 `Wilkinson prize for numerical software`_ for dolfin-adjoint.
 
 
