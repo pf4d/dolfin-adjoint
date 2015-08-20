@@ -91,7 +91,7 @@ problem = MinimizationProblem(rf, bounds=(0.0,0.9))
 # For the problem without bound constraints, uncomment:
 #problem = MinimizationProblem(rf)
 
-parameters = { "type": "tron",
+parameters = { "type": "blmvm",
                "max_it": 2000,
                "fatol": 1e-100,
                "frtol": 0.0,
