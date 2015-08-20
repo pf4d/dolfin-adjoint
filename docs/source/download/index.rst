@@ -10,9 +10,9 @@ Dependencies
 Mandatory dependencies:
 -----------------------
 
-- `FEniCS`_, version 1.6. For installation instructions for FEniCS/dolfin, see `their installation instructions`_.
+- `FEniCS`_, version 1.6. For installation instructions for FEniCS, see `their installation instructions`_.
 
-- `libadjoint`_. This is a library written in C that manipulates the tape of the forward model to derive the associated adjoint equations.
+- `libadjoint`_, version 1.6. This is a library written in C that manipulates the tape of the forward model to derive the associated adjoint equations.
 
 Optional dependencies:
 ----------------------
@@ -71,24 +71,24 @@ From source
 
 The latest stable release of dolfin-adjoint and libadjoint is **version 1.6** which is compatible with FEniCS 1.6. Download links:
 
-* libadjoint: `https://bitbucket.org/dolfin-adjoint/libadjoint/get/libadjoint-1.6.zip`_
-* dolfin-adjoint: `https://bitbucket.org/dolfin-adjoint/dolfin-adjoint/get/dolfin-adjoint-1.6.zip`_
+* libadjoint:
 
-.. _https://bitbucket.org/dolfin-adjoint/libadjoint/get/libadjoint-1.6.zip: https://bitbucket.org/dolfin-adjoint/libadjoint/get/libadjoint-1.6.zip
-.. _https://bitbucket.org/dolfin-adjoint/dolfin-adjoint/get/dolfin-adjoint-1.6.zip: https://bitbucket.org/dolfin-adjoint/dolfin-adjoint/get/dolfin-adjoint-1.6.zip
+.. code-block:: bash
 
-The development version is available from `bitbucket`_ with the following
+   git clone -b dolfin-adjoint-1.6 https://bitbucket.org/dolfin-adjoint/dolfin-adjoint
+
+* dolfin-adjoint:
+
+.. code-block:: bash
+
+   git clone -b libadjoint-1.6 https://bitbucket.org/dolfin-adjoint/libadjoint
+
+The **development version** is available with the following
 command:
 
 .. code-block:: bash
 
    git clone https://bitbucket.org/dolfin-adjoint/dolfin-adjoint
-
-The development version of libadjoint is also available from bitbucket with the
-following command:
-
-.. code-block:: bash
-
    hg clone https://bitbucket.org/dolfin-adjoint/libadjoint
 
 As dolfin-adjoint is a pure Python module, once its dependencies are
@@ -99,23 +99,25 @@ installation via
 
    export PYTHONPATH=<path to dolfin-adjoint>:$PYTHONPATH
 
-Contributions (such as handling new features of dolfin, or new test
-cases or examples) are very welcome.
+libadjoint needs to be compiled with:
 
-.. _bitbucket: https://bitbucket.org/dolfin-adjoint/dolfin-adjoint
+.. code-block:: bash
+
+   cd libadjoint
+   mkdir build; cd build
+   cmake ..
+   make install
+
+
+Contributions (such as handling new features of FEniCS, or new test
+cases or examples) are very welcome.
 
 Older versions
 ==============
 
 An older version, that is compatible with FEniCS 1.5 can be downloaded with:
 
-* libadjoint: `https://bitbucket.org/dolfin-adjoint/libadjoint/downloads/libadjoint-1.5.tar.gz`_
-* dolfin-adjoint: `https://bitbucket.org/dolfin-adjoint/dolfin-adjoint/downloads/dolfin-adjoint-1.5.tar.gz`_
+.. code-block:: bash
 
-An older version, that is compatible with FEniCS 1.4 can be downloaded with:
-
-* libadjoint: `https://bitbucket.org/dolfin-adjoint/libadjoint/downloads/libadjoint-1.4.tar.gz`_
-* dolfin-adjoint: `https://bitbucket.org/dolfin-adjoint/dolfin-adjoint/downloads/dolfin-adjoint-1.4.tar.gz`_
-
-.. _https://bitbucket.org/dolfin-adjoint/libadjoint/downloads/libadjoint-1.4.tar.gz: https://bitbucket.org/dolfin-adjoint/libadjoint/downloads/libadjoint-1.4.tar.gz
-.. _https://bitbucket.org/dolfin-adjoint/dolfin-adjoint/downloads/dolfin-adjoint-1.4.tar.gz: https://bitbucket.org/dolfin-adjoint/dolfin-adjoint/downloads/dolfin-adjoint-1.4.tar.gz
+   git clone -b dolfin-adjoint-1.5 https://bitbucket.org/dolfin-adjoint/dolfin-adjoint
+   git clone -b libadjoint-1.5 https://bitbucket.org/dolfin-adjoint/libadjoint
