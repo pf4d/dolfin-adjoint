@@ -36,7 +36,7 @@ Virtual machine
 ===============
 
 If you'd like to try dolfin-adjoint out without any installation headaches,
-try out `the FENICS VirtualBox virtual machine with FEniCS and dolfin-adjoint 1.4 pre-installed
+try out `the FENICS VirtualBox virtual machine with FEniCS and dolfin-adjoint pre-installed
 <http://fenicsproject.org/pub/virtual/fenics-latest.ova>`_. Here are
 the instructions:
 
