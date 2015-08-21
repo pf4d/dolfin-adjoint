@@ -36,7 +36,7 @@ Virtual machine
 ===============
 
 If you'd like to try dolfin-adjoint out without any installation headaches,
-try out `the FENICS VirtualBox virtual machine with FEniCS and dolfin-adjoint pre-installed
+try out `the FENICS VirtualBox virtual machine with FEniCS and dolfin-adjoint 1.4 pre-installed
 <http://fenicsproject.org/pub/virtual/fenics-latest.ova>`_. Here are
 the instructions:
 
@@ -75,21 +75,21 @@ The latest stable release of dolfin-adjoint and libadjoint is **version 1.6** wh
 
 .. code-block:: bash
 
-   git clone -b dolfin-adjoint-1.6 https://bitbucket.org/dolfin-adjoint/dolfin-adjoint
+   git clone -b libadjoint-1.6 https://bitbucket.org/dolfin-adjoint/libadjoint
 
 * dolfin-adjoint:
 
 .. code-block:: bash
 
-   git clone -b libadjoint-1.6 https://bitbucket.org/dolfin-adjoint/libadjoint
+   git clone -b dolfin-adjoint-1.6 https://bitbucket.org/dolfin-adjoint/dolfin-adjoint
 
 The **development version** is available with the following
 command:
 
 .. code-block:: bash
 
+   git clone https://bitbucket.org/dolfin-adjoint/libadjoint
    git clone https://bitbucket.org/dolfin-adjoint/dolfin-adjoint
-   hg clone https://bitbucket.org/dolfin-adjoint/libadjoint
 
 As dolfin-adjoint is a pure Python module, once its dependencies are
 installed the development version can be used without system-wide
@@ -105,7 +105,7 @@ libadjoint needs to be compiled with:
 
    cd libadjoint
    mkdir build; cd build
-   cmake ..
+   cmake -DCMAKE_INSTALL_PREFIX=<install directory> ..
    make install
 
 
@@ -115,7 +115,7 @@ cases or examples) are very welcome.
 Older versions
 ==============
 
-An older version, that is compatible with FEniCS 1.5 can be downloaded with:
+An older version compatible with FEniCS 1.5 can be downloaded with:
 
 .. code-block:: bash
 
