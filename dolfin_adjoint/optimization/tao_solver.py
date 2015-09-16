@@ -247,9 +247,9 @@ class TAOSolver(OptimizationSolver):
         self.tao.setOptionsPrefix(self.prefix)
         self.tao.setFromOptions()
 
-        def default_monitor(tao):
-            info_blue("Iteration: %3d\tFunctional value: %15.15e\tGradient norm: %15.15e" % (tao.its, tao.objective, tao.gnorm))
-        self.tao.setMonitor(default_monitor)
+        #def default_monitor(tao):
+        #    info_blue("Iteration: %3d\tFunctional value: %15.15e\tGradient norm: %15.15e" % (tao.its, tao.objective, tao.gnorm))
+        #self.tao.setMonitor(default_monitor)
 
         self.tao.setObjectiveGradient(self.__user.objective_and_gradient)
         self.tao.setInitial(self.initial_vec)
