@@ -216,13 +216,17 @@ class TAOSolver(OptimizationSolver):
         OptDB = self.PETSc.Options(prefix=self.prefix + "tao_")
 
         # Some defaults, these will be overridden by user parameters
-        if self.problem.bounds is not None:
-            OptDB.setValue("type", "blmvm")
-        else:
-            OptDB.setValue("type", "lmvm")
-        OptDB.setValue("fatol", 0.0)
-        OptDB.setValue("frtol", 0.0)
-        OptDB.setValue("gatol", 1.0e-9)
+        if "type" not in OptDB:
+            if self.problem.bounds is not None:
+                OptDB.setValue("type", "blmvm")
+            else:
+                OptDB.setValue("type", "lmvm")
+        if "fatol" not in OptDB:
+            OptDB.setValue("fatol", 0.0)
+        if "frtol" not in OptDB:
+            OptDB.setValue("frtol", 0.0)
+        if "gatol" not in OptDB:
+            OptDB.setValue("gatol", 1.0e-9)
 
         if self.parameters is not None:
             for param in self.parameters:
