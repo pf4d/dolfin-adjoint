@@ -24,9 +24,8 @@ mesh = UnitIntervalMesh(1000)
 num_states = state_init.value_size()
 V = VectorFunctionSpace(mesh, "CG", 1, dim=num_states)
 
-def main(u, form, time, Scheme, dt):
+def main(u, form, time, scheme, dt):
 
-    scheme = Scheme(form, u, time)
     scheme.t().assign(float(time))
 
     xs = [float(time)]
@@ -44,7 +43,6 @@ def main(u, form, time, Scheme, dt):
     return (u, xs, ys)
 
 if __name__ == "__main__":
-    Scheme = BackwardEuler
 
     #u = interpolate(state_init, V, name="Solution")
     #u = Function(V, name="Solution")
@@ -57,8 +55,13 @@ if __name__ == "__main__":
     check = False
     plot = False
 
-    dt = 0.1
-    (u, xs, ys) = main(u, form, time, Scheme, dt=dt)
+    def Scheme(form, u, time):
+        return RushLarsenScheme(form, u, time, order=1, generalized=True)
+        return BackwardEuler(form, u, time)
+
+    dt = 0.01
+    scheme = Scheme(form, u, time)
+    (u, xs, ys) = main(u, form, time, scheme, dt=dt)
 
     ## Step 1. Check replay correctness
 
@@ -81,7 +84,8 @@ if __name__ == "__main__":
         time = Constant(0.0)
         form = model.rhs(ic, time, params)*dP
 
-        (u, xs, ys) = main(ic, form, time, Scheme, dt=dt)
+        scheme = Scheme(form, ic, time)
+        (u, xs, ys) = main(ic, form, time, scheme, dt=dt)
         return assemble(inner(u, u)*dx)
 
     dJdm = compute_gradient_tlm(J, m, forget=False)
