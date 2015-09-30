@@ -19,7 +19,7 @@ import fitzhughnagumo as model
 params = model.default_parameters()
 state_init = model.init_values()
 
-mesh = UnitIntervalMesh(1000)
+mesh = UnitIntervalMesh(3)
 #R = FunctionSpace(mesh, "R", 0) # in my opinion, should work, but doesn't
 num_states = state_init.value_size()
 V = VectorFunctionSpace(mesh, "CG", 1, dim=num_states)
@@ -35,7 +35,7 @@ def main(u, form, time, scheme, dt):
     solver.parameters.reset_stage_solutions = True
     solver.parameters.newton_solver.reset_each_step = True
 
-    for i in range(int(0.1/dt)):
+    for i in range(4):
         solver.step(dt)
         xs.append(float(time))
         ys.append(u.vector().array())
@@ -57,6 +57,7 @@ if __name__ == "__main__":
 
     def Scheme(form, u, time):
         return RushLarsenScheme(form, u, time, order=1, generalized=True)
+        return CrankNicolson(form, u, time)
         return BackwardEuler(form, u, time)
 
     dt = 0.01
@@ -77,25 +78,38 @@ if __name__ == "__main__":
 
     dtm = TimeMeasure()
     J = Functional(inner(u, u)*dx*dtm[FINISH_TIME])
-    m = Control(u)
+    param_idx = 0
+    m = Control(params[param_idx])
     Jm = assemble(inner(u, u)*dx)
 
-    def Jhat(ic):
+
+    def Jhat(a_ptb):
+        ic = interpolate(Constant((0.1, -84.9)), V)
+        params_ = list(params)
+        params_[param_idx] = a_ptb
         time = Constant(0.0)
-        form = model.rhs(ic, time, params)*dP
+        form = model.rhs(ic, time, params_)*dP
 
         scheme = Scheme(form, ic, time)
         (u, xs, ys) = main(ic, form, time, scheme, dt=dt)
         return assemble(inner(u, u)*dx)
 
     dJdm = compute_gradient_tlm(J, m, forget=False)
-    minconv_tlm = taylor_test(Jhat, m, Jm, dJdm, \
-                              perturbation_direction=interpolate(Constant((0.1,)*num_states), V), seed=1.0e-1)
+    minconv_tlm = taylor_test(Jhat, m, Jm, dJdm, seed=1.0e1)
     assert minconv_tlm > 1.8
 
     ## Step 3. Check ADM correctness
 
     dJdm = compute_gradient(J, m, forget=False)
-    minconv_adm = taylor_test(Jhat, m, Jm, dJdm, \
-                              perturbation_direction=interpolate(Constant((0.1,)*num_states), V), seed=1.0e-1)
+    print "param: ", float(params[param_idx])
+    print "dJdm: ", float(dJdm)
+##    #dJdm = Constant(float(dJdm) * dt)
+    ptb   = 0.0001*float(params[param_idx])
+    a_ptb = Constant(float(params[param_idx]) + ptb)
+    J_base  = Jhat(params[param_idx])
+    J_ptb   = Jhat(a_ptb)
+    dJdm_fd = (J_ptb - J_base)/ptb
+    print "dJdm_fd: ", dJdm_fd
+
+    minconv_adm = taylor_test(Jhat, m, Jm, dJdm, seed=1.0e1)
     assert minconv_adm > 1.8
