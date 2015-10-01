@@ -29,11 +29,11 @@ class PETScKrylovSolver(dolfin.PETScKrylovSolver):
         self.operators = (A, P)
 
     def set_nullspace(self, nsp):
-        dolfin.PETScKrylovSolver.set_nullspace(self, nsp)
+        A = self.operators[0]
+        dolfin.as_backend_type(A).set_nullspace(nsp)
         self.nsp = nsp
 
     def set_transpose_nullspace(self, tnsp):
-        if hasattr(dolfin.PETScKrylovSolver, 'set_transpose_nullspace'): dolfin.PETScKrylovSolver.set_transpose_nullspace(self, tnsp)
         self.tnsp = tnsp
 
     def set_operator(self, A):
@@ -142,15 +142,9 @@ class PETScKrylovSolver(dolfin.PETScKrylovSolver):
                     solver.parameters.update(parameters)
 
                     if self.adjoint:
-                        # swap nullspaces
                         (nsp_, tnsp_) = (tnsp, nsp)
                     else:
                         (nsp_, tnsp_) = (nsp, tnsp)
-
-                    if nsp_ is not None:
-                        solver.set_nullspace(nsp_)
-                    if tnsp_ is not None and hasattr(solver, 'set_transpose_nullspace'):
-                        solver.set_transpose_nullspace(tnsp_)
 
                     x = dolfin.Function(fn_space)
                     if self.initial_guess is not None and var.type == 'ADJ_FORWARD':
@@ -209,6 +203,12 @@ class PETScKrylovSolver(dolfin.PETScKrylovSolver):
                                 else:
                                     solver.set_operator(A)
 
+                    # Set the nullspace for the linear operator
+                    if nsp_ is not None and need_to_set_operator:
+                        dolfin.as_backend_type(A).set_nullspace(nsp_)
+
+                    # (Possibly override the user in) orthogonalize
+                    # the right-hand-side
                     if tnsp_ is not None:
                         tnsp_.orthogonalize(rhs)
 
