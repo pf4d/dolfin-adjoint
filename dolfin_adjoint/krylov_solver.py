@@ -7,6 +7,9 @@ import adjglobals
 import misc
 import utils
 
+krylov_solvers = []
+adj_krylov_solvers = []
+
 class KrylovSolver(dolfin.KrylovSolver):
     '''This object is overloaded so that solves using this class are automatically annotated,
     so that libadjoint can automatically derive the adjoint and tangent linear models.'''
@@ -15,6 +18,7 @@ class KrylovSolver(dolfin.KrylovSolver):
         self.solver_parameters = args
         self.nsp = None
         self.tnsp = None
+        self.__global_list_idx__ = None
 
         self.operators = (None, None)
         if len(args) > 0 and isinstance(args[0], dolfin.GenericMatrix):
@@ -90,6 +94,12 @@ class KrylovSolver(dolfin.KrylovSolver):
                 """
                 assert tnsp is not None, msg
 
+            if self.__global_list_idx__ is None:
+                self.__global_list_idx__ = len(krylov_solvers)
+                krylov_solvers.append(self)
+                adj_krylov_solvers.append(None)
+            idx = self.__global_list_idx__
+
             class KrylovSolverMatrix(adjlinalg.Matrix):
                 def __init__(self, *args, **kwargs):
                     if 'initial_guess' in kwargs:
@@ -118,7 +128,17 @@ class KrylovSolver(dolfin.KrylovSolver):
                     else:
                         operators = self.operators
 
-                    solver = dolfin.KrylovSolver(*solver_parameters)
+                    # Fetch/construct the solver
+                    if var.type in ['ADJ_FORWARD', 'ADJ_TLM']:
+                        solver = krylov_solvers[idx]
+                        need_to_set_operator = False
+                    else:
+                        if adj_krylov_solvers[idx] is None:
+                            need_to_set_operator = True
+                            adj_krylov_solvers[idx] = KrylovSolver(*solver_parameters)
+                        else:
+                            need_to_set_operator = False
+                        solver = adj_krylov_solvers[idx]
                     solver.parameters.update(parameters)
 
                     if self.adjoint:
@@ -142,43 +162,46 @@ class KrylovSolver(dolfin.KrylovSolver):
                         rhs = b.data.vector().copy()
                         [bc.apply(rhs) for bc in self.bcs]
 
-                        if assemble_system: # if we called assemble_system, rather than assemble
-                            v = dolfin.TestFunction(fn_space)
-                            (A, rhstmp) = dolfin.assemble_system(operators[0], dolfin.inner(b.data, v)*dolfin.dx, self.bcs)
-                            if has_preconditioner:
-                                (P, rhstmp) = dolfin.assemble_system(operators[1], dolfin.inner(b.data, v)*dolfin.dx, self.bcs)
-                                solver.set_operators(A, P)
-                            else:
-                                solver.set_operator(A)
-                        else: # we called assemble
-                            A = dolfin.assemble(operators[0])
-                            [bc.apply(A) for bc in self.bcs]
-                            if has_preconditioner:
-                                P = dolfin.assemble(operators[1])
-                                [bc.apply(P) for bc in self.bcs]
-                                solver.set_operators(A, P)
-                            else:
-                                solver.set_operator(A)
+                        if need_to_set_operator:
+                            if assemble_system: # if we called assemble_system, rather than assemble
+                                v = dolfin.TestFunction(fn_space)
+                                (A, rhstmp) = dolfin.assemble_system(operators[0], dolfin.inner(b.data, v)*dolfin.dx, self.bcs)
+                                if has_preconditioner:
+                                    (P, rhstmp) = dolfin.assemble_system(operators[1], dolfin.inner(b.data, v)*dolfin.dx, self.bcs)
+                                    solver.set_operators(A, P)
+                                else:
+                                    solver.set_operator(A)
+                            else: # we called assemble
+                                A = dolfin.assemble(operators[0])
+                                [bc.apply(A) for bc in self.bcs]
+                                if has_preconditioner:
+                                    P = dolfin.assemble(operators[1])
+                                    [bc.apply(P) for bc in self.bcs]
+                                    solver.set_operators(A, P)
+                                else:
+                                    solver.set_operator(A)
                     else:
 
                         if assemble_system: # if we called assemble_system, rather than assemble
                             (A, rhs) = dolfin.assemble_system(operators[0], b.data, self.bcs)
-                            if has_preconditioner:
-                                (P, rhstmp) = dolfin.assemble_system(operators[1], b.data, self.bcs)
-                                solver.set_operators(A, P)
-                            else:
-                                solver.set_operator(A)
+                            if need_to_set_operator:
+                                if has_preconditioner:
+                                    (P, rhstmp) = dolfin.assemble_system(operators[1], b.data, self.bcs)
+                                    solver.set_operators(A, P)
+                                else:
+                                    solver.set_operator(A)
                         else: # we called assemble
                             A = dolfin.assemble(operators[0])
                             rhs = dolfin.assemble(b.data)
                             [bc.apply(A) for bc in self.bcs]
                             [bc.apply(rhs) for bc in self.bcs]
-                            if has_preconditioner:
-                                P = dolfin.assemble(operators[1])
-                                [bc.apply(P) for bc in self.bcs]
-                                solver.set_operators(A, P)
-                            else:
-                                solver.set_operator(A)
+                            if need_to_set_operator:
+                                if has_preconditioner:
+                                    P = dolfin.assemble(operators[1])
+                                    [bc.apply(P) for bc in self.bcs]
+                                    solver.set_operators(A, P)
+                                else:
+                                    solver.set_operator(A)
 
                     # Set the nullspace for the linear operator
                     if nsp_ is not None:
