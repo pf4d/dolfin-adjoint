@@ -204,7 +204,7 @@ class KrylovSolver(dolfin.KrylovSolver):
                                     solver.set_operator(A)
 
                     # Set the nullspace for the linear operator
-                    if nsp_ is not None:
+                    if nsp_ is not None and need_to_set_operator:
                         dolfin.as_backend_type(A).set_nullspace(nsp_)
 
                     # (Possibly override the user in) orthogonalize
