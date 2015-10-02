@@ -136,6 +136,12 @@ class PETScKrylovSolver(dolfin.PETScKrylovSolver):
                         if adj_petsc_krylov_solvers[idx] is None:
                             need_to_set_operator = True
                             adj_petsc_krylov_solvers[idx] = PETScKrylovSolver(*solver_parameters)
+                            adj_ksp = adj_petsc_krylov_solvers[idx].ksp()
+                            fwd_ksp = petsc_krylov_solvers[idx].ksp()
+                            adj_ksp.setOptionsPrefix(fwd_ksp.getOptionsPrefix())
+                            adj_ksp.setType(fwd_ksp.getType())
+                            adj_ksp.pc.setType(fwd_ksp.pc.getType())
+                            adj_ksp.setFromOptions()
                         else:
                             need_to_set_operator = False
                         solver = adj_petsc_krylov_solvers[idx]
