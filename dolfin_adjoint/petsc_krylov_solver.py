@@ -145,6 +145,12 @@ class PETScKrylovSolver(dolfin.PETScKrylovSolver):
                         else:
                             need_to_set_operator = False
                         solver = adj_petsc_krylov_solvers[idx]
+                        # FIXME: work around DOLFIN bug #583
+                        try:
+                            solver.parameters.convergence_norm_type
+                        except:
+                            solver.parameters.convergence_norm_type = "preconditioned"
+                        # end FIXME
                     solver.parameters.update(parameters)
 
                     if self.adjoint:
