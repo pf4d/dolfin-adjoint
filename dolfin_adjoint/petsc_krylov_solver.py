@@ -25,6 +25,9 @@ class PETScKrylovSolver(dolfin.PETScKrylovSolver):
             self.operators = (args[0], None)
 
     def set_operators(self, A, P):
+        if self.operators != (None, None):
+            raise libadjoint.exceptions.LibadjointErrorInvalidInputs("Can't set an operator twice (yet)")
+
         dolfin.PETScKrylovSolver.set_operators(self, A, P)
         self.operators = (A, P)
 
@@ -37,6 +40,8 @@ class PETScKrylovSolver(dolfin.PETScKrylovSolver):
         self.tnsp = tnsp
 
     def set_operator(self, A):
+        if self.operators != (None, None):
+            raise libadjoint.exceptions.LibadjointErrorInvalidInputs("Can't set an operator twice (yet)")
         dolfin.PETScKrylovSolver.set_operator(self, A)
         self.operators = (A, self.operators[1])
 
@@ -215,6 +220,9 @@ class PETScKrylovSolver(dolfin.PETScKrylovSolver):
                                 else:
                                     solver.set_operator(A)
 
+                    if need_to_set_operator:
+                        print "|A|: %.6e" % A.norm("frobenius")
+
                     # Set the nullspace for the linear operator
                     if nsp_ is not None and need_to_set_operator:
                         dolfin.as_backend_type(A).set_nullspace(nsp_)
@@ -224,6 +232,7 @@ class PETScKrylovSolver(dolfin.PETScKrylovSolver):
                     if tnsp_ is not None:
                         tnsp_.orthogonalize(rhs)
 
+                    print "%s: |b|: %.6e" % (var, rhs.norm("l2"))
                     solver.solve(x.vector(), rhs)
                     return adjlinalg.Vector(x)
 
