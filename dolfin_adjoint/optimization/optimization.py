@@ -129,7 +129,7 @@ def minimize_scipy_generic(rf_np, method, bounds = None, **kwargs):
 
     rf_np.set_controls(np.array(res["x"]))
     m = [p.data() for p in rf_np.controls]
-    return m
+    return m,res
 
 def minimize_custom(rf_np, bounds=None, **kwargs):
     ''' Interface to the user-provided minimisation method '''
@@ -221,10 +221,10 @@ def minimize(rf, method='L-BFGS-B', scale=1.0, **kwargs):
         # For scipy's generic inteface we need to pass the optimisation method as a parameter.
         kwargs["method"] = method
 
-    opt = algorithm(rf_np, **kwargs)
+    opt,res = algorithm(rf_np, **kwargs)
 
     if len(opt) == 1:
-        return opt[0]
+        return opt[0], res
     else:
         return opt
 
